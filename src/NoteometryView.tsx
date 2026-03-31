@@ -67,9 +67,26 @@ function NoteometryApp({ plugin }: { plugin: any }) {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Toolbar mode={mode} setMode={setMode} onReadInk={handleReadInk} onSolve={handleSolve} />
-      <div style={{ flex: 1 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+      <div style={{
+        background: "#000",
+        color: "#0f0",
+        padding: "10px 20px",
+        fontSize: "22px",
+        fontWeight: 900,
+        textAlign: "center",
+        letterSpacing: "6px",
+        borderBottom: "4px solid #0f0",
+        position: "relative",
+        zIndex: 10,
+        flexShrink: 0,
+      }}>
+        NOTEOMETRY
+      </div>
+      <div style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
+        <Toolbar mode={mode} setMode={setMode} onReadInk={handleReadInk} onSolve={handleSolve} />
+      </div>
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <Excalidraw
           excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
           initialData={{
