@@ -1,16 +1,19 @@
 import React from "react";
 
-const MathPalette: React.FC<{ onInsert: (symbol: string) => void }> = ({ onInsert }) => {
-  const symbols = ["∫", "∑", "√", "∞", "π", "±", "∂", "Δ", "≈", "≠", "≤", "≥", "×", "÷"];
+const SYMBOLS = [
+  "∫", "∑", "√", "∞", "π", "±", "∂",
+  "Δ", "≈", "≠", "≤", "≥", "×", "÷",
+  "α", "β", "γ", "θ", "ω", "Ω", "μ",
+];
+
+export default function MathPalette({ onInsert }: { onInsert: (s: string) => void }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "4px", padding: "8px", background: "#222" }}>
-      {symbols.map((s) => (
-        <button key={s} onClick={() => onInsert(s)} style={{ padding: "8px", fontSize: "18px", background: "#333", color: "#fff", border: "none" }}>
+    <div className="noteometry-palette noteometry-palette-math">
+      {SYMBOLS.map((s) => (
+        <button key={s} onClick={() => onInsert(s)} title={s}>
           {s}
         </button>
       ))}
     </div>
   );
-};
-
-export default MathPalette;
+}
