@@ -1,0 +1,10 @@
+{
+  "id": "noteometry",
+  "name": "Noteometry",
+  "version": "1.0.1",
+  "minAppVersion": "1.0.0",
+  "description": "Ink-first STEM notebook. Pencil + eraser + Math & Circuit Sniper + Gemini AI. Powered by Excalidraw.",
+  "author": "Dan",
+  "authorUrl": "https://github.com/danthemadhatter",
+  "isDesktopOnly": false
+}
