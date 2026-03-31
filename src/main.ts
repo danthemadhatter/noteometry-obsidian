@@ -33,8 +33,10 @@ export default class NoteometryPlugin extends Plugin {
     const { workspace } = this.app;
     let leaf = workspace.getLeavesOfType("noteometry-view")[0];
     if (!leaf) {
-      leaf = workspace.getRightLeaf(false);
-      await leaf.setViewState({ type: "noteometry-view" });
+      const newLeaf = workspace.getRightLeaf(false);
+      if (!newLeaf) return;
+      await newLeaf.setViewState({ type: "noteometry-view" });
+      leaf = newLeaf;
     }
     workspace.revealLeaf(leaf);
   }

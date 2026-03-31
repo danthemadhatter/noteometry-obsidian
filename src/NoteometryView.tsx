@@ -20,7 +20,8 @@ export class NoteometryView extends ItemView {
   getIcon() { return "pencil"; }
 
   async onOpen() {
-    const container = this.containerEl.children[1];
+    const container = this.containerEl.children[1] as HTMLElement | undefined;
+    if (!container) return;
     container.empty();
     this.root = createRoot(container);
     this.root.render(<NoteometryApp plugin={this.plugin} />);
@@ -49,6 +50,7 @@ function NoteometryApp({ plugin }: { plugin: any }) {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = (reader.result as string).split(",")[1];
+        if (!base64) return;
         const latex = await readInkFromImage(base64, apiKey);
         alert("✅ READ INK SUCCESS!\n\nLaTeX returned:\n" + latex + "\n\n(Paste into canvas as text element next update)");
         console.log("Gemini 3.1 Pro Preview LaTeX:", latex);
@@ -69,16 +71,14 @@ function NoteometryApp({ plugin }: { plugin: any }) {
       <Toolbar mode={mode} setMode={setMode} onReadInk={handleReadInk} onSolve={handleSolve} />
       <div style={{ flex: 1 }}>
         <Excalidraw
-          ref={(api) => setExcalidrawAPI(api)}
+          excalidrawAPI={(api: any) => setExcalidrawAPI(api)}
           initialData={{
             elements: [],
             appState: { zenModeEnabled: true, viewModeEnabled: false },
           }}
           onChange={() => {}}
-          options={{
-            zenModeEnabled: true,
-            gridModeEnabled: mode === "circuits",
-          }}
+          zenModeEnabled={true}
+          gridModeEnabled={mode === "circuits"}
         />
       </div>
     </div>
