@@ -1,128 +1,83 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { App } from "obsidian";
-import { NoteometryMode } from "../types";
-import MathPalette from "./MathPalette";
-import CircuitPalette from "./CircuitPalette";
 import MarkdownPreview from "./MarkdownPreview";
+import SolutionRenderer from "./SolutionRenderer";
 
 interface Props {
-  mode: NoteometryMode;
-  inputRaw: string;
-  setInputRaw: (v: string) => void;
-  outputRaw: string;
-  loading: boolean;
-  error: string | null;
-  onReadInk: () => void;
-  onSolve: () => void;
-  onInsertSymbol: (s: string) => void;
+  inputCode: string;
+  setInputCode: (v: string) => void;
+  outputCode: string;
+  isSolving: boolean;
   app: App;
 }
 
 export default function Panel({
-  mode,
-  inputRaw,
-  setInputRaw,
-  outputRaw,
-  loading,
-  error,
-  onReadInk,
-  onSolve,
-  onInsertSymbol,
-  app,
+  inputCode, setInputCode, outputCode, isSolving, app,
 }: Props) {
-  // Debounce input for the rendered preview so we don't thrash Obsidian's
-  // markdown renderer on every keystroke.
-  const [previewInput, setPreviewInput] = useState(inputRaw);
-  useEffect(() => {
-    const t = window.setTimeout(() => setPreviewInput(inputRaw), 350);
-    return () => window.clearTimeout(t);
-  }, [inputRaw]);
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {
-      /* silently fail in restricted contexts */
-    });
-  };
-
   return (
     <div className="noteometry-panel">
-      {/* ── Input ───────────────────────────────── */}
-      <div className="noteometry-section">
-        <div className="noteometry-section-hdr">
-          <span>Input</span>
+      {/* Box 1: Input — Rendered */}
+      <div className="noteometry-panel-box">
+        <div className="noteometry-panel-box-hdr">
+          <span>Input — Rendered</span>
+        </div>
+        <div className="noteometry-panel-box-content">
+          {inputCode.trim()
+            ? <MarkdownPreview content={inputCode} app={app} />
+            : <div className="noteometry-placeholder">Lasso ink to populate</div>}
+        </div>
+      </div>
+
+      {/* Box 2: Input — Code */}
+      <div className="noteometry-panel-box">
+        <div className="noteometry-panel-box-hdr">
+          <span>Input — Code</span>
           <button
-            className="noteometry-btn-icon"
-            onClick={() => setInputRaw("")}
-            title="Clear"
+            className="noteometry-panel-box-action noteometry-panel-box-action-danger"
+            onClick={() => setInputCode("")}
           >
-            ✕
+            Clear
           </button>
         </div>
-
         <textarea
-          className="noteometry-textarea"
-          value={inputRaw}
-          onChange={(e) => setInputRaw(e.target.value)}
-          placeholder="Write LaTeX here, or use READ INK to capture from canvas…"
-          rows={4}
+          className="noteometry-panel-textarea"
+          value={inputCode}
+          onChange={(e) => setInputCode(e.target.value)}
+          placeholder="LaTeX / plain math / text — editable"
         />
-
-        {previewInput && (
-          <div className="noteometry-preview">
-            <MarkdownPreview content={previewInput} app={app} />
-          </div>
-        )}
       </div>
 
-      {/* ── Palette ─────────────────────────────── */}
-      {mode === "math" && <MathPalette onInsert={onInsertSymbol} />}
-      {mode === "circuits" && <CircuitPalette onInsert={onInsertSymbol} />}
-
-      {/* ── Actions ─────────────────────────────── */}
-      <div className="noteometry-actions">
-        <button
-          className="noteometry-btn noteometry-btn-readink"
-          onClick={onReadInk}
-          disabled={loading}
-        >
-          {loading ? "⏳" : "📸"} READ INK
-        </button>
-        <button
-          className="noteometry-btn noteometry-btn-solve"
-          onClick={onSolve}
-          disabled={loading || !inputRaw.trim()}
-        >
-          {loading ? "⏳" : "🧠"} SOLVE
-        </button>
-      </div>
-
-      {/* ── Error ───────────────────────────────── */}
-      {error && <div className="noteometry-error">{error}</div>}
-
-      {/* ── Output ──────────────────────────────── */}
-      {outputRaw && (
-        <div className="noteometry-section">
-          <div className="noteometry-section-hdr">
-            <span>Output</span>
+      {/* Box 3: Output — Rendered */}
+      <div className="noteometry-panel-box">
+        <div className="noteometry-panel-box-hdr">
+          <span>Output — Rendered</span>
+          {outputCode && (
             <button
-              className="noteometry-btn-icon"
-              onClick={() => copyToClipboard(outputRaw)}
-              title="Copy raw output"
+              className="noteometry-panel-box-action noteometry-panel-box-action-copy"
+              onClick={() => navigator.clipboard.writeText(outputCode).catch(() => {})}
             >
-              📋
+              Copy
             </button>
-          </div>
-
-          <div className="noteometry-preview noteometry-output-rendered">
-            <MarkdownPreview content={outputRaw} app={app} />
-          </div>
-
-          <details className="noteometry-raw-toggle">
-            <summary>Raw LaTeX</summary>
-            <pre className="noteometry-raw-block">{outputRaw}</pre>
-          </details>
+          )}
         </div>
-      )}
+        <div className="noteometry-panel-box-content">
+          {isSolving
+            ? <div className="noteometry-placeholder noteometry-pulse">DLP v12 solving…</div>
+            : outputCode.trim()
+              ? <SolutionRenderer raw={outputCode} app={app} />
+              : <div className="noteometry-placeholder">Solution appears here</div>}
+        </div>
+      </div>
+
+      {/* Box 4: Output — Raw LaTeX */}
+      <div className="noteometry-panel-box">
+        <div className="noteometry-panel-box-hdr">
+          <span>Output — Raw LaTeX</span>
+        </div>
+        <pre className="noteometry-panel-raw">
+          {outputCode || <span className="noteometry-placeholder">Raw LaTeX output</span>}
+        </pre>
+      </div>
     </div>
   );
 }

@@ -6,10 +6,35 @@ export interface NoteometrySettings {
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
-  geminiApiKey: "",
+  geminiApiKey: "***REMOVED***",
   geminiModel: "gemini-3.1-pro-preview",
   autoSave: true,
   autoSaveDelay: 2000,
 };
 
-export type NoteometryMode = "text" | "math" | "circuits";
+export interface Point {
+  x: number;
+  y: number;
+  pressure?: number;
+}
+
+export interface Stroke {
+  id: string;
+  points: Point[];
+  color: string;
+  width: number;
+  tool: "pen" | "lasso";
+}
+
+export type Tool = "pen" | "eraser" | "lasso";
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface Attachment {
+  name: string;
+  mimeType: string;
+  data: string;
+}

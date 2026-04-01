@@ -1,11 +1,11 @@
 import type NoteometryPlugin from "../main";
+import type { Stroke, ChatMessage } from "../types";
 
 export interface CanvasData {
-  elements: unknown[];
-  appState: Record<string, unknown>;
+  strokes: Stroke[];
   panelInput: string;
   panelOutput: string;
-  panelMode: string;
+  chatMessages: ChatMessage[];
   lastSaved: string;
 }
 
@@ -38,7 +38,18 @@ export async function loadCanvas(
     const path = canvasPath(plugin);
     if (await plugin.app.vault.adapter.exists(path)) {
       const raw = await plugin.app.vault.adapter.read(path);
-      return JSON.parse(raw) as CanvasData;
+      const parsed = JSON.parse(raw);
+      // Migration: old Excalidraw format → return empty state
+      if (parsed.elements && !parsed.strokes) {
+        return {
+          strokes: [],
+          panelInput: parsed.panelInput ?? "",
+          panelOutput: parsed.panelOutput ?? "",
+          chatMessages: [],
+          lastSaved: "",
+        };
+      }
+      return parsed as CanvasData;
     }
   } catch (e) {
     console.error("[Noteometry] load failed:", e);
