@@ -45,8 +45,7 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
     <div className="noteometry-chat">
       {/* Header */}
       <div className="noteometry-chat-header">
-        <span className="noteometry-chat-title">Gemini Chat</span>
-        <span className="noteometry-chat-model">3.1 Pro Preview</span>
+        <span className="noteometry-chat-title">AI Assistant</span>
       </div>
 
       {/* Messages */}
@@ -112,7 +111,7 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
               send();
             }
           }}
-          placeholder="Ask Gemini… (Enter to send, Shift+Enter for newline)"
+          placeholder="Ask a question... (Enter to send)"
           rows={2}
         />
         <button

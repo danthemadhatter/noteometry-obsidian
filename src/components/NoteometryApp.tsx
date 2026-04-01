@@ -268,6 +268,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
         currentStrokeRef.current.points.push(lp[0]);
         lp.push(lp[0]);
       }
+      undoStackRef.current.push([...strokesRef.current]);
+      redoStackRef.current = [];
       strokesRef.current.push(currentStrokeRef.current);
       currentStrokeRef.current = null;
       isDrawingRef.current = false;
@@ -443,6 +445,27 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setChatLoading(false);
   };
 
+  /* ── Chat resize ───────────────────────────────────────── */
+  const [chatHeight, setChatHeight] = useState(220);
+  const chatDragging = useRef(false);
+  const chatLastY = useRef(0);
+  const handleChatResizeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    chatDragging.current = true;
+    chatLastY.current = e.clientY;
+  };
+  const handleChatResizeMove = (e: React.PointerEvent) => {
+    if (!chatDragging.current) return;
+    const dy = e.clientY - chatLastY.current;
+    chatLastY.current = e.clientY;
+    setChatHeight((h) => Math.max(80, Math.min(500, h - dy)));
+  };
+  const handleChatResizeUp = (e: React.PointerEvent) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    chatDragging.current = false;
+  };
+
   /* ── EE Symbol insertion ──────────────────────────────── */
   const handleInsertSymbol = (sym: string) => {
     setInputCode((prev) => prev + sym);
@@ -508,12 +531,20 @@ export default function NoteometryApp({ plugin, app }: Props) {
               app={app}
               onInsertSymbol={handleInsertSymbol}
             />
-            <ChatPanel
-              messages={chatMessages}
-              onSend={handleSendChat}
-              loading={chatLoading}
-              app={app}
+            <div
+              className="noteometry-resize-handle"
+              onPointerDown={handleChatResizeDown}
+              onPointerMove={handleChatResizeMove}
+              onPointerUp={handleChatResizeUp}
             />
+            <div style={{ height: chatHeight, flexShrink: 0 }}>
+              <ChatPanel
+                messages={chatMessages}
+                onSend={handleSendChat}
+                loading={chatLoading}
+                app={app}
+              />
+            </div>
           </div>
         )}
       </div>

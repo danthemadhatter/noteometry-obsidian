@@ -23,24 +23,10 @@ export default class NoteometryPlugin extends Plugin {
       callback: () => this.activateView(),
     });
 
-    // On layout ready, auto-open Noteometry into any empty leaf
+    // On layout ready, auto-open Noteometry and kill empty tabs
     this.app.workspace.onLayoutReady(() => {
-      const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE);
-      if (existing.length > 0) {
-        // Already open — just clean up empties
-        this.cleanupEmptyLeaves();
-        return;
-      }
-      // Find the empty "New tab" leaf and convert it to Noteometry
-      let emptyLeaf: WorkspaceLeaf | null = null;
-      this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
-        if (!emptyLeaf && leaf.view.getViewType() === "empty") {
-          emptyLeaf = leaf;
-        }
-      });
-      if (emptyLeaf) {
-        (emptyLeaf as WorkspaceLeaf).setViewState({ type: VIEW_TYPE, active: true });
-      }
+      // Delay to let Obsidian finish restoring workspace
+      setTimeout(() => this.ensureNoteometryOnly(), 300);
     });
   }
 
@@ -61,17 +47,36 @@ export default class NoteometryPlugin extends Plugin {
       leaf = target;
     }
     workspace.revealLeaf(leaf);
-    this.cleanupEmptyLeaves();
+    // Kill leftover empties after a tick
+    setTimeout(() => this.ensureNoteometryOnly(), 100);
   }
 
-  private cleanupEmptyLeaves() {
-    const leaves: WorkspaceLeaf[] = [];
-    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+  /** Make sure Noteometry is the only thing in the main area */
+  private async ensureNoteometryOnly() {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(VIEW_TYPE);
+
+    if (existing.length === 0) {
+      // No Noteometry leaf — find an empty one and convert it
+      let emptyLeaf: WorkspaceLeaf | null = null;
+      workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+        if (!emptyLeaf && leaf.view.getViewType() === "empty") {
+          emptyLeaf = leaf;
+        }
+      });
+      if (emptyLeaf) {
+        await (emptyLeaf as WorkspaceLeaf).setViewState({ type: VIEW_TYPE, active: true });
+      }
+    }
+
+    // Now kill ALL remaining empty leaves
+    const empties: WorkspaceLeaf[] = [];
+    workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (leaf.view.getViewType() === "empty") {
-        leaves.push(leaf);
+        empties.push(leaf);
       }
     });
-    for (const leaf of leaves) {
+    for (const leaf of empties) {
       leaf.detach();
     }
   }

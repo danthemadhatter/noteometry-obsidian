@@ -12,7 +12,6 @@ interface Props {
   onInsertSymbol: (sym: string) => void;
 }
 
-/** Ensure LaTeX content has $ delimiters so Obsidian renders it as math */
 function ensureMathDelimiters(text: string): string {
   const t = text.trim();
   if (!t) return t;
@@ -30,87 +29,85 @@ function ensureMathDelimiters(text: string): string {
   return t;
 }
 
-/* ── EE Symbol groups ─────────────────────────────────── */
-const SYMBOLS: { label: string; items: { sym: string; tip: string }[] }[] = [
+/* ── EE Symbols ────────────────────────────────────────── */
+const SYMBOLS: { label: string; items: { sym: string; display: string }[] }[] = [
   {
-    label: "Math",
+    label: "Calculus",
     items: [
-      { sym: "\\int ", tip: "\u222b" },
-      { sym: "\\sum ", tip: "\u2211" },
-      { sym: "\\frac{}{}", tip: "a/b" },
-      { sym: "\\sqrt{}", tip: "\u221a" },
-      { sym: "\\partial ", tip: "\u2202" },
-      { sym: "\\infty", tip: "\u221e" },
-      { sym: "\\pm ", tip: "\u00b1" },
-      { sym: "\\cdot ", tip: "\u00b7" },
-      { sym: "\\rightarrow ", tip: "\u2192" },
-      { sym: "\\boxed{}", tip: "[ ]" },
+      { sym: "\\int ", display: "\u222b" },
+      { sym: "\\sum ", display: "\u2211" },
+      { sym: "\\frac{}{}", display: "\u00b9/\u2093" },
+      { sym: "\\sqrt{}", display: "\u221a" },
+      { sym: "\\partial ", display: "\u2202" },
+      { sym: "\\lim_{}", display: "lim" },
+      { sym: "\\infty", display: "\u221e" },
+      { sym: "\\rightarrow ", display: "\u2192" },
     ],
   },
   {
     label: "Greek",
     items: [
-      { sym: "\\Omega", tip: "\u03a9" },
-      { sym: "\\mu", tip: "\u03bc" },
-      { sym: "\\pi", tip: "\u03c0" },
-      { sym: "\\theta", tip: "\u03b8" },
-      { sym: "\\omega", tip: "\u03c9" },
-      { sym: "\\phi", tip: "\u03c6" },
-      { sym: "\\Delta ", tip: "\u0394" },
-      { sym: "\\alpha", tip: "\u03b1" },
-      { sym: "\\beta", tip: "\u03b2" },
-      { sym: "\\gamma", tip: "\u03b3" },
-      { sym: "\\lambda", tip: "\u03bb" },
-      { sym: "\\epsilon", tip: "\u03b5" },
+      { sym: "\\alpha", display: "\u03b1" },
+      { sym: "\\beta", display: "\u03b2" },
+      { sym: "\\gamma", display: "\u03b3" },
+      { sym: "\\delta", display: "\u03b4" },
+      { sym: "\\epsilon", display: "\u03b5" },
+      { sym: "\\theta", display: "\u03b8" },
+      { sym: "\\lambda", display: "\u03bb" },
+      { sym: "\\mu", display: "\u03bc" },
+      { sym: "\\pi", display: "\u03c0" },
+      { sym: "\\phi", display: "\u03c6" },
+      { sym: "\\omega", display: "\u03c9" },
+      { sym: "\\Omega", display: "\u03a9" },
+      { sym: "\\Delta ", display: "\u0394" },
     ],
   },
   {
     label: "EE",
     items: [
-      { sym: "\\vec{}", tip: "vec" },
-      { sym: "\\hat{}", tip: "hat" },
-      { sym: "\\nabla ", tip: "\u2207" },
-      { sym: "\\text{ V}", tip: "V" },
-      { sym: "\\text{ A}", tip: "A" },
-      { sym: "\\text{ W}", tip: "W" },
-      { sym: "\\text{ F}", tip: "F" },
-      { sym: "\\text{ H}", tip: "H" },
-      { sym: "\\text{ Hz}", tip: "Hz" },
-      { sym: "\\text{ dB}", tip: "dB" },
-      { sym: "\\text{ k}\\Omega", tip: "k\u03a9" },
-      { sym: "j\\omega", tip: "j\u03c9" },
+      { sym: "j\\omega", display: "j\u03c9" },
+      { sym: "\\vec{}", display: "a\u20d7" },
+      { sym: "\\nabla ", display: "\u2207" },
+      { sym: "\\pm ", display: "\u00b1" },
+      { sym: "\\cdot ", display: "\u00b7" },
+      { sym: "\\times ", display: "\u00d7" },
+      { sym: "\\boxed{}", display: "\u25a1" },
+      { sym: "\\text{ V}", display: "V" },
+      { sym: "\\text{ A}", display: "A" },
+      { sym: "\\text{ W}", display: "W" },
+      { sym: "\\text{ }\\Omega", display: "\u03a9" },
+      { sym: "\\text{ k}\\Omega", display: "k\u03a9" },
+      { sym: "\\text{ F}", display: "F" },
+      { sym: "\\text{ H}", display: "H" },
+      { sym: "\\text{ Hz}", display: "Hz" },
     ],
   },
 ];
 
-/* ── Resize handle between boxes ───────────────────────── */
+/* ── Resize handle ─────────────────────────────────────── */
 function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
   const dragging = useRef(false);
   const lastY = useRef(0);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragging.current = true;
-    lastY.current = e.clientY;
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const dy = e.clientY - lastY.current;
-    lastY.current = e.clientY;
-    onDrag(dy);
-  };
-  const onPointerUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    dragging.current = false;
-  };
-
   return (
     <div
       className="noteometry-resize-handle"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragging.current = true;
+        lastY.current = e.clientY;
+      }}
+      onPointerMove={(e) => {
+        if (!dragging.current) return;
+        const dy = e.clientY - lastY.current;
+        lastY.current = e.clientY;
+        onDrag(dy);
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        dragging.current = false;
+      }}
     />
   );
 }
@@ -118,58 +115,53 @@ function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
 export default function Panel({
   inputCode, setInputCode, outputCode, isSolving, app, onInsertSymbol,
 }: Props) {
-  // Heights as percentages of panel (4 boxes = 25% each default)
-  const [heights, setHeights] = useState([25, 25, 25, 25]);
+  const [heights, setHeights] = useState([30, 30, 40]);
+  const [showRaw, setShowRaw] = useState(false);
 
   const handleResize = useCallback((index: number, dy: number) => {
     setHeights((prev) => {
       const next = [...prev];
-      // Convert dy pixels to rough percentage (assume ~600px panel height)
       const pct = (dy / 6);
       const above = next[index]!;
       const below = next[index + 1]!;
-      const newAbove = Math.max(10, above + pct);
-      const newBelow = Math.max(10, below - pct);
-      next[index] = newAbove;
-      next[index + 1] = newBelow;
+      next[index] = Math.max(15, above + pct);
+      next[index + 1] = Math.max(15, below - pct);
       return next;
     });
   }, []);
 
   return (
     <div className="noteometry-panel">
-      {/* Box 1: Input — Rendered */}
+      {/* Input preview */}
       <div className="noteometry-panel-box" style={{ flex: heights[0] }}>
         <div className="noteometry-panel-box-hdr">
-          <span>Input — Rendered</span>
+          <span>Preview</span>
         </div>
         <div className="noteometry-panel-box-content">
           {inputCode.trim()
             ? <MarkdownPreview content={ensureMathDelimiters(inputCode)} app={app} />
-            : <div className="noteometry-placeholder">Lasso ink or upload image</div>}
+            : <div className="noteometry-placeholder">Write on the canvas, then lasso and READ INK</div>}
         </div>
       </div>
 
       <ResizeHandle onDrag={(dy) => handleResize(0, dy)} />
 
-      {/* Box 2: Input — Code + EE Symbols */}
+      {/* Input editor + symbols */}
       <div className="noteometry-panel-box" style={{ flex: heights[1] }}>
         <div className="noteometry-panel-box-hdr">
-          <span>Input — Code</span>
-          <button
-            className="noteometry-panel-box-action noteometry-panel-box-action-danger"
-            onClick={() => setInputCode("")}
-          >
-            Clear
-          </button>
+          <span>Input</span>
+          {inputCode && (
+            <button className="noteometry-panel-clear" onClick={() => setInputCode("")}>
+              Clear
+            </button>
+          )}
         </div>
         <textarea
           className="noteometry-panel-textarea"
           value={inputCode}
           onChange={(e) => setInputCode(e.target.value)}
-          placeholder="LaTeX / plain math / text — editable"
+          placeholder="Type or paste LaTeX, or use READ INK to scan handwriting..."
         />
-        {/* EE Symbol bar */}
         <div className="noteometry-symbols">
           {SYMBOLS.map((group) => (
             <div key={group.label} className="noteometry-symbol-group">
@@ -182,7 +174,7 @@ export default function Panel({
                     onClick={() => onInsertSymbol(item.sym)}
                     title={item.sym}
                   >
-                    {item.tip}
+                    {item.display}
                   </button>
                 ))}
               </div>
@@ -193,38 +185,38 @@ export default function Panel({
 
       <ResizeHandle onDrag={(dy) => handleResize(1, dy)} />
 
-      {/* Box 3: Output — Rendered */}
+      {/* Solution output */}
       <div className="noteometry-panel-box" style={{ flex: heights[2] }}>
         <div className="noteometry-panel-box-hdr">
-          <span>Output — Rendered</span>
-          {outputCode && (
-            <button
-              className="noteometry-panel-box-action noteometry-panel-box-action-copy"
-              onClick={() => navigator.clipboard.writeText(outputCode).catch(() => {})}
-            >
-              Copy
-            </button>
-          )}
+          <span>Solution</span>
+          <div className="noteometry-panel-box-actions">
+            {outputCode && (
+              <>
+                <button
+                  className="noteometry-panel-action"
+                  onClick={() => setShowRaw(!showRaw)}
+                >
+                  {showRaw ? "Rendered" : "Raw"}
+                </button>
+                <button
+                  className="noteometry-panel-action"
+                  onClick={() => navigator.clipboard.writeText(outputCode).catch(() => {})}
+                >
+                  Copy
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div className="noteometry-panel-box-content">
           {isSolving
-            ? <div className="noteometry-placeholder noteometry-pulse">DLP v12 solving…</div>
+            ? <div className="noteometry-placeholder noteometry-pulse">Solving...</div>
             : outputCode.trim()
-              ? <SolutionRenderer raw={outputCode} app={app} />
-              : <div className="noteometry-placeholder">Solution appears here</div>}
+              ? showRaw
+                ? <pre className="noteometry-panel-raw">{outputCode}</pre>
+                : <SolutionRenderer raw={outputCode} app={app} />
+              : <div className="noteometry-placeholder">Hit SOLVE to get a step-by-step solution</div>}
         </div>
-      </div>
-
-      <ResizeHandle onDrag={(dy) => handleResize(2, dy)} />
-
-      {/* Box 4: Output — Raw LaTeX */}
-      <div className="noteometry-panel-box" style={{ flex: heights[3] }}>
-        <div className="noteometry-panel-box-hdr">
-          <span>Output — Raw LaTeX</span>
-        </div>
-        <pre className="noteometry-panel-raw">
-          {outputCode || <span className="noteometry-placeholder">Raw LaTeX output</span>}
-        </pre>
       </div>
     </div>
   );
