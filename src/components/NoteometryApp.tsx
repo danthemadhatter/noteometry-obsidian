@@ -19,6 +19,9 @@ const PEN_WIDTH = 2.5;
 const PEN_COLOR = "#1a1a1a";
 const LASSO_COLOR = "#3b82f6";
 const MIN_DIST = 1;
+// 1/8" grid at 96 DPI = 12px per minor line, 8 minor = 1" = 96px major
+const GRID_MINOR = 12;
+const GRID_MAJOR = GRID_MINOR * 8;
 
 function uuid(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -35,6 +38,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const currentStrokeRef = useRef<Stroke | null>(null);
   const isDrawingRef = useRef(false);
   const lassoPointsRef = useRef<Point[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Tool state ───────────────────────────────────────── */
   const [activeTool, setActiveTool] = useState<Tool>("pen");
@@ -46,6 +50,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [outputCode, setOutputCode] = useState("");
   const [isReading, setIsReading] = useState(false);
   const [isSolving, setIsSolving] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   /* ── Chat state ───────────────────────────────────────── */
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -55,7 +60,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [ready, setReady] = useState(false);
   const saveTimer = useRef<number>(0);
 
-  // Load saved state on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -72,7 +76,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  // Debounced auto-save
   const doSave = useCallback(() => {
     if (!plugin.settings.autoSave) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -91,25 +94,48 @@ export default function NoteometryApp({ plugin, app }: Props) {
   useEffect(() => { doSave(); }, [inputCode, outputCode, chatMessages]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
-  /* ── Canvas drawing ───────────────────────────────────── */
+  /* ── Graph paper canvas drawing ───────────────────────── */
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width;
+    const h = canvas.height;
 
-    // Grid dots
-    ctx.fillStyle = "#d1d5db";
-    const sp = 20;
-    for (let x = sp; x < canvas.width; x += sp)
-      for (let y = sp; y < canvas.height; y += sp) {
-        ctx.beginPath();
-        ctx.arc(x, y, 0.8, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+
+    // Minor grid lines (1/8")
+    ctx.strokeStyle = "#e8ebe8";
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let x = GRID_MINOR; x < w; x += GRID_MINOR) {
+      if (x % GRID_MAJOR === 0) continue; // skip majors
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, h);
+    }
+    for (let y = GRID_MINOR; y < h; y += GRID_MINOR) {
+      if (y % GRID_MAJOR === 0) continue;
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(w, y + 0.5);
+    }
+    ctx.stroke();
+
+    // Major grid lines (1")
+    ctx.strokeStyle = "#c8ccc8";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let x = GRID_MAJOR; x < w; x += GRID_MAJOR) {
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, h);
+    }
+    for (let y = GRID_MAJOR; y < h; y += GRID_MAJOR) {
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(w, y + 0.5);
+    }
+    ctx.stroke();
 
     for (const s of strokesRef.current) drawStroke(ctx, s);
     if (currentStrokeRef.current) drawStroke(ctx, currentStrokeRef.current);
@@ -161,7 +187,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     ctx.restore();
   }
 
-  // ResizeObserver to keep canvas synced
+  // ResizeObserver — no zoom, just fill container
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -288,7 +314,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
     doSave();
   }, [redraw, doSave]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -358,6 +383,31 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setIsReading(false);
   };
 
+  /* ── Image upload for scan ────────────────────────────── */
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setIsReading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("File read failed"));
+        reader.readAsDataURL(file);
+      });
+      const res = await readInk(dataUrl, plugin.settings.geminiApiKey, plugin.settings.geminiModel);
+      if (res.ok) {
+        setInputCode(res.text);
+      } else {
+        setInputCode(res.error ?? "Image scan failed");
+      }
+    } catch {
+      setInputCode("Image scan failed.");
+    }
+    setIsReading(false);
+  };
+
   /* ── SOLVE ────────────────────────────────────────────── */
   const handleSolve = async () => {
     if (!inputCode.trim()) return;
@@ -393,6 +443,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setChatLoading(false);
   };
 
+  /* ── EE Symbol insertion ──────────────────────────────── */
+  const handleInsertSymbol = (sym: string) => {
+    setInputCode((prev) => prev + sym);
+  };
+
   /* ── Cursor ───────────────────────────────────────────── */
   const cursorClass = activeTool === "pen" ? "cursor-crosshair" : activeTool === "eraser" ? "cursor-cell" : "";
 
@@ -403,50 +458,64 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   return (
     <div className="noteometry-container">
-      <div className="noteometry-split">
-        {/* ── Left: Canvas + Chat ── */}
-        <div className="noteometry-left">
-          <div className="noteometry-canvas-area">
-            <Toolbar
-              activeTool={activeTool}
-              setTool={setTool}
-              onUndo={undo}
-              onRedo={redo}
-              onClear={clearCanvas}
-              onReadInk={handleReadInk}
-              onSolve={handleSolve}
-              isReading={isReading}
-              isSolving={isSolving}
-              hasInput={!!inputCode.trim()}
-            />
-            <div ref={containerRef} className="noteometry-canvas-container">
-              <canvas
-                ref={canvasRef}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                className={`noteometry-canvas ${cursorClass}`}
-              />
-            </div>
-          </div>
+      {/* Hidden image upload input */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="noteometry-hidden"
+      />
 
-          <ChatPanel
-            messages={chatMessages}
-            onSend={handleSendChat}
-            loading={chatLoading}
-            app={app}
+      <div className="noteometry-split">
+        {/* ── Canvas area (full width when panel closed) ── */}
+        <div className="noteometry-canvas-area">
+          <Toolbar
+            activeTool={activeTool}
+            setTool={setTool}
+            onUndo={undo}
+            onRedo={redo}
+            onClear={clearCanvas}
+            onReadInk={handleReadInk}
+            onSolve={handleSolve}
+            onUploadImage={() => imageInputRef.current?.click()}
+            onTogglePanel={() => setPanelOpen(!panelOpen)}
+            isReading={isReading}
+            isSolving={isSolving}
+            hasInput={!!inputCode.trim()}
+            panelOpen={panelOpen}
           />
+          <div ref={containerRef} className="noteometry-canvas-container">
+            <canvas
+              ref={canvasRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              className={`noteometry-canvas ${cursorClass}`}
+            />
+          </div>
         </div>
 
-        {/* ── Right: 4-box panel ── */}
-        <Panel
-          inputCode={inputCode}
-          setInputCode={setInputCode}
-          outputCode={outputCode}
-          isSolving={isSolving}
-          app={app}
-        />
+        {/* ── Right panel (collapsible) ── */}
+        {panelOpen && (
+          <div className="noteometry-right">
+            <Panel
+              inputCode={inputCode}
+              setInputCode={setInputCode}
+              outputCode={outputCode}
+              isSolving={isSolving}
+              app={app}
+              onInsertSymbol={handleInsertSymbol}
+            />
+            <ChatPanel
+              messages={chatMessages}
+              onSend={handleSendChat}
+              loading={chatLoading}
+              app={app}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

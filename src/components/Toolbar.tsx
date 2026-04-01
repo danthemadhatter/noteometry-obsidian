@@ -1,5 +1,5 @@
 import React from "react";
-import { PenTool, Eraser, Lasso, Undo2, Redo2, Trash2, ScanText, Calculator } from "lucide-react";
+import { PenTool, Eraser, Lasso, Undo2, Redo2, Trash2, ScanText, Calculator, ImageUp, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { Tool } from "../types";
 
 interface Props {
@@ -10,21 +10,25 @@ interface Props {
   onClear: () => void;
   onReadInk: () => void;
   onSolve: () => void;
+  onUploadImage: () => void;
+  onTogglePanel: () => void;
   isReading: boolean;
   isSolving: boolean;
   hasInput: boolean;
+  panelOpen: boolean;
 }
 
 export default function Toolbar({
   activeTool, setTool,
   onUndo, onRedo, onClear,
-  onReadInk, onSolve,
-  isReading, isSolving, hasInput,
+  onReadInk, onSolve, onUploadImage, onTogglePanel,
+  isReading, isSolving, hasInput, panelOpen,
 }: Props) {
   const toolBtn = (tool: Tool, Icon: typeof PenTool) => (
     <button
       className={`noteometry-tb-btn ${activeTool === tool ? "active" : ""}`}
       onClick={() => setTool(tool)}
+      title={tool.charAt(0).toUpperCase() + tool.slice(1)}
     >
       <Icon size={18} />
     </button>
@@ -39,11 +43,20 @@ export default function Toolbar({
 
         <div className="noteometry-tb-sep" />
 
-        <button className="noteometry-tb-btn" onClick={onUndo}><Undo2 size={18} /></button>
-        <button className="noteometry-tb-btn" onClick={onRedo}><Redo2 size={18} /></button>
-        <button className="noteometry-tb-btn noteometry-tb-btn-danger" onClick={onClear}><Trash2 size={18} /></button>
+        <button className="noteometry-tb-btn" onClick={onUndo} title="Undo"><Undo2 size={18} /></button>
+        <button className="noteometry-tb-btn" onClick={onRedo} title="Redo"><Redo2 size={18} /></button>
+        <button className="noteometry-tb-btn noteometry-tb-btn-danger" onClick={onClear} title="Clear"><Trash2 size={18} /></button>
 
         <div className="noteometry-tb-sep" />
+
+        <button
+          className="noteometry-tb-btn"
+          onClick={onUploadImage}
+          disabled={isReading}
+          title="Upload image to scan"
+        >
+          <ImageUp size={18} />
+        </button>
 
         <button
           className="noteometry-tb-action noteometry-tb-readink"
@@ -61,6 +74,16 @@ export default function Toolbar({
         >
           <Calculator size={15} />
           {isSolving ? "Solving\u2026" : "SOLVE"}
+        </button>
+
+        <div className="noteometry-tb-sep" />
+
+        <button
+          className="noteometry-tb-btn"
+          onClick={onTogglePanel}
+          title={panelOpen ? "Close panel" : "Open panel"}
+        >
+          {panelOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
         </button>
       </div>
     </div>
