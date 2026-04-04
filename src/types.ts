@@ -6,7 +6,7 @@ export interface NoteometrySettings {
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
-  geminiApiKey: "***REMOVED***",
+  geminiApiKey: "",
   geminiModel: "gemini-3.1-pro-preview",
   autoSave: true,
   autoSaveDelay: 2000,
