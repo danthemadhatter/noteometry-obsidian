@@ -1,5 +1,5 @@
 import React from "react";
-import { PenTool, Eraser, Lasso, Undo2, Redo2, Trash2, ScanText, Calculator, ImageUp, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PenTool, Eraser, Lasso, Hand, Type, Undo2, Redo2, Trash2, ScanText, ImageUp, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { Tool } from "../types";
 
 interface Props {
@@ -9,20 +9,17 @@ interface Props {
   onRedo: () => void;
   onClear: () => void;
   onReadInk: () => void;
-  onSolve: () => void;
   onUploadImage: () => void;
   onTogglePanel: () => void;
   isReading: boolean;
-  isSolving: boolean;
-  hasInput: boolean;
   panelOpen: boolean;
 }
 
 export default function Toolbar({
   activeTool, setTool,
   onUndo, onRedo, onClear,
-  onReadInk, onSolve, onUploadImage, onTogglePanel,
-  isReading, isSolving, hasInput, panelOpen,
+  onReadInk, onUploadImage, onTogglePanel,
+  isReading, panelOpen,
 }: Props) {
   const toolBtn = (tool: Tool, Icon: typeof PenTool) => (
     <button
@@ -40,6 +37,8 @@ export default function Toolbar({
         {toolBtn("pen", PenTool)}
         {toolBtn("eraser", Eraser)}
         {toolBtn("lasso", Lasso)}
+        {toolBtn("grab", Hand)}
+        {toolBtn("text", Type)}
 
         <div className="noteometry-tb-sep" />
 
@@ -61,19 +60,10 @@ export default function Toolbar({
         <button
           className="noteometry-tb-action noteometry-tb-readink"
           onClick={onReadInk}
-          disabled={isReading || isSolving}
+          disabled={isReading}
         >
           <ScanText size={15} />
           {isReading ? "Reading\u2026" : "READ INK"}
-        </button>
-
-        <button
-          className="noteometry-tb-action noteometry-tb-solve"
-          onClick={onSolve}
-          disabled={isSolving || isReading || !hasInput}
-        >
-          <Calculator size={15} />
-          {isSolving ? "Solving\u2026" : "SOLVE"}
         </button>
 
         <div className="noteometry-tb-sep" />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, X } from "lucide-react";
+import { Send, Paperclip, X, RotateCcw } from "lucide-react";
 import { App } from "obsidian";
 import type { ChatMessage, Attachment } from "../types";
 import MarkdownPreview from "./MarkdownPreview";
@@ -7,15 +7,17 @@ import MarkdownPreview from "./MarkdownPreview";
 interface Props {
   messages: ChatMessage[];
   onSend: (text: string, attachments: Attachment[]) => void;
+  onClear: () => void;
   loading: boolean;
   app: App;
 }
 
-export default function ChatPanel({ messages, onSend, loading, app }: Props) {
+export default function ChatPanel({ messages, onSend, onClear, loading, app }: Props) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,13 +47,21 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
     <div className="noteometry-chat">
       {/* Header */}
       <div className="noteometry-chat-header">
-        <span className="noteometry-chat-title">AI Assistant</span>
+        <span className="noteometry-chat-title">Chat</span>
+        {messages.length > 0 && (
+          <button className="noteometry-chat-clear" onClick={onClear} title="New conversation">
+            <RotateCcw size={13} />
+            <span>New</span>
+          </button>
+        )}
       </div>
 
       {/* Messages */}
       <div className="noteometry-chat-messages">
         {messages.length === 0 && (
-          <div className="noteometry-chat-empty">Ask anything — attach images or docs</div>
+          <div className="noteometry-chat-empty">
+            Draw and READ INK, or type a problem below
+          </div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`noteometry-chat-row ${m.role}`}>
@@ -62,7 +72,7 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
         ))}
         {loading && (
           <div className="noteometry-chat-row assistant">
-            <div className="noteometry-chat-bubble assistant noteometry-pulse">Thinking…</div>
+            <div className="noteometry-chat-bubble assistant noteometry-pulse">Solving…</div>
           </div>
         )}
         <div ref={endRef} />
@@ -102,6 +112,7 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
           <Paperclip size={15} />
         </button>
         <textarea
+          ref={textareaRef}
           className="noteometry-chat-textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -111,7 +122,7 @@ export default function ChatPanel({ messages, onSend, loading, app }: Props) {
               send();
             }
           }}
-          placeholder="Ask a question... (Enter to send)"
+          placeholder="Type a problem or question... (Enter to send)"
           rows={2}
         />
         <button

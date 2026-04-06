@@ -1,6 +1,23 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Noteometry — Apple Notes-inspired. Minimal chrome, content first.
+   Noteometry — iPad / OneNote inspired. Warm, tactile, content-first.
    ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --nm-accent: #4A90D9;
+  --nm-accent-light: rgba(74, 144, 217, 0.12);
+  --nm-accent-hover: #3A7BC8;
+  --nm-warm-bg: #FAFAF8;
+  --nm-warm-bg-alt: #F5F4F0;
+  --nm-warm-border: rgba(0, 0, 0, 0.08);
+  --nm-warm-border-strong: rgba(0, 0, 0, 0.14);
+  --nm-section-active: #E8E4DC;
+  --nm-danger: #E25555;
+  --nm-radius: 10px;
+  --nm-radius-sm: 6px;
+  --nm-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
+  --nm-shadow-toolbar: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.12);
+  --nm-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
 
 .noteometry-root {
   height: 100%;
@@ -10,10 +27,185 @@
 .noteometry-container {
   height: 100%;
   display: flex;
+  flex-direction: row;
+  background: var(--nm-warm-bg);
+  color: var(--text-normal);
+  font-family: var(--nm-font);
+}
+
+.noteometry-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
-  background: var(--background-primary);
+}
+
+/* ── Sidebar — OneNote-style section/page columns ─────────── */
+
+.noteometry-sidebar {
+  display: flex;
+  flex-direction: row;
+  border-right: 1px solid var(--nm-warm-border-strong);
+  background: var(--nm-warm-bg-alt);
+  flex-shrink: 0;
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.noteometry-sidebar-collapsed {
+  width: 36px;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.noteometry-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: 4px;
+  border-radius: var(--nm-radius-sm);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.noteometry-sidebar-toggle:hover {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+
+.noteometry-sidebar-sections {
+  display: flex;
+  flex-direction: column;
+  width: 150px;
+  border-right: 1px solid var(--nm-warm-border);
+  background: var(--nm-warm-bg-alt);
+}
+
+.noteometry-sidebar-pages {
+  display: flex;
+  flex-direction: column;
+  width: 170px;
+  background: var(--nm-warm-bg);
+}
+
+.noteometry-sidebar-hdr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 12px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.noteometry-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.noteometry-sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-normal);
+  border-left: 3px solid transparent;
+  transition: all 0.12s;
+  border-radius: 0;
+}
+
+.noteometry-sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.noteometry-sidebar-item.active {
+  background: var(--nm-section-active);
+  border-left-color: var(--nm-accent);
+  font-weight: 600;
   color: var(--text-normal);
 }
+
+.noteometry-sidebar-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.noteometry-sidebar-item-del {
+  opacity: 0;
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: all 0.12s;
+  border-radius: 4px;
+}
+
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-del {
+  opacity: 0.5;
+}
+
+.noteometry-sidebar-item-del:hover {
+  opacity: 1 !important;
+  color: var(--nm-danger);
+  background: rgba(226, 85, 85, 0.08);
+}
+
+.noteometry-sidebar-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nm-accent);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--nm-warm-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+
+.noteometry-sidebar-add:hover {
+  background: var(--nm-accent-light);
+}
+
+.noteometry-sidebar-add-row {
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+.noteometry-sidebar-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1.5px solid var(--nm-accent);
+  border-radius: var(--nm-radius-sm);
+  background: var(--nm-warm-bg);
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+
+.noteometry-sidebar-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--nm-accent-light);
+}
+
+/* ── Loading / Utility ───────────────────────────────────── */
 
 .noteometry-loading {
   display: flex;
@@ -21,13 +213,25 @@
   justify-content: center;
   height: 100%;
   color: var(--text-faint);
+  font-size: 14px;
 }
 
-.noteometry-hidden { display: none; }
+.noteometry-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  margin: -1px;
+}
 
 .noteometry-placeholder {
   font-size: 13px;
   color: var(--text-faint);
+  padding: 8px;
 }
 
 .noteometry-pulse {
@@ -35,10 +239,10 @@
 }
 @keyframes noteometry-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.35; }
 }
 
-/* ── Layout ────────────────────────────────────────────────────── */
+/* ── Layout — canvas + panel split ────────────────────────── */
 
 .noteometry-split {
   flex: 1;
@@ -61,6 +265,7 @@
   width: 100%;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .noteometry-canvas {
@@ -71,43 +276,95 @@
 }
 .noteometry-canvas.cursor-crosshair { cursor: crosshair; }
 .noteometry-canvas.cursor-cell { cursor: cell; }
+.noteometry-canvas.cursor-grab { cursor: grab; }
+.noteometry-canvas.cursor-grab:active { cursor: grabbing; }
+.noteometry-canvas.cursor-text { cursor: text; }
+
+/* ── Text boxes on canvas ─────────────────────────────────── */
+
+.noteometry-textbox {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid var(--nm-accent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: move;
+  min-width: 80px;
+  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.15s;
+}
+.noteometry-textbox:hover {
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.2);
+}
+.noteometry-textbox.editing {
+  border-color: var(--nm-accent);
+  box-shadow: 0 0 0 2px var(--nm-accent-light);
+  background: rgba(255, 255, 255, 0.97);
+  cursor: text;
+}
+
+.noteometry-textbox-input {
+  width: 100%;
+  min-height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: var(--nm-font);
+  resize: both;
+  outline: none;
+  line-height: 1.5;
+  padding: 0;
+}
+
+.noteometry-textbox-display {
+  color: var(--text-normal);
+  font-family: var(--nm-font);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1em;
+}
+
+/* ── Right panel ──────────────────────────────────────────── */
 
 .noteometry-right {
-  width: 360px;
+  width: 370px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 0.5px solid rgba(0,0,0,0.1);
+  border-left: 1px solid var(--nm-warm-border-strong);
   overflow: hidden;
-  background: var(--background-primary);
+  background: var(--nm-warm-bg);
 }
 
-/* ── Resize handles — nearly invisible, Apple-style ────────────── */
+/* ── Resize handles ───────────────────────────────────────── */
 
 .noteometry-resize-handle {
-  height: 8px;
+  height: 10px;
   flex-shrink: 0;
   cursor: row-resize;
   touch-action: none;
   position: relative;
 }
-.noteometry-resize-handle:hover::after {
+.noteometry-resize-handle:hover::after,
+.noteometry-resize-handle:active::after {
   content: '';
   position: absolute;
-  left: 35%;
-  right: 35%;
-  top: 3px;
+  left: 30%;
+  right: 30%;
+  top: 4px;
   height: 2px;
   border-radius: 1px;
   background: var(--text-faint);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
-/* ── Toolbar — thin, light, unobtrusive ────────────────────────── */
+/* ── Floating toolbar — frosted glass iPad feel ──────────── */
 
 .noteometry-floating-toolbar-wrap {
   position: absolute;
-  top: 8px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -118,107 +375,117 @@
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 1px;
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 0.5px solid rgba(0,0,0,0.12);
-  padding: 3px 6px;
-  border-radius: 10px;
-  box-shadow: 0 0.5px 4px rgba(0,0,0,0.06);
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  border-radius: 14px;
+  box-shadow: var(--nm-shadow-toolbar);
 }
 
 .noteometry-tb-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 7px;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
-  color: rgba(0,0,0,0.35);
+  color: rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition: all 0.15s;
 }
 .noteometry-tb-btn:hover {
-  background: rgba(0,0,0,0.05);
-  color: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.7);
 }
 .noteometry-tb-btn.active {
-  background: rgba(0,122,255,0.1);
-  color: #007aff;
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
 }
 .noteometry-tb-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 .noteometry-tb-btn-danger:hover {
-  color: #ff3b30;
-  background: rgba(255,59,48,0.08);
+  color: var(--nm-danger);
+  background: rgba(226, 85, 85, 0.08);
 }
 
 .noteometry-tb-sep {
-  width: 0.5px;
-  height: 14px;
-  background: rgba(0,0,0,0.12);
+  width: 1px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.1);
   margin: 0 4px;
 }
 
 .noteometry-tb-action {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 5px 12px;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
   transition: all 0.15s;
   color: #fff;
 }
 .noteometry-tb-action:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: default;
 }
 .noteometry-tb-readink {
-  background: #007aff;
+  background: var(--nm-accent);
 }
 .noteometry-tb-readink:hover:not(:disabled) {
-  background: #0066d6;
+  background: var(--nm-accent-hover);
 }
 .noteometry-tb-solve {
-  background: #1c1c1e;
+  background: #2C2C2E;
 }
 .noteometry-tb-solve:hover:not(:disabled) {
-  background: #3a3a3c;
+  background: #48484A;
 }
 
-/* ── Panel — clean, borderless sections ────────────────────────── */
+/* ── Panel — warm cards with subtle depth ─────────────────── */
 
 .noteometry-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 6px 0;
 }
 
 .noteometry-panel-box {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius);
+  margin: 0 10px;
+  background: #fff;
+  box-shadow: var(--nm-shadow-soft);
 }
 
 .noteometry-panel-box-hdr {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px 4px;
+  padding: 10px 14px 6px;
   flex-shrink: 0;
 }
 .noteometry-panel-box-hdr span {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
 }
 
 .noteometry-panel-box-actions {
@@ -229,32 +496,33 @@
 .noteometry-panel-clear,
 .noteometry-panel-action {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--nm-radius-sm);
   cursor: pointer;
-  padding: 2px 8px;
-  color: #007aff;
+  padding: 3px 8px;
+  color: var(--nm-accent);
   transition: all 0.12s;
 }
 .noteometry-panel-clear:hover {
-  color: #ff3b30;
+  color: var(--nm-danger);
+  background: rgba(226, 85, 85, 0.06);
 }
 .noteometry-panel-action:hover {
-  opacity: 0.7;
+  background: var(--nm-accent-light);
 }
 
 .noteometry-panel-box-content {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 16px 8px;
+  padding: 4px 14px 10px;
 }
 
 .noteometry-panel-textarea {
   flex: 1;
   width: 100%;
-  padding: 4px 16px;
+  padding: 4px 14px;
   font-family: var(--font-monospace);
   font-size: 13px;
   line-height: 1.6;
@@ -279,57 +547,94 @@
   line-height: 1.5;
 }
 
-/* ── Symbol palette — compact, clean ───────────────────────────── */
+/* ── MathPalette — compact, touchable symbol grid ─────────── */
 
-.noteometry-symbols {
+.noteometry-mathpal {
   flex-shrink: 0;
-  padding: 6px 12px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-top: 1px solid var(--nm-warm-border);
+  background: var(--nm-warm-bg-alt);
 }
 
-.noteometry-symbol-group {
+.noteometry-mathpal-tabs {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  gap: 0;
+  border-bottom: 1px solid var(--nm-warm-border);
+  overflow-x: auto;
+  padding: 0 2px;
+  scrollbar-width: none;
 }
+.noteometry-mathpal-tabs::-webkit-scrollbar { display: none; }
 
-.noteometry-symbol-label {
-  font-size: 10px;
+.noteometry-mathpal-tab {
+  padding: 4px 7px;
+  font-size: 12px;
   font-weight: 500;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
   color: var(--text-faint);
-  width: 48px;
+  white-space: nowrap;
+  transition: all 0.12s;
   flex-shrink: 0;
 }
+.noteometry-mathpal-tab:hover {
+  color: var(--text-normal);
+  background: rgba(0, 0, 0, 0.03);
+}
+.noteometry-mathpal-tab.active {
+  color: var(--nm-accent);
+  border-bottom-color: var(--nm-accent);
+  font-weight: 600;
+}
 
-.noteometry-symbol-row {
+.noteometry-mathpal-tab-icon {
+  font-size: 13px;
+}
+
+.noteometry-mathpal-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
+  padding: 4px 6px;
+  max-height: 68px;
+  overflow-y: auto;
 }
 
-.noteometry-symbol-btn {
-  width: 30px;
-  height: 30px;
+.noteometry-mathpal-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  background: transparent;
-  color: var(--text-normal);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.12s;
+  width: 34px;
+  height: 30px;
   padding: 0;
+  background: #fff;
+  color: var(--text-normal);
+  border: 1px solid var(--nm-warm-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s;
+  font-size: 15px;
 }
-.noteometry-symbol-btn:hover {
-  background: rgba(0,122,255,0.1);
-  color: #007aff;
+.noteometry-mathpal-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+  color: var(--nm-accent);
+}
+.noteometry-mathpal-btn:active {
+  transform: scale(0.93);
 }
 
-/* ── Math rendering ────────────────────────────────────────────── */
+.noteometry-mathpal-btn-sym {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.noteometry-mathpal-btn-label {
+  display: none;
+}
+
+/* ── Math rendering ───────────────────────────────────────── */
 
 .noteometry-markdown {
   font-size: 15px;
@@ -340,7 +645,7 @@
   overflow-x: auto;
 }
 
-/* ── Solution renderer ─────────────────────────────────────────── */
+/* ── Solution renderer ────────────────────────────────────── */
 
 .noteometry-solution {
   display: flex;
@@ -349,11 +654,11 @@
 }
 .noteometry-solution-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #007aff;
-  margin-top: 14px;
+  color: var(--nm-accent);
+  margin-top: 16px;
 }
 .noteometry-solution-label:first-child {
   margin-top: 0;
@@ -363,29 +668,57 @@
   line-height: 1.7;
 }
 
-/* ── Chat — clean, Apple Messages style ────────────────────────── */
+/* ── Chat — warm iMessage-style bubbles ───────────────────── */
 
 .noteometry-chat {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--background-primary);
+  background: #fff;
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius);
+  margin: 0 10px 10px;
+  overflow: hidden;
+  box-shadow: var(--nm-shadow-soft);
 }
 
 .noteometry-chat-header {
-  padding: 8px 16px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 4px;
   flex-shrink: 0;
 }
+
+.noteometry-chat-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--nm-accent);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.noteometry-chat-clear:hover {
+  background: var(--nm-accent-light);
+}
 .noteometry-chat-title {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
 }
 
 .noteometry-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 6px 16px;
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -404,35 +737,37 @@
 
 .noteometry-chat-bubble {
   max-width: 85%;
-  padding: 8px 14px;
+  padding: 10px 14px;
   font-size: 13px;
   line-height: 1.5;
 }
 .noteometry-chat-bubble.user {
-  background: #007aff;
+  background: var(--nm-accent);
   color: #fff;
   border-radius: 18px 18px 4px 18px;
 }
 .noteometry-chat-bubble.assistant {
-  background: var(--background-secondary);
+  background: var(--nm-warm-bg-alt);
   color: var(--text-normal);
   border-radius: 18px 18px 18px 4px;
+  border: 1px solid var(--nm-warm-border);
 }
 
 .noteometry-chat-attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 4px 16px;
+  padding: 4px 14px;
   flex-shrink: 0;
 }
 .noteometry-chat-attachment-chip {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--background-secondary);
+  background: var(--nm-warm-bg-alt);
+  border: 1px solid var(--nm-warm-border);
   border-radius: 8px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -450,57 +785,68 @@
   padding: 0;
   display: flex;
 }
-.noteometry-chat-attachment-remove:hover { color: #ff3b30; }
+.noteometry-chat-attachment-remove:hover { color: var(--nm-danger); }
 
 .noteometry-chat-input-row {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 8px 16px 12px;
+  padding: 8px 14px 12px;
   flex-shrink: 0;
+  border-top: 1px solid var(--nm-warm-border);
 }
 
 .noteometry-chat-attach-btn {
   display: flex;
-  padding: 6px;
+  padding: 7px;
   background: none;
   border: none;
   cursor: pointer;
   color: var(--text-faint);
   flex-shrink: 0;
   border-radius: 50%;
+  transition: all 0.12s;
 }
 .noteometry-chat-attach-btn:hover {
-  color: #007aff;
+  color: var(--nm-accent);
+  background: var(--nm-accent-light);
 }
 
 .noteometry-chat-textarea {
   flex: 1;
   padding: 8px 14px;
   font-size: 13px;
-  background: var(--background-secondary);
+  background: var(--nm-warm-bg-alt);
   color: var(--text-normal);
-  border: none;
+  border: 1px solid var(--nm-warm-border);
   border-radius: 20px;
   resize: none;
   line-height: 1.4;
+  font-family: var(--nm-font);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .noteometry-chat-textarea:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0,122,255,0.3);
+  border-color: var(--nm-accent);
+  box-shadow: 0 0 0 2px var(--nm-accent-light);
 }
 .noteometry-chat-textarea::placeholder { color: var(--text-faint); }
 
 .noteometry-chat-send-btn {
   display: flex;
-  padding: 6px;
-  background: #007aff;
+  padding: 7px;
+  background: var(--nm-accent);
   color: #fff;
   border: none;
   border-radius: 50%;
   cursor: pointer;
   flex-shrink: 0;
-  transition: opacity 0.12s;
+  transition: all 0.15s;
 }
-.noteometry-chat-send-btn:hover:not(:disabled) { opacity: 0.8; }
-.noteometry-chat-send-btn:disabled { opacity: 0.3; cursor: default; }
+.noteometry-chat-send-btn:hover:not(:disabled) {
+  background: var(--nm-accent-hover);
+}
+.noteometry-chat-send-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}

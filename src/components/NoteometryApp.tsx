@@ -1,12 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App } from "obsidian";
 import type NoteometryPlugin from "../main";
-import type { Tool, Stroke, Point, ChatMessage, Attachment } from "../types";
-import { readInk, solve, chat } from "../lib/gemini";
-import { saveCanvas, loadCanvas, CanvasData } from "../lib/persistence";
+import type { Tool, Stroke, Point, ChatMessage, Attachment, TextBox } from "../types";
+import { readInk, chat } from "../lib/ai";
+import {
+  savePage, loadPage, listSections, listPages,
+  createSection, createPage, migrateLegacy,
+  CanvasData,
+} from "../lib/persistence";
 import Toolbar from "./Toolbar";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
+import Sidebar from "./Sidebar";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -39,6 +44,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const isDrawingRef = useRef(false);
   const lassoPointsRef = useRef<Point[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const panRef = useRef({ x: 0, y: 0 });
+  const grabAnchorRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const textBoxesRef = useRef<TextBox[]>([]);
+  const [editingTextBox, setEditingTextBox] = useState<string | null>(null);
+  const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
+  const draggingTextBox = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
 
   /* ── Tool state ───────────────────────────────────────── */
   const [activeTool, setActiveTool] = useState<Tool>("pen");
@@ -47,52 +58,137 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Panel state ──────────────────────────────────────── */
   const [inputCode, setInputCode] = useState("");
-  const [outputCode, setOutputCode] = useState("");
   const [isReading, setIsReading] = useState(false);
-  const [isSolving, setIsSolving] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
   /* ── Chat state ───────────────────────────────────────── */
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
 
+  /* ── Section / Page state ─────────────────────────────── */
+  const [currentSection, setCurrentSection] = useState("");
+  const [currentPage, setCurrentPage] = useState("");
+  const sectionRef = useRef("");
+  const pageRef = useRef("");
+
   /* ── Persistence ──────────────────────────────────────── */
   const [ready, setReady] = useState(false);
   const saveTimer = useRef<number>(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const saved = await loadCanvas(plugin);
-      if (cancelled) return;
-      if (saved) {
-        strokesRef.current = saved.strokes ?? [];
-        setInputCode(saved.panelInput ?? "");
-        setOutputCode(saved.panelOutput ?? "");
-        setChatMessages(saved.chatMessages ?? []);
-      }
-      setReady(true);
-    })();
-    return () => { cancelled = true; };
+  /** Load page data into canvas/panel state */
+  const applyPageData = useCallback((data: CanvasData) => {
+    strokesRef.current = data.strokes ?? [];
+    textBoxesRef.current = data.textBoxes ?? [];
+    setTextBoxes(data.textBoxes ?? []);
+    panRef.current = data.pan ?? { x: 0, y: 0 };
+    undoStackRef.current = [];
+    redoStackRef.current = [];
+    lassoPointsRef.current = [];
+    currentStrokeRef.current = null;
+    setEditingTextBox(null);
+    setInputCode(data.panelInput ?? "");
+    setChatMessages(data.chatMessages ?? []);
   }, []);
+
+  /** Save current page (immediate) */
+  const saveNow = useCallback(async () => {
+    const sec = sectionRef.current;
+    const pg = pageRef.current;
+    if (!sec || !pg) return;
+    const data: CanvasData = {
+      strokes: strokesRef.current,
+      textBoxes: textBoxesRef.current,
+      panelInput: inputCode,
+      panelOutput: "",
+      chatMessages,
+      pan: { ...panRef.current },
+      lastSaved: new Date().toISOString(),
+    };
+    await savePage(plugin, sec, pg, data);
+  }, [inputCode, chatMessages, plugin]);
 
   const doSave = useCallback(() => {
     if (!plugin.settings.autoSave) return;
+    if (!sectionRef.current || !pageRef.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(async () => {
-      const data: CanvasData = {
-        strokes: strokesRef.current,
-        panelInput: inputCode,
-        panelOutput: outputCode,
-        chatMessages,
-        lastSaved: new Date().toISOString(),
-      };
-      await saveCanvas(plugin, data);
+      await saveNow();
     }, plugin.settings.autoSaveDelay);
-  }, [inputCode, outputCode, chatMessages, plugin]);
+  }, [saveNow, plugin]);
 
-  useEffect(() => { doSave(); }, [inputCode, outputCode, chatMessages]);
+  useEffect(() => { doSave(); }, [inputCode, chatMessages]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
+
+  /** Handle section/page selection from sidebar */
+  const handleSelect = useCallback(async (section: string, page: string) => {
+    // Save current page first
+    await saveNow();
+
+    // If only section selected, load first page
+    if (section && !page) {
+      const pages = await listPages(plugin, section);
+      page = pages[0] ?? "";
+    }
+
+    sectionRef.current = section;
+    pageRef.current = page;
+    setCurrentSection(section);
+    setCurrentPage(page);
+
+    if (section && page) {
+      const data = await loadPage(plugin, section, page);
+      applyPageData(data);
+    } else {
+      applyPageData({
+        strokes: [], textBoxes: [], panelInput: "", panelOutput: "",
+        chatMessages: [], pan: { x: 0, y: 0 }, lastSaved: "",
+      });
+    }
+  }, [plugin, applyPageData, saveNow]);
+
+  /** Initial load */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Migrate legacy single-file canvas
+      const migrated = await migrateLegacy(plugin);
+
+      const secs = await listSections(plugin);
+      if (cancelled) return;
+
+      let sec = "";
+      let pg = "";
+
+      if (migrated) {
+        sec = migrated.section;
+        pg = migrated.page;
+      } else if (secs.length > 0) {
+        sec = secs[0]!;
+        const pages = await listPages(plugin, sec);
+        pg = pages[0] ?? "";
+      } else {
+        // First run — create a default section and page
+        sec = "General";
+        pg = "Page 1";
+        await createSection(plugin, sec);
+        await createPage(plugin, sec, pg);
+      }
+
+      if (cancelled) return;
+      sectionRef.current = sec;
+      pageRef.current = pg;
+      setCurrentSection(sec);
+      setCurrentPage(pg);
+
+      if (sec && pg) {
+        const data = await loadPage(plugin, sec, pg);
+        if (!cancelled) applyPageData(data);
+      }
+
+      if (!cancelled) setReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   /* ── Graph paper canvas drawing ───────────────────────── */
   const redraw = useCallback(() => {
@@ -102,43 +198,55 @@ export default function NoteometryApp({ plugin, app }: Props) {
     if (!ctx) return;
     const w = canvas.width;
     const h = canvas.height;
+    const px = panRef.current.x;
+    const py = panRef.current.y;
 
     // White background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
 
-    // Minor grid lines (1/8")
+    // Minor grid lines (1/8") — offset by pan so they tile infinitely
     ctx.strokeStyle = "#e8ebe8";
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    for (let x = GRID_MINOR; x < w; x += GRID_MINOR) {
-      if (x % GRID_MAJOR === 0) continue; // skip majors
+    const minorOffX = ((px % GRID_MINOR) + GRID_MINOR) % GRID_MINOR;
+    const minorOffY = ((py % GRID_MINOR) + GRID_MINOR) % GRID_MINOR;
+    for (let x = minorOffX; x < w; x += GRID_MINOR) {
+      const worldX = x - px;
+      if (Math.round(worldX) % GRID_MAJOR === 0) continue;
       ctx.moveTo(x + 0.5, 0);
       ctx.lineTo(x + 0.5, h);
     }
-    for (let y = GRID_MINOR; y < h; y += GRID_MINOR) {
-      if (y % GRID_MAJOR === 0) continue;
+    for (let y = minorOffY; y < h; y += GRID_MINOR) {
+      const worldY = y - py;
+      if (Math.round(worldY) % GRID_MAJOR === 0) continue;
       ctx.moveTo(0, y + 0.5);
       ctx.lineTo(w, y + 0.5);
     }
     ctx.stroke();
 
-    // Major grid lines (1")
+    // Major grid lines (1") — offset by pan
     ctx.strokeStyle = "#c8ccc8";
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    for (let x = GRID_MAJOR; x < w; x += GRID_MAJOR) {
+    const majorOffX = ((px % GRID_MAJOR) + GRID_MAJOR) % GRID_MAJOR;
+    const majorOffY = ((py % GRID_MAJOR) + GRID_MAJOR) % GRID_MAJOR;
+    for (let x = majorOffX; x < w; x += GRID_MAJOR) {
       ctx.moveTo(x + 0.5, 0);
       ctx.lineTo(x + 0.5, h);
     }
-    for (let y = GRID_MAJOR; y < h; y += GRID_MAJOR) {
+    for (let y = majorOffY; y < h; y += GRID_MAJOR) {
       ctx.moveTo(0, y + 0.5);
       ctx.lineTo(w, y + 0.5);
     }
     ctx.stroke();
 
+    // Draw strokes in world coordinates (translate by pan)
+    ctx.save();
+    ctx.translate(px, py);
     for (const s of strokesRef.current) drawStroke(ctx, s);
     if (currentStrokeRef.current) drawStroke(ctx, currentStrokeRef.current);
+    ctx.restore();
   }, []);
 
   function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
@@ -204,10 +312,25 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => obs.disconnect();
   }, [redraw, ready]);
 
+  // Redraw when page changes (strokes are in refs, need explicit trigger)
+  useEffect(() => {
+    if (ready) redraw();
+  }, [currentSection, currentPage, ready, redraw]);
+
   /* ── Pointer handlers ─────────────────────────────────── */
   function getPos(e: React.PointerEvent<HTMLCanvasElement>): Point {
     const r = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top, pressure: e.pressure ?? 0.5 };
+    return {
+      x: e.clientX - r.left - panRef.current.x,
+      y: e.clientY - r.top - panRef.current.y,
+      pressure: e.pressure ?? 0.5,
+    };
+  }
+
+  /** Screen-space position (no pan offset) for grab tool */
+  function getScreenPos(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
+    const r = canvasRef.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
   function addPoint(stroke: Stroke, pos: Point) {
@@ -218,10 +341,31 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
     const pos = getPos(e);
     const tool = toolRef.current;
-    if (tool === "pen") {
+    if (tool === "text") {
+      // Place a new text box at click position — don't capture pointer
+      const newBox: TextBox = {
+        id: uuid(),
+        x: pos.x,
+        y: pos.y,
+        width: 200,
+        height: 32,
+        text: "",
+        fontSize: 15,
+      };
+      textBoxesRef.current = [...textBoxesRef.current, newBox];
+      setTextBoxes([...textBoxesRef.current]);
+      setEditingTextBox(newBox.id);
+      doSave();
+      return;
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (tool === "grab") {
+      isDrawingRef.current = true;
+      const sp = getScreenPos(e);
+      grabAnchorRef.current = { x: sp.x, y: sp.y, panX: panRef.current.x, panY: panRef.current.y };
+    } else if (tool === "pen") {
       isDrawingRef.current = true;
       currentStrokeRef.current = { id: uuid(), points: [pos], color: PEN_COLOR, width: PEN_WIDTH, tool: "pen" };
     } else if (tool === "lasso") {
@@ -236,8 +380,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
-    const pos = getPos(e);
     const tool = toolRef.current;
+    if (tool === "grab") {
+      const sp = getScreenPos(e);
+      const a = grabAnchorRef.current;
+      panRef.current = { x: a.panX + (sp.x - a.x), y: a.panY + (sp.y - a.y) };
+      redraw();
+      return;
+    }
+    const pos = getPos(e);
     if (tool === "pen" && currentStrokeRef.current) {
       addPoint(currentStrokeRef.current, pos);
       redraw();
@@ -253,6 +404,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
     const tool = toolRef.current;
+    if (tool === "grab") {
+      isDrawingRef.current = false;
+      return;
+    }
     if (tool === "pen" && currentStrokeRef.current && currentStrokeRef.current.points.length > 1) {
       undoStackRef.current.push([...strokesRef.current]);
       redoStackRef.current = [];
@@ -274,6 +429,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
       currentStrokeRef.current = null;
       isDrawingRef.current = false;
       redraw();
+      // Auto-trigger READ INK after lasso completes
+      if (lp.length >= 3) {
+        setTimeout(() => handleReadInk(), 100);
+      }
       return;
     }
     currentStrokeRef.current = null;
@@ -328,23 +487,28 @@ export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Snapshot helpers ─────────────────────────────────── */
   function cropToLasso(): string | null {
     const lasso = lassoPointsRef.current;
-    const canvas = canvasRef.current;
-    if (!canvas || lasso.length < 3) return null;
+    if (lasso.length < 3) return null;
     const xs = lasso.map((p) => p.x);
     const ys = lasso.map((p) => p.y);
-    const minX = Math.max(0, Math.floor(Math.min(...xs)) - 8);
-    const minY = Math.max(0, Math.floor(Math.min(...ys)) - 8);
-    const maxX = Math.min(canvas.width, Math.ceil(Math.max(...xs)) + 8);
-    const maxY = Math.min(canvas.height, Math.ceil(Math.max(...ys)) + 8);
+    const pad = 12;
+    const minX = Math.floor(Math.min(...xs)) - pad;
+    const minY = Math.floor(Math.min(...ys)) - pad;
+    const maxX = Math.ceil(Math.max(...xs)) + pad;
+    const maxY = Math.ceil(Math.max(...ys)) + pad;
     const w = maxX - minX;
     const h = maxY - minY;
     if (w <= 0 || h <= 0) return null;
+    // Cap to reasonable size
+    const scale = Math.min(1, 4096 / Math.max(w, h));
+    const tw = Math.round(w * scale);
+    const th = Math.round(h * scale);
     const tmp = document.createElement("canvas");
-    tmp.width = w;
-    tmp.height = h;
+    tmp.width = tw;
+    tmp.height = th;
     const tctx = tmp.getContext("2d")!;
     tctx.fillStyle = "#ffffff";
-    tctx.fillRect(0, 0, w, h);
+    tctx.fillRect(0, 0, tw, th);
+    if (scale !== 1) tctx.scale(scale, scale);
     tctx.translate(-minX, -minY);
     for (const s of strokesRef.current) {
       if (s.tool !== "lasso") drawStroke(tctx, s);
@@ -360,27 +524,67 @@ export default function NoteometryApp({ plugin, app }: Props) {
     const tctx = tmp.getContext("2d")!;
     tctx.fillStyle = "#ffffff";
     tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.save();
+    tctx.translate(panRef.current.x, panRef.current.y);
     for (const s of strokesRef.current) {
       if (s.tool !== "lasso") drawStroke(tctx, s);
     }
+    tctx.restore();
     return tmp.toDataURL("image/png");
   }
 
-  /* ── READ INK ─────────────────────────────────────────── */
+  /* ── Send to chat helper ──────────────────────────────── */
+  const sendToChat = async (userText: string, atts: Attachment[] = []) => {
+    const userMsg: ChatMessage = { role: "user", text: userText };
+    const newHistory = [...chatMessages, userMsg];
+    setChatMessages(newHistory);
+    setChatLoading(true);
+    try {
+      const res = await chat(newHistory, atts, plugin.settings);
+      setChatMessages((prev) => [...prev, {
+        role: "assistant",
+        text: res.ok ? res.text : (res.error ?? "No response"),
+      }]);
+    } catch {
+      setChatMessages((prev) => [...prev, { role: "assistant", text: "AI request failed." }]);
+    }
+    setChatLoading(false);
+  };
+
+  /* ── READ INK → OCR → auto-solve in chat ─────────────── */
   const handleReadInk = async () => {
     setIsReading(true);
     try {
-      const img = lassoPointsRef.current.length >= 3
+      const hasLasso = lassoPointsRef.current.length >= 3;
+      const img = hasLasso
         ? (cropToLasso() ?? fullSnapshot())
         : fullSnapshot();
-      const res = await readInk(img, plugin.settings.geminiApiKey, plugin.settings.geminiModel);
-      if (res.ok) {
+
+      // Remove lasso strokes from canvas after capture
+      if (hasLasso) {
+        strokesRef.current = strokesRef.current.filter((s) => s.tool !== "lasso");
+        lassoPointsRef.current = [];
+        redraw();
+      }
+
+      const res = await readInk(img, plugin.settings);
+      if (res.ok && res.text.trim()) {
+        // Populate input box (shows in Preview) and auto-solve in chat
         setInputCode(res.text);
+        setIsReading(false);
+        await sendToChat(`Solve this:\n$${res.text}$`);
+        return;
       } else {
-        setInputCode(res.error ?? "READ INK failed");
+        setChatMessages((prev) => [...prev, {
+          role: "assistant",
+          text: res.error ?? "READ INK couldn't extract anything. Try drawing larger or using lasso.",
+        }]);
       }
     } catch {
-      setInputCode("Vision API failed.");
+      setChatMessages((prev) => [...prev, {
+        role: "assistant",
+        text: "Vision API failed.",
+      }]);
     }
     setIsReading(false);
   };
@@ -398,55 +602,39 @@ export default function NoteometryApp({ plugin, app }: Props) {
         reader.onerror = () => reject(new Error("File read failed"));
         reader.readAsDataURL(file);
       });
-      const res = await readInk(dataUrl, plugin.settings.geminiApiKey, plugin.settings.geminiModel);
-      if (res.ok) {
+      const res = await readInk(dataUrl, plugin.settings);
+      if (res.ok && res.text.trim()) {
         setInputCode(res.text);
+        setIsReading(false);
+        await sendToChat(`Solve this:\n$${res.text}$`);
+        return;
       } else {
-        setInputCode(res.error ?? "Image scan failed");
+        setChatMessages((prev) => [...prev, {
+          role: "assistant",
+          text: res.error ?? "Image scan failed",
+        }]);
       }
     } catch {
-      setInputCode("Image scan failed.");
+      setChatMessages((prev) => [...prev, {
+        role: "assistant",
+        text: "Image scan failed.",
+      }]);
     }
     setIsReading(false);
   };
 
-  /* ── SOLVE ────────────────────────────────────────────── */
-  const handleSolve = async () => {
-    if (!inputCode.trim()) return;
-    setIsSolving(true);
-    try {
-      const res = await solve(inputCode, plugin.settings.geminiApiKey, plugin.settings.geminiModel);
-      if (res.ok) {
-        setOutputCode(res.text);
-      } else {
-        setOutputCode(res.error ?? "SOLVE failed");
-      }
-    } catch {
-      setOutputCode("Solver API failed.");
-    }
-    setIsSolving(false);
-  };
-
   /* ── Chat ─────────────────────────────────────────────── */
   const handleSendChat = async (text: string, attachments: Attachment[]) => {
-    const userMsg: ChatMessage = { role: "user", text };
-    const newHistory = [...chatMessages, userMsg];
-    setChatMessages(newHistory);
-    setChatLoading(true);
-    try {
-      const res = await chat(newHistory, attachments, plugin.settings.geminiApiKey, plugin.settings.geminiModel);
-      setChatMessages((prev) => [...prev, {
-        role: "assistant",
-        text: res.ok ? res.text : (res.error ?? "No response"),
-      }]);
-    } catch {
-      setChatMessages((prev) => [...prev, { role: "assistant", text: "Chat API failed." }]);
-    }
-    setChatLoading(false);
+    await sendToChat(text, attachments);
+  };
+
+  /* ── Symbol insertion into input ──────────────────────── */
+  const handleInsertSymbol = (sym: string) => {
+    setInputCode((prev) => prev + sym);
   };
 
   /* ── Chat resize ───────────────────────────────────────── */
-  const [chatHeight, setChatHeight] = useState(220);
+  const [chatHeight, setChatHeight] = useState(320);
   const chatDragging = useRef(false);
   const chatLastY = useRef(0);
   const handleChatResizeDown = (e: React.PointerEvent) => {
@@ -459,20 +647,61 @@ export default function NoteometryApp({ plugin, app }: Props) {
     if (!chatDragging.current) return;
     const dy = e.clientY - chatLastY.current;
     chatLastY.current = e.clientY;
-    setChatHeight((h) => Math.max(80, Math.min(500, h - dy)));
+    setChatHeight((h) => Math.max(120, Math.min(600, h - dy)));
   };
   const handleChatResizeUp = (e: React.PointerEvent) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
     chatDragging.current = false;
   };
 
-  /* ── EE Symbol insertion ──────────────────────────────── */
-  const handleInsertSymbol = (sym: string) => {
-    setInputCode((prev) => prev + sym);
+  /* ── Text box helpers ─────────────────────────────────── */
+  const updateTextBox = (id: string, updates: Partial<TextBox>) => {
+    textBoxesRef.current = textBoxesRef.current.map((tb) =>
+      tb.id === id ? { ...tb, ...updates } : tb
+    );
+    setTextBoxes([...textBoxesRef.current]);
+    doSave();
+  };
+
+  const deleteTextBox = (id: string) => {
+    textBoxesRef.current = textBoxesRef.current.filter((tb) => tb.id !== id);
+    setTextBoxes([...textBoxesRef.current]);
+    if (editingTextBox === id) setEditingTextBox(null);
+    doSave();
+  };
+
+  const handleTextBoxPointerDown = (e: React.PointerEvent, tb: TextBox) => {
+    e.stopPropagation();
+    if (editingTextBox === tb.id) return; // already editing, let textarea handle it
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    draggingTextBox.current = {
+      id: tb.id,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleTextBoxPointerMove = (e: React.PointerEvent) => {
+    if (!draggingTextBox.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const cr = container.getBoundingClientRect();
+    const drag = draggingTextBox.current;
+    const newX = e.clientX - cr.left - panRef.current.x - drag.offsetX;
+    const newY = e.clientY - cr.top - panRef.current.y - drag.offsetY;
+    updateTextBox(drag.id, { x: newX, y: newY });
+  };
+
+  const handleTextBoxPointerUp = (e: React.PointerEvent) => {
+    if (draggingTextBox.current) {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      draggingTextBox.current = null;
+    }
   };
 
   /* ── Cursor ───────────────────────────────────────────── */
-  const cursorClass = activeTool === "pen" ? "cursor-crosshair" : activeTool === "eraser" ? "cursor-cell" : "";
+  const cursorClass = activeTool === "pen" ? "cursor-crosshair" : activeTool === "eraser" ? "cursor-cell" : activeTool === "grab" ? "cursor-grab" : activeTool === "text" ? "cursor-text" : "";
 
   /* ── Render ───────────────────────────────────────────── */
   if (!ready) {
@@ -490,63 +719,113 @@ export default function NoteometryApp({ plugin, app }: Props) {
         className="noteometry-hidden"
       />
 
-      <div className="noteometry-split">
-        {/* ── Canvas area (full width when panel closed) ── */}
-        <div className="noteometry-canvas-area">
-          <Toolbar
-            activeTool={activeTool}
-            setTool={setTool}
-            onUndo={undo}
-            onRedo={redo}
-            onClear={clearCanvas}
-            onReadInk={handleReadInk}
-            onSolve={handleSolve}
-            onUploadImage={() => imageInputRef.current?.click()}
-            onTogglePanel={() => setPanelOpen(!panelOpen)}
-            isReading={isReading}
-            isSolving={isSolving}
-            hasInput={!!inputCode.trim()}
-            panelOpen={panelOpen}
-          />
-          <div ref={containerRef} className="noteometry-canvas-container">
-            <canvas
-              ref={canvasRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-              className={`noteometry-canvas ${cursorClass}`}
-            />
-          </div>
-        </div>
+      {/* ── Sidebar (sections + pages) ── */}
+      <Sidebar
+        plugin={plugin}
+        currentSection={currentSection}
+        currentPage={currentPage}
+        onSelect={handleSelect}
+      />
 
-        {/* ── Right panel (collapsible) ── */}
-        {panelOpen && (
-          <div className="noteometry-right">
-            <Panel
-              inputCode={inputCode}
-              setInputCode={setInputCode}
-              outputCode={outputCode}
-              isSolving={isSolving}
-              app={app}
-              onInsertSymbol={handleInsertSymbol}
+      {/* ── Main area (canvas + panel) ── */}
+      <div className="noteometry-main">
+        <div className="noteometry-split">
+          {/* ── Canvas area ── */}
+          <div className="noteometry-canvas-area">
+            <Toolbar
+              activeTool={activeTool}
+              setTool={setTool}
+              onUndo={undo}
+              onRedo={redo}
+              onClear={clearCanvas}
+              onReadInk={handleReadInk}
+              onUploadImage={() => imageInputRef.current?.click()}
+              onTogglePanel={() => setPanelOpen(!panelOpen)}
+              isReading={isReading}
+              panelOpen={panelOpen}
             />
-            <div
-              className="noteometry-resize-handle"
-              onPointerDown={handleChatResizeDown}
-              onPointerMove={handleChatResizeMove}
-              onPointerUp={handleChatResizeUp}
-            />
-            <div style={{ height: chatHeight, flexShrink: 0 }}>
-              <ChatPanel
-                messages={chatMessages}
-                onSend={handleSendChat}
-                loading={chatLoading}
-                app={app}
+            <div ref={containerRef} className="noteometry-canvas-container">
+              <canvas
+                ref={canvasRef}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                className={`noteometry-canvas ${cursorClass}`}
               />
+              {/* Text box overlays */}
+              {textBoxes.map((tb) => (
+                <div
+                  key={tb.id}
+                  className={`noteometry-textbox ${editingTextBox === tb.id ? "editing" : ""}`}
+                  style={{
+                    left: tb.x + panRef.current.x,
+                    top: tb.y + panRef.current.y,
+                    width: tb.width,
+                    minHeight: tb.height,
+                    fontSize: tb.fontSize,
+                  }}
+                  onPointerDown={(e) => handleTextBoxPointerDown(e, tb)}
+                  onPointerMove={handleTextBoxPointerMove}
+                  onPointerUp={handleTextBoxPointerUp}
+                  onDoubleClick={() => setEditingTextBox(tb.id)}
+                >
+                  {editingTextBox === tb.id ? (
+                    <textarea
+                      className="noteometry-textbox-input"
+                      value={tb.text}
+                      ref={(el) => { if (el) setTimeout(() => el.focus(), 10); }}
+                      onChange={(e) => updateTextBox(tb.id, { text: e.target.value })}
+                      onBlur={() => {
+                        if (!tb.text.trim()) deleteTextBox(tb.id);
+                        else setEditingTextBox(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          if (!tb.text.trim()) deleteTextBox(tb.id);
+                          else setEditingTextBox(null);
+                        }
+                        e.stopPropagation();
+                      }}
+                      style={{ fontSize: tb.fontSize }}
+                    />
+                  ) : (
+                    <div className="noteometry-textbox-display">
+                      {tb.text || "\u00A0"}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        )}
+
+          {/* ── Right panel — Preview/Input + Chat ── */}
+          {panelOpen && (
+            <div className="noteometry-right">
+              <Panel
+                inputCode={inputCode}
+                setInputCode={setInputCode}
+                app={app}
+                onInsertSymbol={handleInsertSymbol}
+              />
+              <div
+                className="noteometry-resize-handle"
+                onPointerDown={handleChatResizeDown}
+                onPointerMove={handleChatResizeMove}
+                onPointerUp={handleChatResizeUp}
+              />
+              <div style={{ height: chatHeight, flexShrink: 0 }}>
+                <ChatPanel
+                  messages={chatMessages}
+                  onSend={handleSendChat}
+                  onClear={() => setChatMessages([])}
+                  loading={chatLoading}
+                  app={app}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
