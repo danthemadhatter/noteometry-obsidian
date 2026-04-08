@@ -24,32 +24,6 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   autoSaveDelay: 2000,
 };
 
-export interface Point {
-  x: number;
-  y: number;
-  pressure?: number;
-}
-
-export interface Stroke {
-  id: string;
-  points: Point[];
-  color: string;
-  width: number;
-  tool: "pen" | "lasso";
-}
-
-export type Tool = "pen" | "eraser" | "lasso" | "grab" | "text";
-
-export interface TextBox {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  text: string;
-  fontSize: number;
-}
-
 export interface ChatMessage {
   role: "user" | "assistant";
   text: string;

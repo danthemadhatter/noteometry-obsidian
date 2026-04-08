@@ -1,13 +1,13 @@
 import React, { useState, useRef, useCallback } from "react";
-import { App } from "obsidian";
-import MarkdownPreview from "./MarkdownPreview";
+import KaTeXRenderer from "./KaTeXRenderer";
 import MathPalette from "./MathPalette";
 
 interface Props {
   inputCode: string;
   setInputCode: (v: string) => void;
-  app: App;
   onInsertSymbol: (sym: string) => void;
+  onSolve: () => void;
+  onClosePanel: () => void;
 }
 
 function ensureMathDelimiters(text: string): string {
@@ -27,7 +27,6 @@ function ensureMathDelimiters(text: string): string {
   return t;
 }
 
-/* ── Resize handle ─────────────────────────────────────── */
 function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
   const dragging = useRef(false);
   const lastY = useRef(0);
@@ -56,16 +55,16 @@ function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
 }
 
 export default function Panel({
-  inputCode, setInputCode, app, onInsertSymbol,
+  inputCode, setInputCode, onInsertSymbol, onSolve, onClosePanel,
 }: Props) {
-  const [heights, setHeights] = useState([35, 65]);
+  const [heights, setHeights] = useState([30, 70]);
 
   const handleResize = useCallback((dy: number) => {
     setHeights((prev) => {
       const next = [...prev];
       const pct = (dy / 6);
-      next[0] = Math.max(20, prev[0]! + pct);
-      next[1] = Math.max(20, prev[1]! - pct);
+      next[0] = Math.max(0, prev[0]! + pct);
+      next[1] = Math.max(0, prev[1]! - pct);
       return next;
     });
   }, []);
@@ -76,11 +75,18 @@ export default function Panel({
       <div className="noteometry-panel-box" style={{ flex: heights[0] }}>
         <div className="noteometry-panel-box-hdr">
           <span>Preview</span>
+          <button
+            className="noteometry-panel-action"
+            onClick={onClosePanel}
+            title="Close panel"
+          >
+            ✕
+          </button>
         </div>
         <div className="noteometry-panel-box-content">
           {inputCode.trim()
-            ? <MarkdownPreview content={ensureMathDelimiters(inputCode)} app={app} />
-            : <div className="noteometry-placeholder">Write on the canvas, then lasso and READ INK</div>}
+            ? <KaTeXRenderer content={ensureMathDelimiters(inputCode)} />
+            : <div className="noteometry-placeholder">Use toolbar lasso → OCR, or type below</div>}
         </div>
       </div>
 
@@ -90,17 +96,24 @@ export default function Panel({
       <div className="noteometry-panel-box" style={{ flex: heights[1] }}>
         <div className="noteometry-panel-box-hdr">
           <span>Input</span>
-          {inputCode && (
-            <button className="noteometry-panel-clear" onClick={() => setInputCode("")}>
-              Clear
-            </button>
-          )}
+          <div className="noteometry-panel-box-actions">
+            {inputCode.trim() && (
+              <button className="noteometry-panel-solve" onClick={onSolve}>
+                SOLVE
+              </button>
+            )}
+            {inputCode && (
+              <button className="noteometry-panel-clear" onClick={() => setInputCode("")}>
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         <textarea
           className="noteometry-panel-textarea"
           value={inputCode}
           onChange={(e) => setInputCode(e.target.value)}
-          placeholder="Type or paste LaTeX, or use READ INK to scan handwriting..."
+          placeholder="Type or paste LaTeX, or use READ INK..."
         />
         <MathPalette onInsert={onInsertSymbol} />
       </div>

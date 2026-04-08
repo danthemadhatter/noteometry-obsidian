@@ -68,6 +68,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
 
   /* ── Delete section ────────────────────────────────── */
   const handleDeleteSection = async (name: string) => {
+    if (!confirm(`Delete section "${name}" and all its pages? This cannot be undone.`)) return;
     await deleteSection(plugin, name);
     await refreshSections();
     if (currentSection === name) {
@@ -77,6 +78,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
 
   /* ── Delete page ───────────────────────────────────── */
   const handleDeletePage = async (name: string) => {
+    if (!confirm(`Delete page "${name}"? This cannot be undone.`)) return;
     await deletePage(plugin, currentSection, name);
     const updated = await listPages(plugin, currentSection);
     setPages(updated);

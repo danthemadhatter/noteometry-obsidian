@@ -112,15 +112,23 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are a strict math and electrical engineering OCR engine.
-Your only job is to look at the provided image of handwritten equations and convert it to clean LaTeX.
-Return ONLY the raw LaTeX string. No explanation. No markdown code blocks. No preamble. Just LaTeX.`;
+const VISION_SYSTEM = `You are an expert at reading handwritten content, screenshots, and diagrams. Extract ALL information from the image accurately.
+
+RULES:
+1. If you see math/equations: output LaTeX wrapped in $$ delimiters. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
+2. If you see plain text: output it as plain text, preserving line breaks and structure
+3. If you see a diagram/figure with variables, coordinates, or labels: describe the setup precisely, then express any visible equations or relationships in LaTeX
+4. If you see a mix of text and math: output both, using $$ for math parts and plain text for the rest
+5. If you see a screenshot of a homework/textbook problem: transcribe the FULL problem including all given information, figures described, and the question asked
+6. NEVER describe symbols in words — no "[integral symbol]", no prose about what symbols look like
+7. Preserve the structure and order of the original content`;
 
 export async function readInk(
   base64Png: string,
   settings: NoteometrySettings
 ): Promise<AIResult> {
   const data = base64Png.replace(/^data:image\/\w+;base64,/, "");
+  const prompt = "Read and extract everything in this image. For math, use $$...$$ LaTeX. For text, output plain text. For diagrams, describe the setup and express relationships as LaTeX. Preserve structure.";
 
   if (settings.aiProvider === "lmstudio") {
     return callLMStudio(settings, settings.lmStudioVisionModel, VISION_SYSTEM, [
@@ -128,7 +136,7 @@ export async function readInk(
         role: "user",
         content: [
           { type: "image_url", image_url: { url: `data:image/png;base64,${data}` } },
-          { type: "text", text: "Extract the math from this image into LaTeX." },
+          { type: "text", text: prompt },
         ],
       },
     ]);
@@ -140,7 +148,7 @@ export async function readInk(
       role: "user",
       content: [
         { type: "image", source: { type: "base64", media_type: "image/png", data } },
-        { type: "text", text: "Extract the math from this image into LaTeX." },
+        { type: "text", text: prompt },
       ],
     },
   ]);

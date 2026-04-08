@@ -1,23 +1,33 @@
 import type NoteometryPlugin from "../main";
-import type { Stroke, ChatMessage, TextBox } from "../types";
+import type { ChatMessage } from "../types";
+import type { Stroke, Stamp } from "./inkEngine";
+import type { CanvasObject } from "./canvasObjects";
 
 export interface CanvasData {
+  version?: number;
   strokes: Stroke[];
-  textBoxes: TextBox[];
+  stamps: Stamp[];
+  canvasObjects: CanvasObject[];
+  viewport: { scrollX: number; scrollY: number };
   panelInput: string;
-  panelOutput: string;
   chatMessages: ChatMessage[];
-  pan: { x: number; y: number };
+  tableData: Record<string, string[][]>;
+  textBoxData: Record<string, string>;
   lastSaved: string;
+  // Legacy fields (read-only, for migration)
+  excalidrawElements?: unknown[];
 }
 
 const EMPTY_PAGE: CanvasData = {
+  version: 2,
   strokes: [],
-  textBoxes: [],
+  stamps: [],
+  canvasObjects: [],
+  viewport: { scrollX: 0, scrollY: 0 },
   panelInput: "",
-  panelOutput: "",
   chatMessages: [],
-  pan: { x: 0, y: 0 },
+  tableData: {},
+  textBoxData: {},
   lastSaved: "",
 };
 
@@ -64,7 +74,6 @@ export async function deleteSection(plugin: NoteometryPlugin, name: string): Pro
   const path = sectionPath(plugin, name);
   const adapter = plugin.app.vault.adapter;
   if (await adapter.exists(path)) {
-    // Delete all pages in the section first
     const pages = await listPages(plugin, name);
     for (const p of pages) {
       await deletePage(plugin, name, p);
@@ -128,17 +137,34 @@ export async function loadPage(
     if (await adapter.exists(path)) {
       const raw = await adapter.read(path);
       const parsed = JSON.parse(raw);
-      // Migration: old Excalidraw format
-      if (parsed.elements && !parsed.strokes) {
-        return { ...EMPTY_PAGE };
+
+      // v2 format (new ink engine)
+      if (parsed.version === 2 || parsed.strokes) {
+        return {
+          version: 2,
+          strokes: parsed.strokes ?? [],
+          stamps: parsed.stamps ?? [],
+          canvasObjects: parsed.canvasObjects ?? [],
+          viewport: parsed.viewport ?? { scrollX: 0, scrollY: 0 },
+          panelInput: parsed.panelInput ?? "",
+          chatMessages: parsed.chatMessages ?? [],
+          tableData: parsed.tableData ?? {},
+          textBoxData: parsed.textBoxData ?? {},
+          lastSaved: parsed.lastSaved ?? "",
+        };
       }
+
+      // v1 format (Excalidraw) — migrate what we can
       return {
-        strokes: parsed.strokes ?? [],
-        textBoxes: parsed.textBoxes ?? [],
+        version: 2,
+        strokes: [],
+        stamps: [],
+        canvasObjects: [],
+        viewport: { scrollX: 0, scrollY: 0 },
         panelInput: parsed.panelInput ?? "",
-        panelOutput: parsed.panelOutput ?? "",
         chatMessages: parsed.chatMessages ?? [],
-        pan: parsed.pan ?? { x: 0, y: 0 },
+        tableData: parsed.tableData ?? {},
+        textBoxData: parsed.textBoxData ?? {},
         lastSaved: parsed.lastSaved ?? "",
       };
     }
@@ -155,7 +181,6 @@ export async function savePage(
   data: CanvasData
 ): Promise<void> {
   try {
-    // Ensure folder exists
     const secPath = sectionPath(plugin, section);
     const adapter = plugin.app.vault.adapter;
     if (!(await adapter.exists(secPath))) {
@@ -177,13 +202,23 @@ export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section
   try {
     if (await adapter.exists(legacyPath)) {
       const raw = await adapter.read(legacyPath);
-      const data = JSON.parse(raw) as CanvasData;
-      // Save to default section/page
+      const parsed = JSON.parse(raw);
       const section = "General";
       const page = "Untitled";
       await createSection(plugin, section);
+      const data: CanvasData = {
+        version: 2,
+        strokes: [],
+        stamps: [],
+        canvasObjects: [],
+        viewport: { scrollX: 0, scrollY: 0 },
+        panelInput: parsed.panelInput ?? "",
+        chatMessages: parsed.chatMessages ?? [],
+        tableData: parsed.tableData ?? {},
+        textBoxData: parsed.textBoxData ?? {},
+        lastSaved: parsed.lastSaved ?? "",
+      };
       await savePage(plugin, section, page, data);
-      // Remove legacy file
       await adapter.remove(legacyPath);
       return { section, page };
     }

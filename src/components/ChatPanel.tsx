@@ -1,23 +1,69 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, X, RotateCcw } from "lucide-react";
-import { App } from "obsidian";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Paperclip, X, RotateCcw, Copy, Check } from "lucide-react";
+import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
-import MarkdownPreview from "./MarkdownPreview";
+import KaTeXRenderer from "./KaTeXRenderer";
 
 interface Props {
   messages: ChatMessage[];
   onSend: (text: string, attachments: Attachment[]) => void;
   onClear: () => void;
   loading: boolean;
-  app: App;
 }
 
-export default function ChatPanel({ messages, onSend, onClear, loading, app }: Props) {
+/** Convert a message containing LaTeX ($..$ or $$..$$) into MathML + plain text */
+/** Convert a message with LaTeX to HTML+MathML with proper paragraph breaks for Word */
+function toMathML(text: string): string {
+  // Split into paragraphs on double-newlines or single newlines
+  const lines = text.split(/\n/);
+
+  const htmlLines = lines.map((line) => {
+    let result = line;
+    // Replace display math $$..$$
+    result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_m, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { output: "mathml", throwOnError: false, displayMode: true });
+      } catch { return tex; }
+    });
+    // Replace inline math $..$
+    result = result.replace(/\$([^$]+?)\$/g, (_m, tex) => {
+      try {
+        return katex.renderToString(tex.trim(), { output: "mathml", throwOnError: false, displayMode: false });
+      } catch { return tex; }
+    });
+    return result;
+  });
+
+  // Wrap each line in a paragraph, skip empty lines (they become spacing)
+  return htmlLines
+    .map((l) => l.trim() ? `<p>${l}</p>` : "")
+    .join("\n");
+}
+
+export default function ChatPanel({ messages, onSend, onClear, loading }: Props) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const copyAsMathML = useCallback(async (text: string, idx: number) => {
+    const mathml = toMathML(text);
+    try {
+      // Write both HTML (MathML) and plain text to clipboard
+      const blob = new Blob([mathml], { type: "text/html" });
+      const textBlob = new Blob([text], { type: "text/plain" });
+      await navigator.clipboard.write([
+        new ClipboardItem({ "text/html": blob, "text/plain": textBlob }),
+      ]);
+    } catch {
+      // Fallback: plain text
+      await navigator.clipboard.writeText(text);
+    }
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 1500);
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -66,7 +112,17 @@ export default function ChatPanel({ messages, onSend, onClear, loading, app }: P
         {messages.map((m, i) => (
           <div key={i} className={`noteometry-chat-row ${m.role}`}>
             <div className={`noteometry-chat-bubble ${m.role}`}>
-              <MarkdownPreview content={m.text} app={app} />
+              <KaTeXRenderer content={m.text} />
+              {m.role === "assistant" && (
+                <button
+                  className="noteometry-chat-copy-btn"
+                  onClick={() => copyAsMathML(m.text, i)}
+                  title="Copy as MathML (paste into Word)"
+                >
+                  {copiedIdx === i ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedIdx === i ? "Copied" : "Copy"}
+                </button>
+              )}
             </div>
           </div>
         ))}
