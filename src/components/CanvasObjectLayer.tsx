@@ -133,19 +133,33 @@ export default function CanvasObjectLayer({
             </span>
             <button
               className="noteometry-object-delete"
-              onClick={(e) => {
+              onPointerUp={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 const label = obj.type === "textbox" ? "text box" : obj.type === "table" ? "table" : "image";
-                if (confirm(`Delete this ${label}? This cannot be undone.`)) {
-                  handleDelete(e, obj.id);
+                if (confirm(`Delete this ${label}?`)) {
+                  onObjectsChange(objects.filter(o => o.id !== obj.id));
+                  if (selectedObjectId === obj.id) onSelectObject(null);
                 }
               }}
               title="Delete"
             >&times;</button>
           </div>
 
-          {/* Content */}
-          <div className="noteometry-object-content">
+          {/* Content — stop propagation so drag handler doesn't steal focus */}
+          <div
+            className="noteometry-object-content"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Focus the first editable element inside (keyboard popup on iPad)
+              const editable = (e.currentTarget as HTMLElement).querySelector<HTMLElement>(
+                '[contenteditable], input, textarea'
+              );
+              if (editable) editable.focus();
+            }}
+          >
             {obj.type === "textbox" && <RichTextEditor textBoxId={obj.id} />}
             {obj.type === "table" && <TableEditor tableId={obj.id} />}
             {obj.type === "image" && (

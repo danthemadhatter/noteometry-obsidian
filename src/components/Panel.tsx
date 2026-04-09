@@ -6,6 +6,8 @@ interface Props {
   inputCode: string;
   setInputCode: (v: string) => void;
   onInsertSymbol: (sym: string) => void;
+  onStampSymbol?: (sym: string) => void;
+  onDropStamp?: (display: string, screenX: number, screenY: number) => void;
   onSolve: () => void;
   onClosePanel: () => void;
 }
@@ -55,7 +57,7 @@ function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
 }
 
 export default function Panel({
-  inputCode, setInputCode, onInsertSymbol, onSolve, onClosePanel,
+  inputCode, setInputCode, onInsertSymbol, onStampSymbol, onDropStamp, onSolve, onClosePanel,
 }: Props) {
   const [heights, setHeights] = useState([30, 70]);
 
@@ -115,7 +117,7 @@ export default function Panel({
           onChange={(e) => setInputCode(e.target.value)}
           placeholder="Type or paste LaTeX, or use READ INK..."
         />
-        <MathPalette onInsert={onInsertSymbol} />
+        <MathPalette onInsert={onInsertSymbol} onDragStart={onStampSymbol} onDropStamp={onDropStamp} />
       </div>
     </div>
   );

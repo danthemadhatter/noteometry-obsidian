@@ -1,8 +1,10 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 
 interface Props {
   onInsert: (latex: string) => void;
   onDragStart?: (display: string) => void;
+  /** Place a stamp directly at screen coordinates (for touch drag) */
+  onDropStamp?: (display: string, screenX: number, screenY: number) => void;
 }
 
 export interface SymbolItem {
@@ -119,11 +121,88 @@ const TABS: TabDef[] = [
     id: "trig", label: "sin",
     items: [
       { latex: "\\sin ", display: "sin" }, { latex: "\\cos ", display: "cos" },
-      { latex: "\\tan ", display: "tan" }, { latex: "\\ln ", display: "ln" },
-      { latex: "\\log ", display: "log" }, { latex: "\\log_{}", display: "log₍₎" },
-      { latex: "e^{}", display: "eˣ" },
+      { latex: "\\tan ", display: "tan" }, { latex: "\\sec ", display: "sec" },
+      { latex: "\\csc ", display: "csc" }, { latex: "\\cot ", display: "cot" },
+      { latex: "\\arcsin ", display: "sin⁻¹" }, { latex: "\\arccos ", display: "cos⁻¹" },
+      { latex: "\\arctan ", display: "tan⁻¹" },
+      { latex: "\\ln ", display: "ln" }, { latex: "\\log ", display: "log" },
+      { latex: "\\log_{}", display: "log₍₎" }, { latex: "e^{}", display: "eˣ" },
+    ],
+  },
+  {
+    id: "diffeq", label: "y′",
+    items: [
+      { latex: "y'", display: "y′", title: "First derivative" },
+      { latex: "y''", display: "y″", title: "Second derivative" },
+      { latex: "\\dot{y}", display: "ẏ", title: "Time derivative" },
+      { latex: "\\ddot{y}", display: "ÿ", title: "Second time derivative" },
+      { latex: "\\frac{dy}{dx}", display: "dy/dx", title: "Derivative" },
+      { latex: "\\frac{d^2y}{dx^2}", display: "d²y/dx²", title: "Second derivative" },
+      { latex: "\\frac{\\partial f}{\\partial x}", display: "∂f/∂x", title: "Partial derivative" },
+      { latex: "\\frac{\\partial^2 f}{\\partial x^2}", display: "∂²f/∂x²", title: "Second partial" },
+      { latex: "\\mathcal{L}\\{\\}", display: "ℒ{ }", title: "Laplace transform" },
+      { latex: "\\mathcal{L}^{-1}\\{\\}", display: "ℒ⁻¹{ }", title: "Inverse Laplace" },
+      { latex: "\\mathcal{F}\\{\\}", display: "ℱ{ }", title: "Fourier transform" },
+      { latex: "s", display: "s", title: "Laplace variable" },
+      { latex: "\\delta(t)", display: "δ(t)", title: "Dirac delta" },
+      { latex: "u(t)", display: "u(t)", title: "Unit step" },
+    ],
+  },
+  {
+    id: "stats", label: "P(X)",
+    items: [
+      { latex: "P()", display: "P( )", title: "Probability" },
+      { latex: "E[]", display: "E[ ]", title: "Expected value" },
+      { latex: "\\text{Var}()", display: "Var( )", title: "Variance" },
+      { latex: "\\sigma^2", display: "σ²", title: "Variance" },
+      { latex: "\\bar{x}", display: "x̄", title: "Sample mean" },
+      { latex: "\\hat{p}", display: "p̂", title: "Estimate" },
+      { latex: "\\mu", display: "μ", title: "Population mean" },
+      { latex: "\\sigma", display: "σ", title: "Std deviation" },
+      { latex: "\\binom{n}{k}", display: "ⁿCₖ", title: "Binomial coefficient" },
+      { latex: "n!", display: "n!", title: "Factorial" },
+      { latex: "\\sim ", display: "∼", title: "Distributed as" },
+      { latex: "\\mathcal{N}(\\mu, \\sigma^2)", display: "N(μ,σ²)", title: "Normal dist" },
+      { latex: "\\chi^2", display: "χ²", title: "Chi-squared" },
+      { latex: "H_0", display: "H₀", title: "Null hypothesis" },
+      { latex: "H_a", display: "Hₐ", title: "Alt hypothesis" },
+    ],
+  },
+  {
+    id: "ee", label: "⚡",
+    items: [
+      { latex: "V", display: "V", title: "Voltage" },
+      { latex: "I", display: "I", title: "Current" },
+      { latex: "R", display: "R", title: "Resistance" },
+      { latex: "Z", display: "Z", title: "Impedance" },
+      { latex: "j\\omega", display: "jω", title: "Complex frequency" },
+      { latex: "\\angle ", display: "∠", title: "Phasor angle" },
+      { latex: "\\vec{E}", display: "E⃗", title: "Electric field" },
+      { latex: "\\vec{B}", display: "B⃗", title: "Magnetic field" },
+      { latex: "\\vec{H}", display: "H⃗", title: "H field" },
+      { latex: "\\epsilon_0", display: "ε₀", title: "Permittivity" },
+      { latex: "\\mu_0", display: "μ₀", title: "Permeability" },
+      { latex: "\\nabla \\times ", display: "∇×", title: "Curl" },
+      { latex: "\\nabla \\cdot ", display: "∇·", title: "Divergence" },
+      { latex: "\\oint \\vec{E} \\cdot d\\vec{l}", display: "∮E⃗·dl⃗", title: "Line integral" },
+      { latex: "\\oiint \\vec{B} \\cdot d\\vec{A}", display: "∯B⃗·dA⃗", title: "Surface integral" },
+      { latex: "\\frac{1}{j\\omega C}", display: "1/jωC", title: "Capacitor impedance" },
+      { latex: "j\\omega L", display: "jωL", title: "Inductor impedance" },
+      { latex: "\\Omega ", display: "Ω", title: "Ohms" },
+      { latex: "\\text{dB}", display: "dB", title: "Decibels" },
+      { latex: "H(s)", display: "H(s)", title: "Transfer function" },
+    ],
+  },
+  {
+    id: "logic", label: "∀∃",
+    items: [
       { latex: "\\forall ", display: "∀" }, { latex: "\\exists ", display: "∃" },
-      { latex: "\\neg ", display: "¬" }, { latex: "\\land ", display: "∧" }, { latex: "\\lor ", display: "∨" },
+      { latex: "\\neg ", display: "¬" }, { latex: "\\land ", display: "∧" },
+      { latex: "\\lor ", display: "∨" }, { latex: "\\oplus ", display: "⊕", title: "XOR" },
+      { latex: "\\Rightarrow ", display: "⇒" }, { latex: "\\Leftrightarrow ", display: "⇔" },
+      { latex: "\\top ", display: "⊤", title: "True" }, { latex: "\\bot ", display: "⊥", title: "False" },
+      { latex: "\\emptyset ", display: "∅" }, { latex: "\\cup ", display: "∪" },
+      { latex: "\\cap ", display: "∩" }, { latex: "\\setminus ", display: "∖" },
     ],
   },
 ];
@@ -132,9 +211,17 @@ const TABS: TabDef[] = [
 export { TABS };
 export type { TabDef };
 
-export default function MathPalette({ onInsert, onDragStart }: Props) {
+export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Props) {
   const [openTab, setOpenTab] = useState<string | null>(null);
+  const dragRef = useRef<{
+    item: SymbolItem;
+    ghost: HTMLElement | null;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
 
+  // Desktop HTML5 drag — stamp on canvas ONLY, no Input insertion
   const handleDragStart = useCallback((e: React.DragEvent, item: SymbolItem) => {
     const stampText = item.stamp ?? item.display;
     e.dataTransfer.setData("text/plain", stampText);
@@ -142,6 +229,81 @@ export default function MathPalette({ onInsert, onDragStart }: Props) {
     e.dataTransfer.effectAllowed = "copy";
     onDragStart?.(stampText);
   }, [onDragStart]);
+
+  // ── Touch drag for iPad ──
+  // Attach touchmove/touchend to DOCUMENT so they fire even after
+  // the finger leaves the original button element.
+  const onTouchStart = useCallback((e: React.TouchEvent, item: SymbolItem) => {
+    const t = e.touches[0];
+    if (!t) return;
+    dragRef.current = {
+      item,
+      ghost: null,
+      startX: t.clientX,
+      startY: t.clientY,
+      moved: false,
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      const state = dragRef.current;
+      const touch = ev.touches[0];
+      if (!state || !touch) return;
+
+      const dx = touch.clientX - state.startX;
+      const dy = touch.clientY - state.startY;
+
+      if (!state.moved && Math.abs(dx) + Math.abs(dy) > 12) {
+        state.moved = true;
+        // Create ghost — drag only places on canvas, no Input insertion
+        const ghost = document.createElement("div");
+        ghost.textContent = state.item.stamp ?? state.item.display;
+        ghost.style.cssText =
+          "position:fixed;z-index:99999;pointer-events:none;" +
+          "font-size:24px;padding:6px 10px;" +
+          "background:rgba(74,144,217,0.15);border:2px solid #4A90D9;" +
+          "border-radius:10px;transform:translate(-50%,-110%);";
+        document.body.appendChild(ghost);
+        state.ghost = ghost;
+      }
+
+      if (state.ghost) {
+        state.ghost.style.left = touch.clientX + "px";
+        state.ghost.style.top = touch.clientY + "px";
+      }
+
+      if (state.moved) {
+        ev.preventDefault(); // prevent scroll while dragging
+      }
+    };
+
+    const onTouchEnd = (ev: TouchEvent) => {
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
+
+      const state = dragRef.current;
+      dragRef.current = null;
+      if (!state) return;
+
+      if (state.ghost) {
+        state.ghost.remove();
+        // Check if finger ended over the canvas → place stamp directly
+        const touch = ev.changedTouches[0];
+        if (touch) {
+          const el = document.elementFromPoint(touch.clientX, touch.clientY);
+          if (el?.closest(".noteometry-canvas-area") && onDropStamp) {
+            const stampText = state.item.stamp ?? state.item.display;
+            onDropStamp(stampText, touch.clientX, touch.clientY);
+          }
+        }
+      } else if (!state.moved) {
+        // Pure tap — insert into Input only
+        onInsert(state.item.latex);
+      }
+    };
+
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+  }, [onInsert, onDragStart]);
 
   return (
     <div className="noteometry-mathpal">
@@ -168,7 +330,7 @@ export default function MathPalette({ onInsert, onDragStart }: Props) {
                 className="noteometry-mathpal-btn"
                 draggable
                 onDragStart={(e) => handleDragStart(e, item)}
-                onClick={() => onInsert(item.latex)}
+                onTouchStart={(e) => onTouchStart(e, item)}
                 title={item.title ?? item.latex}
               >
                 {item.display}

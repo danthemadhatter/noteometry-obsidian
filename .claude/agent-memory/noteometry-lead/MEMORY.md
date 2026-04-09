@@ -1,0 +1,2 @@
+- [User Profile](user_dan.md) -- Dan, EE student building Noteometry, deep canvas/Excalidraw domain knowledge
+- [Excalidraw Pointer Events](project_excalidraw_events.md) -- Excalidraw v0.18 interactive canvas captures pointer events aggressively; must disable to overlay

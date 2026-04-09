@@ -19,6 +19,8 @@ interface Props {
   onViewportChange: (scrollX: number, scrollY: number) => void;
   disabled?: boolean;
   selectedStampId?: string | null;
+  onEraseStart?: () => void;
+  onEraseEnd?: () => void;
 }
 
 const TOOL_CYCLE: CanvasTool[] = ["pen", "eraser", "grab"];
@@ -28,6 +30,7 @@ export default function InkCanvas({
   activeColor, strokeWidth,
   tool, onToolChange, scrollX, scrollY, onViewportChange,
   disabled = false, selectedStampId = null,
+  onEraseStart, onEraseEnd,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -190,6 +193,7 @@ export default function InkCanvas({
     }
 
     if (toolRef.current === "eraser") {
+      onEraseStart?.();
       const tolerance = 10;
       const remainingStrokes = strokesRef.current.filter(s => !pointNearStroke(x, y, s, tolerance));
       if (remainingStrokes.length !== strokesRef.current.length) onStrokesChange(remainingStrokes);
@@ -269,7 +273,7 @@ export default function InkCanvas({
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
 
-    if (toolRef.current === "eraser") return;
+    if (toolRef.current === "eraser") { onEraseEnd?.(); return; }
 
     // Finalize shape tools → convert to stroke points
     if (shapeStartRef.current && shapeEndRef.current) {
@@ -417,32 +421,7 @@ export default function InkCanvas({
     };
   }, [onViewportChange, redrawGrid, redrawInk]);
 
-  // ── Apple Pencil double-tap → cycle tools (pen → eraser → grab) ──
-  const lastTapRef = useRef(0);
-  useEffect(() => {
-    if (!onToolChange) return;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const onDoubleTap = (e: PointerEvent) => {
-      // Only react to stylus (Apple Pencil)
-      if (e.pointerType !== "pen") return;
-      const now = Date.now();
-      if (now - lastTapRef.current < 400) {
-        // Double-tap detected — cycle tool
-        const idx = TOOL_CYCLE.indexOf(toolRef.current);
-        const next = TOOL_CYCLE[(idx + 1) % TOOL_CYCLE.length]!;
-        onToolChange(next);
-        lastTapRef.current = 0; // reset to avoid triple-tap
-        e.preventDefault();
-      } else {
-        lastTapRef.current = now;
-      }
-    };
-
-    container.addEventListener("pointerdown", onDoubleTap);
-    return () => container.removeEventListener("pointerdown", onDoubleTap);
-  }, [onToolChange]);
+  // Tool cycling is handled by a toolbar button (works on all devices)
 
   // ── Resize observer ────────────────────────────────
   useEffect(() => {

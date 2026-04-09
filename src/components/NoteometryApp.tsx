@@ -8,7 +8,7 @@ import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox } from "../l
 import { renderStrokesToImage, renderLassoRegionToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject } from "../lib/canvasObjects";
 import { newStampId } from "../lib/inkEngine";
-import { readInk, chat } from "../lib/ai";
+import { readInk, chat, solve } from "../lib/ai";
 import {
   savePage, loadPage, listSections, listPages,
   createSection, createPage, migrateLegacy,
@@ -29,6 +29,9 @@ interface Props {
   app: App;
 }
 
+/** Called by NoteometryView.onClose to flush pending saves */
+export let flushSave: (() => Promise<void>) | null = null;
+
 export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Canvas state ────────────────────────────────────── */
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -42,8 +45,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [lassoActive, setLassoActive] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
+  const [pendingSymbol, setPendingSymbol] = useState<string | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Swipe blocking is handled in NoteometryView.ts at the view boundary
 
   // Clear selection when switching away from select tool
   useEffect(() => {
@@ -76,31 +83,42 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [selectedObjectId, selectedStampId]);
 
-  // Click canvas to select stamps or deselect
+  // Click canvas to place pending symbol, select stamps, or deselect
   const handleCanvasAreaClick = useCallback((e: React.MouseEvent) => {
-    if (tool !== "select") return;
     const target = e.target as HTMLElement;
     if (target.closest(".noteometry-canvas-object, .noteometry-canvas-toolbar")) return;
 
-    // Check if clicking a stamp
     const rect = canvasAreaRef.current?.getBoundingClientRect();
-    if (rect) {
-      const clickX = e.clientX - rect.left + scrollX;
-      const clickY = e.clientY - rect.top + scrollY;
-      for (const st of stamps) {
-        const bb = stampBBox(st);
-        if (clickX >= bb.x && clickX <= bb.x + bb.w && clickY >= bb.y && clickY <= bb.y + bb.h) {
-          setSelectedStampId(st.id);
-          setSelectedObjectId(null);
-          return;
-        }
+    if (!rect) return;
+    const clickX = e.clientX - rect.left + scrollX;
+    const clickY = e.clientY - rect.top + scrollY;
+
+    // Place pending symbol from palette (tap to place on touch devices)
+    if (pendingSymbol) {
+      setStamps(prev => [...prev, {
+        id: newStampId(), x: clickX, y: clickY,
+        text: pendingSymbol, fontSize: 28, color: activeColor,
+      }]);
+      setPendingSymbol(null);
+      return;
+    }
+
+    if (tool !== "select") return;
+
+    // Check if clicking a stamp
+    for (const st of stamps) {
+      const bb = stampBBox(st);
+      if (clickX >= bb.x && clickX <= bb.x + bb.w && clickY >= bb.y && clickY <= bb.y + bb.h) {
+        setSelectedStampId(st.id);
+        setSelectedObjectId(null);
+        return;
       }
     }
 
     // Clicked empty space
     setSelectedObjectId(null);
     setSelectedStampId(null);
-  }, [tool, stamps, scrollX, scrollY]);
+  }, [tool, stamps, scrollX, scrollY, pendingSymbol, activeColor]);
 
   /* ── Undo/Redo (snapshots of strokes + stamps) ────────── */
   interface UndoSnapshot { strokes: Stroke[]; stamps: Stamp[] }
@@ -157,8 +175,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, [handleUndo, handleRedo]);
 
   /* ── Stroke changes (with undo tracking) ─────────────── */
+  const erasingRef = useRef(false);
   const handleStrokesChange = useCallback((newStrokes: Stroke[]) => {
-    pushUndo();
+    if (!erasingRef.current) pushUndo();
     setStrokes(newStrokes);
   }, [pushUndo]);
 
@@ -210,7 +229,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }, plugin.settings.autoSaveDelay);
   }, [saveNow, plugin]);
 
-  useEffect(() => { doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
+  const loadingPageRef = useRef(false);
+  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
   // Trigger auto-save when table/textbox store changes
@@ -218,6 +238,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setOnChangeCallback(() => doSave());
     return () => setOnChangeCallback(null);
   }, [doSave]);
+
+  // Expose save for view close
+  useEffect(() => {
+    flushSave = saveNow;
+    return () => { flushSave = null; };
+  }, [saveNow]);
 
   /* ── Section/page selection ──────────────────────────── */
   const handleSelect = useCallback(async (section: string, page: string) => {
@@ -238,6 +264,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setCurrentSection(section);
     setCurrentPage(page);
 
+    loadingPageRef.current = true;
     if (section && page) {
       const data = await loadPage(plugin, section, page);
       setInputCode(data.panelInput ?? "");
@@ -262,6 +289,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
       setScrollX(0);
       setScrollY(0);
     }
+    // Clear loading flag after React processes the state updates
+    requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [plugin, saveNow]);
 
   /* ── Initial load ────────────────────────────────────── */
@@ -415,9 +444,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     );
     if (dataUrl) {
       pendingLassoCropRef.current = dataUrl;
+      // Lasso stays visible — user taps OCR to process, or lasso toggle to cancel
+    } else {
+      // Nothing captured — dismiss lasso
       setLassoActive(false);
-      // Auto-trigger OCR processing so the user doesn't need to click again
-      handleReadInkRef.current();
     }
   }, [strokes, stamps, canvasObjects, scrollX, scrollY]);
 
@@ -429,7 +459,18 @@ export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Solve from Input box ────────────────────────────── */
   const handleSolveInput = async () => {
     if (!inputCode.trim()) return;
-    await sendToChat(`Solve this:\n$${inputCode}$`);
+    setChatMessages(prev => [...prev, { role: "user", text: inputCode }]);
+    setChatLoading(true);
+    try {
+      const res = await solve(inputCode, plugin.settings);
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        text: res.ok ? res.text : (res.error ?? "Solve failed."),
+      }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: "assistant", text: "Solver error." }]);
+    }
+    setChatLoading(false);
   };
 
   /* ── Symbol insertion ────────────────────────────────── */
@@ -441,11 +482,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const handleInsertTextBox = useCallback(() => {
     const obj = createTextBox(scrollX + 150, scrollY + 150);
     setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
   }, [scrollX, scrollY]);
 
   const handleInsertTable = useCallback(() => {
     const obj = createTable(scrollX + 200, scrollY + 200);
     setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
   }, [scrollX, scrollY]);
 
   const handleInsertImage = useCallback(() => {
@@ -544,7 +589,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, [scrollX, scrollY, activeColor, pushUndo]);
 
   /* ── Right panel resize ──────────────────────────────── */
-  const [panelWidth, setPanelWidth] = useState(320);
+  const [panelWidth, setPanelWidth] = useState(() => window.innerWidth < 1024 ? 240 : 320);
   const panelDragging = useRef(false);
   const panelLastX = useRef(0);
 
@@ -593,7 +638,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }
 
   return (
-    <div className="noteometry-container">
+    <div ref={containerRef} className="noteometry-container">
       {/* ── Sidebar ── */}
       <Sidebar
         plugin={plugin}
@@ -606,13 +651,16 @@ export default function NoteometryApp({ plugin, app }: Props) {
       <div className="noteometry-main">
         <div className="noteometry-split">
           {/* ── Canvas area ── */}
-          <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}`} onClick={handleCanvasAreaClick} onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop}>
+          <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}${pendingSymbol ? " noteometry-placing-symbol" : ""}`}
+            onClick={handleCanvasAreaClick}
+            onDragOver={handleCanvasDragOver}
+            onDrop={handleCanvasDrop}
+          >
             {/* Hidden image input */}
             <input
               ref={imageInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleImageUpload}
               className="noteometry-hidden"
             />
@@ -676,7 +724,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
               strokes={strokes}
               onStrokesChange={handleStrokesChange}
               stamps={stamps}
-              onStampsChange={(newStamps: Stamp[]) => { pushUndo(); setStamps(newStamps); }}
+              onStampsChange={(newStamps: Stamp[]) => { if (!erasingRef.current) pushUndo(); setStamps(newStamps); }}
+              onEraseStart={() => { erasingRef.current = true; pushUndo(); }}
+              onEraseEnd={() => { erasingRef.current = false; }}
               activeColor={activeColor}
               strokeWidth={strokeWidth}
               tool={tool}
@@ -722,6 +772,18 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   inputCode={inputCode}
                   setInputCode={setInputCode}
                   onInsertSymbol={handleInsertSymbol}
+                  onStampSymbol={(sym) => setPendingSymbol(sym)}
+                  onDropStamp={(display, screenX, screenY) => {
+                    // Direct stamp placement from touch drag
+                    const rect = canvasAreaRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    const x = screenX - rect.left + scrollX;
+                    const y = screenY - rect.top + scrollY;
+                    setStamps(prev => [...prev, {
+                      id: newStampId(), x, y,
+                      text: display, fontSize: 28, color: activeColor,
+                    }]);
+                  }}
                   onSolve={handleSolveInput}
                   onClosePanel={() => setPanelOpen(false)}
                 />

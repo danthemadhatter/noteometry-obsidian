@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Paperclip, X, RotateCcw, Copy, Check } from "lucide-react";
+import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
 import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
-import KaTeXRenderer from "./KaTeXRenderer";
 
 interface Props {
   messages: ChatMessage[];
@@ -11,32 +10,52 @@ interface Props {
   loading: boolean;
 }
 
-/** Convert a message containing LaTeX ($..$ or $$..$$) into MathML + plain text */
-/** Convert a message with LaTeX to HTML+MathML with proper paragraph breaks for Word */
-function toMathML(text: string): string {
-  // Split into paragraphs on double-newlines or single newlines
+/**
+ * Render content with LaTeX as pure MathML (no KaTeX wrapper spans).
+ * This produces bare <math> elements that Safari renders natively
+ * and that copy-paste into Word as real equations.
+ */
+function renderAsMathML(text: string): string {
+  if (!text) return "";
+  let result = text;
+
+  // Helper: render LaTeX to pure MathML, stripping KaTeX wrapper spans
+  const toMath = (tex: string, display: boolean): string => {
+    try {
+      const html = katex.renderToString(tex.trim(), {
+        output: "mathml",
+        displayMode: display,
+        throwOnError: false,
+      });
+      // KaTeX wraps in <span class="katex">...</span>, extract the <math> element
+      const match = html.match(/<math[\s\S]*?<\/math>/);
+      if (match) {
+        return display
+          ? `<div style="text-align:center;margin:8px 0">${match[0]}</div>`
+          : match[0];
+      }
+      return html;
+    } catch { return tex; }
+  };
+
+  // Display math $$...$$
+  result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_m, tex) => toMath(tex, true));
+
+  // Inline math $...$
+  result = result.replace(/\$([^$]+?)\$/g, (_m, tex) => toMath(tex, false));
+
+  result = result.replace(/\n/g, "<br>");
+  return result;
+}
+
+/** Same as renderAsMathML but with <p> wrapping for Word clipboard */
+function toMathMLForClipboard(text: string): string {
   const lines = text.split(/\n/);
-
-  const htmlLines = lines.map((line) => {
-    let result = line;
-    // Replace display math $$..$$
-    result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_m, tex) => {
-      try {
-        return katex.renderToString(tex.trim(), { output: "mathml", throwOnError: false, displayMode: true });
-      } catch { return tex; }
-    });
-    // Replace inline math $..$
-    result = result.replace(/\$([^$]+?)\$/g, (_m, tex) => {
-      try {
-        return katex.renderToString(tex.trim(), { output: "mathml", throwOnError: false, displayMode: false });
-      } catch { return tex; }
-    });
-    return result;
-  });
-
-  // Wrap each line in a paragraph, skip empty lines (they become spacing)
-  return htmlLines
-    .map((l) => l.trim() ? `<p>${l}</p>` : "")
+  return lines
+    .map((line) => {
+      if (!line.trim()) return "";
+      return `<p>${renderAsMathML(line)}</p>`;
+    })
     .join("\n");
 }
 
@@ -49,16 +68,32 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const copyAsMathML = useCallback(async (text: string, idx: number) => {
-    const mathml = toMathML(text);
+    const mathml = toMathMLForClipboard(text);
     try {
-      // Write both HTML (MathML) and plain text to clipboard
-      const blob = new Blob([mathml], { type: "text/html" });
-      const textBlob = new Blob([text], { type: "text/plain" });
-      await navigator.clipboard.write([
-        new ClipboardItem({ "text/html": blob, "text/plain": textBlob }),
-      ]);
+      // Try ClipboardItem API (works in modern browsers for HTML)
+      if (typeof ClipboardItem !== "undefined") {
+        const blob = new Blob([mathml], { type: "text/html" });
+        const textBlob = new Blob([text], { type: "text/plain" });
+        await navigator.clipboard.write([
+          new ClipboardItem({ "text/html": blob, "text/plain": textBlob }),
+        ]);
+      } else {
+        // Fallback: use execCommand with a hidden div for HTML clipboard
+        const tmp = document.createElement("div");
+        tmp.innerHTML = mathml;
+        tmp.style.position = "fixed";
+        tmp.style.left = "-9999px";
+        document.body.appendChild(tmp);
+        const range = document.createRange();
+        range.selectNodeContents(tmp);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.execCommand("copy");
+        sel?.removeAllRanges();
+        document.body.removeChild(tmp);
+      }
     } catch {
-      // Fallback: plain text
       await navigator.clipboard.writeText(text);
     }
     setCopiedIdx(idx);
@@ -96,7 +131,7 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
         <span className="noteometry-chat-title">Chat</span>
         {messages.length > 0 && (
           <button className="noteometry-chat-clear" onClick={onClear} title="New conversation">
-            <RotateCcw size={13} />
+            <IconRotate />
             <span>New</span>
           </button>
         )}
@@ -112,15 +147,18 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
         {messages.map((m, i) => (
           <div key={i} className={`noteometry-chat-row ${m.role}`}>
             <div className={`noteometry-chat-bubble ${m.role}`}>
-              <KaTeXRenderer content={m.text} />
+              <div
+                className="noteometry-katex-output"
+                dangerouslySetInnerHTML={{ __html: renderAsMathML(m.text) }}
+              />
               {m.role === "assistant" && (
                 <button
                   className="noteometry-chat-copy-btn"
                   onClick={() => copyAsMathML(m.text, i)}
                   title="Copy as MathML (paste into Word)"
                 >
-                  {copiedIdx === i ? <Check size={12} /> : <Copy size={12} />}
-                  {copiedIdx === i ? "Copied" : "Copy"}
+                  {copiedIdx === i ? <IconCheck /> : <IconCopy />}
+                  {copiedIdx === i ? "Copied!" : "Copy for Word"}
                 </button>
               )}
             </div>
@@ -144,7 +182,7 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
                 className="noteometry-chat-attachment-remove"
                 onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
               >
-                <X size={10} />
+                <IconX />
               </button>
             </div>
           ))}
@@ -165,7 +203,7 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
           className="noteometry-chat-attach-btn"
           onClick={() => fileRef.current?.click()}
         >
-          <Paperclip size={15} />
+          <IconPaperclip />
         </button>
         <textarea
           ref={textareaRef}
@@ -186,7 +224,7 @@ export default function ChatPanel({ messages, onSend, onClear, loading }: Props)
           onClick={send}
           disabled={loading || (!input.trim() && !attachments.length)}
         >
-          <Send size={14} />
+          <IconSend />
         </button>
       </div>
     </div>

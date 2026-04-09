@@ -112,23 +112,26 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are an expert at reading handwritten content, screenshots, and diagrams. Extract ALL information from the image accurately.
+const VISION_SYSTEM = `You are an expert at reading and extracting content from ANY image. You handle handwritten notes, typed text, screenshots, diagrams, photos of textbook pages, circuit schematics, graphs, tables, code snippets, mixed-media collages — literally anything visual.
 
 RULES:
-1. If you see math/equations: output LaTeX wrapped in $$ delimiters. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
-2. If you see plain text: output it as plain text, preserving line breaks and structure
-3. If you see a diagram/figure with variables, coordinates, or labels: describe the setup precisely, then express any visible equations or relationships in LaTeX
-4. If you see a mix of text and math: output both, using $$ for math parts and plain text for the rest
-5. If you see a screenshot of a homework/textbook problem: transcribe the FULL problem including all given information, figures described, and the question asked
-6. NEVER describe symbols in words — no "[integral symbol]", no prose about what symbols look like
-7. Preserve the structure and order of the original content`;
+1. Math/equations: output LaTeX wrapped in $$ delimiters. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
+2. Plain text: output as plain text, preserving line breaks and structure
+3. Diagrams/figures: describe precisely — note ALL labels, values, connections, component types, and relationships. Express any visible equations in LaTeX
+4. Circuit schematics: identify all components (resistors, capacitors, inductors, sources), their values, node names, and write the circuit equations (KVL/KCL) in LaTeX
+5. Mixed content: output everything — use $$ for math parts, plain text for the rest
+6. Screenshots/photos of problems: transcribe the FULL problem including all given information and the question
+7. Photos/images of real objects: describe what's relevant and extract any visible text, numbers, labels, or data
+8. NEVER describe symbols in words — use actual LaTeX commands
+9. Preserve the structure and order of the original content
+10. If the content looks messy, mixed, or collage-like — process ALL of it anyway, best effort`;
 
 export async function readInk(
   base64Png: string,
   settings: NoteometrySettings
 ): Promise<AIResult> {
   const data = base64Png.replace(/^data:image\/\w+;base64,/, "");
-  const prompt = "Read and extract everything in this image. For math, use $$...$$ LaTeX. For text, output plain text. For diagrams, describe the setup and express relationships as LaTeX. Preserve structure.";
+  const prompt = "Extract everything from this image. For math, use $$...$$ LaTeX. For text, output plain text. For diagrams/circuits, describe the setup and express relationships as equations. For photos/screenshots, transcribe all visible content. Process everything you see regardless of format or quality.";
 
   if (settings.aiProvider === "lmstudio") {
     return callLMStudio(settings, settings.lmStudioVisionModel, VISION_SYSTEM, [

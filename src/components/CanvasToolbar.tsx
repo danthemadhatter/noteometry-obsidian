@@ -3,7 +3,7 @@ import {
   IconSelect, IconPen, IconEraser, IconHand, IconLasso, IconScan,
   IconType, IconTable, IconImage, IconUndo, IconRedo,
   IconLine, IconArrow, IconRect, IconCircle,
-  IconDownload, IconTrash, IconPenLine,
+  IconDownload, IconTrash, IconSliders, IconRefresh,
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
 
@@ -21,6 +21,13 @@ const STROKE_WIDTHS = [
   { width: 3, label: "Medium" },
   { width: 5, label: "Thick" },
   { width: 8, label: "Marker" },
+];
+
+const SHAPE_TOOLS: { tool: CanvasTool; icon: React.FC; label: string }[] = [
+  { tool: "line", icon: IconLine, label: "Line" },
+  { tool: "arrow", icon: IconArrow, label: "Arrow" },
+  { tool: "rect", icon: IconRect, label: "Rectangle" },
+  { tool: "circle", icon: IconCircle, label: "Circle" },
 ];
 
 interface Props {
@@ -70,15 +77,17 @@ export default function CanvasToolbar({
   onReadInk, isReading,
   onClearCanvas, onExportImage,
 }: Props) {
-  const [showWidths, setShowWidths] = useState(false);
+  const [popup, setPopup] = useState<"" | "shapes" | "widths" | "insert" | "more">("");
+  const toggle = (p: typeof popup) => setPopup(popup === p ? "" : p);
+  const isShape = ["line", "arrow", "rect", "circle"].includes(tool);
+
+  // Get current shape icon for the button
+  const ShapeIcon = SHAPE_TOOLS.find(s => s.tool === tool)?.icon ?? IconLine;
 
   return (
     <div className="noteometry-canvas-toolbar">
-      {/* ── Core tools ── */}
+      {/* ── Core drawing tools + cycle ── */}
       <div className="noteometry-toolbar-group">
-        <Btn active={tool === "select" && !lassoActive} onClick={() => onToolChange("select")} title="Select">
-          <IconSelect />
-        </Btn>
         <Btn active={tool === "pen" && !lassoActive} onClick={() => onToolChange("pen")} title="Pen">
           <IconPen />
         </Btn>
@@ -88,21 +97,44 @@ export default function CanvasToolbar({
         <Btn active={tool === "grab" && !lassoActive} onClick={() => onToolChange("grab")} title="Pan">
           <IconHand />
         </Btn>
+        <Btn active={tool === "select" && !lassoActive} onClick={() => onToolChange("select")} title="Select">
+          <IconSelect />
+        </Btn>
+        <Btn
+          onClick={() => {
+            const cycle: CanvasTool[] = ["pen", "eraser", "grab"];
+            const idx = cycle.indexOf(tool);
+            onToolChange(cycle[(idx + 1) % cycle.length]!);
+          }}
+          title="Cycle tool (Pen → Eraser → Grab)"
+        >
+          <IconRefresh />
+        </Btn>
       </div>
 
-      {/* ── Shape tools ── */}
+      {/* ── Shapes (popup) ── */}
+      <div className="noteometry-toolbar-group" style={{ position: "relative" }}>
+        <Btn active={isShape} onClick={() => toggle("shapes")} title="Shapes">
+          <ShapeIcon />
+        </Btn>
+        {popup === "shapes" && (
+          <div className="noteometry-toolbar-popup">
+            {SHAPE_TOOLS.map((s) => (
+              <Btn key={s.tool} active={tool === s.tool} onClick={() => { onToolChange(s.tool); setPopup(""); }} title={s.label}>
+                <s.icon />
+              </Btn>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Undo / Redo (always visible) ── */}
       <div className="noteometry-toolbar-group">
-        <Btn active={tool === "line"} onClick={() => onToolChange("line")} title="Straight line">
-          <IconLine />
+        <Btn onClick={onUndo} disabled={!canUndo} title="Undo">
+          <IconUndo />
         </Btn>
-        <Btn active={tool === "arrow"} onClick={() => onToolChange("arrow")} title="Arrow">
-          <IconArrow />
-        </Btn>
-        <Btn active={tool === "rect"} onClick={() => onToolChange("rect")} title="Rectangle">
-          <IconRect />
-        </Btn>
-        <Btn active={tool === "circle"} onClick={() => onToolChange("circle")} title="Circle">
-          <IconCircle />
+        <Btn onClick={onRedo} disabled={!canRedo} title="Redo">
+          <IconRedo />
         </Btn>
       </div>
 
@@ -135,18 +167,18 @@ export default function CanvasToolbar({
         ))}
       </div>
 
-      {/* ── Stroke width ── */}
+      {/* ── Width picker (popup) ── */}
       <div className="noteometry-toolbar-group" style={{ position: "relative" }}>
-        <Btn onClick={() => setShowWidths(!showWidths)} title="Stroke width" active={showWidths}>
-          <IconPenLine />
+        <Btn onClick={() => toggle("widths")} title="Stroke width" active={popup === "widths"}>
+          <IconSliders />
         </Btn>
-        {showWidths && (
-          <div className="noteometry-width-picker">
+        {popup === "widths" && (
+          <div className="noteometry-toolbar-popup">
             {STROKE_WIDTHS.map((sw) => (
               <button
                 key={sw.width}
                 className={`noteometry-width-option ${strokeWidth === sw.width ? "active" : ""}`}
-                onClick={() => { onStrokeWidthChange(sw.width); setShowWidths(false); }}
+                onClick={() => { onStrokeWidthChange(sw.width); setPopup(""); }}
                 title={sw.label}
               >
                 <span
@@ -159,7 +191,7 @@ export default function CanvasToolbar({
         )}
       </div>
 
-      {/* ── Insert objects ── */}
+      {/* ── Insert (direct buttons) ── */}
       <div className="noteometry-toolbar-group">
         <Btn onClick={onInsertTextBox} title="Text box">
           <IconType />
@@ -167,25 +199,22 @@ export default function CanvasToolbar({
         <Btn onClick={onInsertTable} title="Table">
           <IconTable />
         </Btn>
-        <Btn onClick={onInsertImage} title="Photo / Camera">
+        <Btn onClick={onInsertImage} title="Image">
           <IconImage />
         </Btn>
       </div>
 
-      {/* ── Undo / Redo / Actions ── */}
-      <div className="noteometry-toolbar-group">
-        <Btn onClick={onUndo} disabled={!canUndo} title="Undo">
-          <IconUndo />
-        </Btn>
-        <Btn onClick={onRedo} disabled={!canRedo} title="Redo">
-          <IconRedo />
-        </Btn>
-        <Btn onClick={onExportImage} title="Export as image">
+      {/* ── More actions (popup) ── */}
+      <div className="noteometry-toolbar-group" style={{ position: "relative" }}>
+        <Btn onClick={() => toggle("more")} title="More" active={popup === "more"}>
           <IconDownload />
         </Btn>
-        <Btn onClick={onClearCanvas} title="Clear canvas">
-          <IconTrash />
-        </Btn>
+        {popup === "more" && (
+          <div className="noteometry-toolbar-popup">
+            <Btn onClick={() => { onExportImage(); setPopup(""); }} title="Export PNG"><IconDownload /></Btn>
+            <Btn onClick={() => { onClearCanvas(); setPopup(""); }} title="Clear canvas"><IconTrash /></Btn>
+          </div>
+        )}
       </div>
     </div>
   );

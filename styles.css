@@ -26,6 +26,17 @@
 .noteometry-root {
   height: 100%;
   overflow: hidden;
+  /* Prevent Obsidian's swipe-to-open-backlinks from triggering */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+/* Block Obsidian's edge swipe gestures inside Noteometry */
+.noteometry-container,
+.noteometry-right,
+.noteometry-right-inner,
+.noteometry-mathpal {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .noteometry-container {
@@ -184,19 +195,29 @@
   flex: 1;
 }
 
+.noteometry-sidebar-item-action,
 .noteometry-sidebar-item-del {
   opacity: 0;
   background: none;
   border: none;
-  padding: 3px;
+  padding: 4px;
   cursor: pointer;
   color: var(--text-faint);
   flex-shrink: 0;
   transition: all 0.12s;
   border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.noteometry-sidebar-item-action svg,
+.noteometry-sidebar-item-del svg {
+  width: 12px !important;
+  height: 12px !important;
 }
 
-.noteometry-sidebar-item:hover .noteometry-sidebar-item-del {
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-action,
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-del,
+.noteometry-sidebar-item:active .noteometry-sidebar-item-action,
+.noteometry-sidebar-item:active .noteometry-sidebar-item-del {
   opacity: 0.5;
 }
 
@@ -204,6 +225,32 @@
   opacity: 1 !important;
   color: var(--nm-danger);
   background: rgba(226, 85, 85, 0.08);
+}
+.noteometry-sidebar-item-action:hover {
+  opacity: 1 !important;
+  color: var(--nm-accent);
+}
+
+/* Inline input OK button */
+.noteometry-sidebar-input-ok {
+  padding: 4px 10px;
+  background: var(--nm-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--nm-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Show action buttons on touch (no hover on iPad) */
+@media (pointer: coarse) {
+  .noteometry-sidebar-item-action,
+  .noteometry-sidebar-item-del {
+    opacity: 0.4;
+  }
 }
 
 .noteometry-sidebar-add {
@@ -621,13 +668,24 @@
   padding: 0 2px;
 }
 .noteometry-color-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  display: inline-block !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  border-radius: 50% !important;
   border: 2px solid transparent;
   cursor: pointer;
   transition: border-color 0.12s, transform 0.12s;
-  padding: 0;
+  padding: 0 !important;
+  margin: 0 1px;
+  flex: 0 0 18px;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .noteometry-color-dot:hover {
   transform: scale(1.2);
@@ -766,6 +824,23 @@
   color: var(--nm-accent);
   border-bottom-color: var(--nm-accent);
   font-weight: 600;
+}
+
+.noteometry-mathpal-place-btn {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--nm-accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.noteometry-mathpal-place-btn:active {
+  transform: scale(0.95);
 }
 
 .noteometry-mathpal-grid {
@@ -1067,6 +1142,7 @@
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100% - 16px);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -1079,13 +1155,41 @@
   border-radius: 16px;
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.15);
   pointer-events: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.noteometry-canvas-toolbar::-webkit-scrollbar { display: none; }
+
+/* Pending symbol placement indicator */
+.noteometry-placing-symbol {
+  cursor: crosshair !important;
+}
+.noteometry-placing-symbol::after {
+  content: "Tap to place symbol";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--nm-accent);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 300;
+  pointer-events: none;
+  animation: nm-fade-in 0.2s ease;
+}
+@keyframes nm-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
 .noteometry-toolbar-group {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 3px;
+  flex-shrink: 0;
 }
 .noteometry-toolbar-group + .noteometry-toolbar-group {
   border-left: 1px solid rgba(0, 0, 0, 0.08);
@@ -1169,6 +1273,24 @@
   display: none;
 }
 
+/* Toolbar popups (shapes, width, insert, more) */
+.noteometry-toolbar-popup {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+
 /* Stroke width picker popup */
 .noteometry-width-picker {
   position: absolute;
@@ -1248,11 +1370,19 @@
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 14px;
-  padding: 0 2px;
+  font-size: 18px;
+  padding: 6px 8px;
   line-height: 1;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .noteometry-object-delete:hover { color: var(--nm-danger); }
+.noteometry-object-delete:active { color: var(--nm-danger); transform: scale(0.9); }
 
 .noteometry-object-content {
   flex: 1;
@@ -1347,8 +1477,13 @@
     width: 36px;
     height: 36px;
   }
-  .noteometry-toolbar-colors {
-    display: none; /* color dots hidden on phone — use long-press later */
+  .noteometry-toolbar-colors .noteometry-color-dot {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+    min-height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
   }
 
   /* Stack canvas + panel vertically */

@@ -74,8 +74,10 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       }
     };
 
+    let captured = false;
+
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || captured) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -110,6 +112,9 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       if (pts.length >= 10) {
         const xs = pts.map((p) => p.x);
         const ys = pts.map((p) => p.y);
+        captured = true;
+        // Let clicks pass through to toolbar/OCR button
+        canvas.style.pointerEvents = "none";
         onCompleteRef.current({
           points: [...pts],
           minX: Math.min(...xs),
