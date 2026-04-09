@@ -63,8 +63,8 @@ export default function Panel({
     setHeights((prev) => {
       const next = [...prev];
       const pct = (dy / 6);
-      next[0] = Math.max(0, prev[0]! + pct);
-      next[1] = Math.max(0, prev[1]! - pct);
+      next[0] = Math.max(10, prev[0]! + pct);
+      next[1] = Math.max(10, prev[1]! - pct);
       return next;
     });
   }, []);

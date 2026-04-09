@@ -44,23 +44,52 @@
   flex-direction: column;
 }
 
-/* ── Sidebar — OneNote-style section/page columns ─────────── */
+/* ── Sidebar — single-column, overlay on mobile ─────────── */
 
 .noteometry-sidebar {
-  display: flex;
-  flex-direction: row;
-  border-right: 1px solid var(--nm-warm-border-strong);
-  background: var(--nm-warm-bg-alt);
   flex-shrink: 0;
   height: 100%;
-  transition: width 0.2s ease;
+  z-index: 500;
 }
 
-.noteometry-sidebar-collapsed {
-  width: 36px;
+.noteometry-sidebar-closed {
+  width: 44px;
+  display: flex;
   align-items: flex-start;
-  justify-content: center;
-  padding-top: 10px;
+  padding-top: 8px;
+  background: var(--nm-warm-bg-alt);
+  border-right: 1px solid var(--nm-warm-border);
+}
+
+.noteometry-sidebar-open {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  background: var(--nm-warm-bg-alt);
+  border-right: 1px solid var(--nm-warm-border-strong);
+}
+
+.noteometry-sidebar-backdrop {
+  display: none;
+}
+
+/* Mobile: sidebar overlays canvas */
+@media (max-width: 768px) {
+  .noteometry-sidebar-open {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+  .noteometry-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 499;
+    background: rgba(0, 0, 0, 0.3);
+  }
 }
 
 .noteometry-sidebar-toggle {
@@ -81,38 +110,47 @@
   color: var(--nm-accent);
 }
 
-.noteometry-sidebar-sections {
-  display: flex;
-  flex-direction: column;
-  width: 150px;
-  border-right: 1px solid var(--nm-warm-border);
-  background: var(--nm-warm-bg-alt);
-}
-
-.noteometry-sidebar-pages {
-  display: flex;
-  flex-direction: column;
-  width: 170px;
-  background: var(--nm-warm-bg);
-}
-
 .noteometry-sidebar-hdr {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 12px 12px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-faint);
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--nm-warm-border);
   flex-shrink: 0;
+}
+
+.noteometry-sidebar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-normal, #1e1e1e);
+  letter-spacing: -0.2px;
+}
+
+.noteometry-sidebar-section {
+  border-bottom: 1px solid var(--nm-warm-border);
+}
+
+.noteometry-sidebar-pages {
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .noteometry-sidebar-list {
   flex: 1;
   overflow-y: auto;
   padding: 2px 0;
+}
+
+.noteometry-sidebar-section-item {
+  font-weight: 600;
+  color: var(--text-normal, #1e1e1e);
+}
+.noteometry-sidebar-page-item {
+  padding-left: 28px !important;
+  font-size: 13px;
+}
+.noteometry-sidebar-add-page {
+  padding-left: 28px !important;
+  font-size: 12px;
 }
 
 .noteometry-sidebar-item {
@@ -261,131 +299,8 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* Graph paper: 1/8" (12px) light grid + 1" (96px) bold grid */
+  /* Grid is drawn on the canvas layer (canvasRenderer.ts) so it scrolls with content */
   background-color: #fafaf8;
-  background-image:
-    /* bold 1" grid */
-    linear-gradient(rgba(160, 180, 200, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(160, 180, 200, 0.35) 1px, transparent 1px),
-    /* fine 1/8" grid */
-    linear-gradient(rgba(160, 180, 200, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(160, 180, 200, 0.12) 1px, transparent 1px);
-  background-size:
-    96px 96px,
-    96px 96px,
-    12px 12px,
-    12px 12px;
-}
-
-/* ── Excalidraw integration + visual customization ─────────── */
-
-/* Excalidraw overrides removed — using custom canvas */
-
-/* When lasso is active, disable the entire Excalidraw component
-   so the overlay canvas intercepts all pointer events. */
-.noteometry-lasso-active .excalidraw,
-.noteometry-lasso-active .excalidraw * {
-  pointer-events: none !important;
-}
-
-/* Make Excalidraw background transparent so graph paper shows through */
-.noteometry-canvas-area .excalidraw,
-.noteometry-canvas-area .excalidraw .excalidraw__canvas-wrapper,
-.noteometry-canvas-area .excalidraw .excalidraw__canvas-wrapper > div,
-.noteometry-canvas-area .excalidraw .layer-ui__wrapper {
-  background: transparent !important;
-}
-
-/* Warm up Excalidraw's UI to match Noteometry */
-.noteometry-canvas-area .excalidraw {
-  --island-bg-color: rgba(250, 250, 248, 0.95);
-  --popup-bg-color: #fafaf8;
-  --popup-secondary-bg-color: #f5f4f0;
-  --color-primary: #4A90D9;
-  --color-primary-darker: #3A7BC8;
-  --color-primary-darkest: #2A6AB8;
-  --color-primary-light: rgba(74, 144, 217, 0.15);
-  --color-surface-high: #fafaf8;
-  --color-surface-low: #f5f4f0;
-  --color-surface-mid: #f0efeb;
-  --default-border-color: rgba(0, 0, 0, 0.08);
-  --color-on-primary-container: #4A90D9;
-  font-family: var(--nm-font);
-}
-
-/* Rounded, softer toolbar islands */
-.noteometry-canvas-area .excalidraw .Island {
-  border-radius: 14px !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
-}
-
-/* Softer toolbar buttons */
-.noteometry-canvas-area .excalidraw .ToolIcon__icon {
-  border-radius: 8px !important;
-}
-
-/* Active tool highlight */
-.noteometry-canvas-area .excalidraw .ToolIcon--selected .ToolIcon__icon {
-  background: var(--nm-accent-light) !important;
-}
-
-/* Hide Excalidraw's welcome screen and some UI clutter */
-.noteometry-canvas-area .excalidraw .welcome-screen-center,
-.noteometry-canvas-area .excalidraw .main-menu-trigger {
-  display: none !important;
-}
-/* Hide zoom controls — zoom locked to 100% */
-.noteometry-canvas-area .excalidraw .zoom-actions,
-.noteometry-canvas-area .excalidraw [class*="footer-right"] {
-  display: none !important;
-}
-
-/* ── Move Excalidraw toolbar to left side as vertical column ── */
-
-/* The entire footer/menu area — reposition to left side */
-.noteometry-canvas-area .excalidraw .layer-ui__wrapper__footer {
-  position: absolute !important;
-  top: 6px !important;
-  left: 6px !important;
-  bottom: auto !important;
-  right: auto !important;
-  width: auto !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  padding: 0 !important;
-  pointer-events: none !important;
-}
-.noteometry-canvas-area .excalidraw .layer-ui__wrapper__footer > * {
-  pointer-events: auto !important;
-}
-
-/* The toolbar wrapper — make vertical */
-.noteometry-canvas-area .excalidraw [class*="footer-left"] {
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  gap: 4px !important;
-}
-
-/* The toolbar island itself — vertical */
-.noteometry-canvas-area .excalidraw .App-toolbar-container,
-.noteometry-canvas-area .excalidraw .App-toolbar,
-.noteometry-canvas-area .excalidraw .App-toolbar-content {
-  flex-direction: column !important;
-}
-
-/* Dividers become horizontal lines in vertical layout */
-.noteometry-canvas-area .excalidraw .App-toolbar__divider {
-  width: 80% !important;
-  height: 1px !important;
-  margin: 2px auto !important;
-}
-
-/* Shape picker dropdown — position to the right of toolbar */
-.noteometry-canvas-area .excalidraw .App-toolbar__extra-tools-dropdown {
-  left: 100% !important;
-  top: 0 !important;
-  bottom: auto !important;
 }
 
 /* ── Right panel ──────────────────────────────────────────── */
@@ -448,7 +363,6 @@
   top: 8px;
   right: 8px;
   z-index: 200;
-  pointer-events: auto;
   display: flex;
   gap: 4px;
   pointer-events: none;
@@ -1150,19 +1064,33 @@
 
 .noteometry-canvas-toolbar {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 200;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--nm-warm-border);
-  border-radius: var(--nm-radius);
-  box-shadow: var(--nm-shadow-toolbar);
+  gap: 2px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.15);
   pointer-events: auto;
+}
+
+.noteometry-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 3px;
+}
+.noteometry-toolbar-group + .noteometry-toolbar-group {
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  margin-left: 2px;
+  padding-left: 5px;
 }
 
 .noteometry-toolbar-readink {
@@ -1185,34 +1113,100 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: var(--nm-radius-sm);
+  border-radius: 10px;
   cursor: pointer;
-  color: var(--text-normal);
-  transition: all 0.12s;
+  color: #3c3c43;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Ensure inline SVG icons render correctly inside Noteometry */
+.noteometry-toolbar-btn svg,
+.noteometry-sidebar svg,
+.noteometry-sidebar-add svg,
+.noteometry-sidebar-item svg {
+  display: inline-block !important;
+  width: 18px !important;
+  height: 18px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.noteometry-toolbar-btn svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+.noteometry-sidebar-item-del svg {
+  width: 13px !important;
+  height: 13px !important;
 }
 .noteometry-toolbar-btn:hover {
-  background: var(--nm-accent-light);
-  color: var(--nm-accent);
+  background: rgba(0, 0, 0, 0.06);
+}
+.noteometry-toolbar-btn:active {
+  transform: scale(0.92);
 }
 .noteometry-toolbar-btn.active {
   background: var(--nm-accent);
   color: #fff;
 }
 .noteometry-toolbar-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
+}
+.noteometry-toolbar-btn:disabled:active {
+  transform: none;
 }
 
 .noteometry-toolbar-sep {
-  width: 1px;
-  height: 20px;
-  background: var(--nm-warm-border-strong);
-  margin: 0 4px;
+  display: none;
+}
+
+/* Stroke width picker popup */
+.noteometry-width-picker {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+.noteometry-width-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.noteometry-width-option.active {
+  background: var(--nm-accent-light);
+}
+.noteometry-width-option:active {
+  transform: scale(0.92);
+}
+.noteometry-width-preview {
+  display: block;
+  border-radius: 4px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1336,4 +1330,35 @@
 
 .noteometry-canvas-object {
   z-index: 51;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* Toolbar: still centered bottom, but compact */
+  .noteometry-canvas-toolbar {
+    bottom: 8px;
+    padding: 4px 6px;
+    border-radius: 14px;
+  }
+  .noteometry-toolbar-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .noteometry-toolbar-colors {
+    display: none; /* color dots hidden on phone — use long-press later */
+  }
+
+  /* Stack canvas + panel vertically */
+  .noteometry-split {
+    flex-direction: column !important;
+  }
+  .noteometry-right {
+    width: 100% !important;
+    max-height: 40vh;
+    border-left: none !important;
+    border-top: 1px solid var(--nm-warm-border-strong);
+  }
 }

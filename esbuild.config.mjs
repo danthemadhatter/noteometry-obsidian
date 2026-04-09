@@ -1,6 +1,22 @@
 import esbuild from "esbuild";
 import process from "process";
 import { builtinModules } from 'node:module';
+import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+// Auto-deploy built files to Obsidian Sync vault after production builds
+const SYNC_VAULT_PLUGIN = join(
+  process.env.HOME || "",
+  "Documents/Noteometry/.obsidian/plugins/noteometry"
+);
+
+function deployToVault() {
+  if (!existsSync(SYNC_VAULT_PLUGIN)) return;
+  for (const f of ["main.js", "styles.css", "manifest.json"]) {
+    try { copyFileSync(f, join(SYNC_VAULT_PLUGIN, f)); } catch {}
+  }
+  console.log("Deployed to Obsidian Sync vault");
+}
 
 const banner =
 `/*
@@ -43,6 +59,7 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	deployToVault();
 	process.exit(0);
 } else {
 	await context.watch();

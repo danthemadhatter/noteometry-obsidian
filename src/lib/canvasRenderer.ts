@@ -89,7 +89,7 @@ export function drawGrid(
   ctx.stroke();
 }
 
-/** Draw a single stroke with pressure-sensitive width */
+/** Draw a single stroke — uniform width, no pressure sensitivity */
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
   stroke: Stroke,
@@ -101,10 +101,9 @@ export function drawStroke(
     // Single point — draw a dot
     if (pts.length === 1) {
       const p = pts[0]!;
-      const r = stroke.width * Math.max(p.pressure, 0.3) * 0.5;
       ctx.fillStyle = stroke.color;
       ctx.beginPath();
-      ctx.arc(p.x - scrollX, p.y - scrollY, r, 0, Math.PI * 2);
+      ctx.arc(p.x - scrollX, p.y - scrollY, stroke.width * 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
     return;
@@ -113,29 +112,25 @@ export function drawStroke(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = stroke.color;
+  ctx.lineWidth = stroke.width;
 
-  // Draw stroke as connected segments with varying width
-  for (let i = 0; i < pts.length - 1; i++) {
+  // Draw as a single smooth path
+  ctx.beginPath();
+  const p0 = pts[0]!;
+  ctx.moveTo(p0.x - scrollX, p0.y - scrollY);
+
+  for (let i = 1; i < pts.length - 1; i++) {
     const a = pts[i]!;
     const b = pts[i + 1]!;
-    const pressure = (a.pressure + b.pressure) / 2;
-    const w = stroke.width * Math.max(pressure, 0.2);
-
-    ctx.lineWidth = w;
-    ctx.beginPath();
-    ctx.moveTo(a.x - scrollX, a.y - scrollY);
-
-    // Use quadratic curve to midpoint for smoothness
-    if (i < pts.length - 2) {
-      const c = pts[i + 2]!;
-      const midX = (b.x + c.x) / 2;
-      const midY = (b.y + c.y) / 2;
-      ctx.quadraticCurveTo(b.x - scrollX, b.y - scrollY, midX - scrollX, midY - scrollY);
-    } else {
-      ctx.lineTo(b.x - scrollX, b.y - scrollY);
-    }
-    ctx.stroke();
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    ctx.quadraticCurveTo(a.x - scrollX, a.y - scrollY, midX - scrollX, midY - scrollY);
   }
+
+  // Final segment
+  const last = pts[pts.length - 1]!;
+  ctx.lineTo(last.x - scrollX, last.y - scrollY);
+  ctx.stroke();
 }
 
 /** Draw all strokes */

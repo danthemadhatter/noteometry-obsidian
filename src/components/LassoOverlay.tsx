@@ -34,7 +34,7 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     // Create an overlay canvas
     const canvas = document.createElement("canvas");
     canvas.style.cssText =
-      "position:absolute;top:0;left:0;width:100%;height:100%;z-index:99999;" +
+      "position:absolute;top:0;left:0;width:100%;height:100%;z-index:300;" +
       "cursor:crosshair;touch-action:none;pointer-events:auto;";
     canvas.dataset.lasso = "true";
     container.appendChild(canvas);
@@ -128,7 +128,7 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       }
     };
 
-    // CAPTURE phase to intercept before Excalidraw
+    // CAPTURE phase to intercept before canvas layers
     container.addEventListener("pointerdown", onDown, true);
     container.addEventListener("pointermove", onMove, true);
     container.addEventListener("pointerup", onUp, true);

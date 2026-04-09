@@ -53,6 +53,8 @@ export default function TableEditor({ tableId }: Props) {
                 <td key={ci}>
                   <input
                     className="noteometry-table-cell"
+                    inputMode="text"
+                    enterKeyHint="next"
                     value={cell}
                     onChange={(e) => updateCell(ri, ci, e.target.value)}
                     onKeyDown={(e) => {

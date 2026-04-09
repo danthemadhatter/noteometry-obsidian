@@ -43,12 +43,23 @@ export default function RichTextEditor({ textBoxId }: Props) {
 
   const handleFontSize = useCallback((size: number) => {
     setFontSize(size);
-    // execCommand fontSize uses 1-7 scale, so we use a span approach
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && editorRef.current) {
-      editorRef.current.style.fontSize = `${size}px`;
+      const range = sel.getRangeAt(0);
+      if (!range.collapsed && editorRef.current.contains(range.commonAncestorContainer)) {
+        // Wrap the selected text in a span with the chosen font size
+        const span = document.createElement("span");
+        span.style.fontSize = `${size}px`;
+        range.surroundContents(span);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        handleInput();
+      } else {
+        // No selection — set default for new text
+        editorRef.current.style.fontSize = `${size}px`;
+      }
     }
-  }, []);
+  }, [handleInput]);
 
   return (
     <div className="noteometry-richtext">
@@ -108,9 +119,13 @@ export default function RichTextEditor({ textBoxId }: Props) {
         ref={editorRef}
         className="noteometry-richtext-content"
         contentEditable
+        tabIndex={0}
+        inputMode="text"
+        role="textbox"
         onInput={handleInput}
         onKeyUp={updateFormatState}
         onClick={updateFormatState}
+        onTouchEnd={(e) => { e.currentTarget.focus(); updateFormatState(); }}
         onKeyDown={(e) => e.stopPropagation()}
         style={{ fontSize: `${fontSize}px` }}
         suppressContentEditableWarning

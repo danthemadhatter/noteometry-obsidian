@@ -38,7 +38,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [scrollY, setScrollY] = useState(0);
   const [tool, setTool] = useState<CanvasTool>("select");
   const [activeColor, setActiveColor] = useState("#1e1e1e");
-  const [strokeWidth] = useState(2);
+  const [strokeWidth, setStrokeWidth] = useState(3);
   const [lassoActive, setLassoActive] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
@@ -375,6 +375,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setIsReading(false);
   };
 
+  // Keep a ref to handleReadInk so handleLassoComplete can call the latest version
+  const handleReadInkRef = useRef(handleReadInk);
+  handleReadInkRef.current = handleReadInk;
+
   /* ── Lasso complete → high-res crop of EVERYTHING visible ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
     // Convert lasso polygon from screen coords to scene coords
@@ -411,6 +415,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
     );
     if (dataUrl) {
       pendingLassoCropRef.current = dataUrl;
+      setLassoActive(false);
+      // Auto-trigger OCR processing so the user doesn't need to click again
+      handleReadInkRef.current();
     }
   }, [strokes, stamps, canvasObjects, scrollX, scrollY]);
 
@@ -624,6 +631,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               }}
               activeColor={activeColor}
               onColorChange={setActiveColor}
+              strokeWidth={strokeWidth}
+              onStrokeWidthChange={setStrokeWidth}
               onInsertTextBox={handleInsertTextBox}
               onInsertTable={handleInsertTable}
               onInsertImage={handleInsertImage}
@@ -633,6 +642,21 @@ export default function NoteometryApp({ plugin, app }: Props) {
               canRedo={canRedo}
               onReadInk={handleReadInk}
               isReading={isReading}
+              onClearCanvas={() => {
+                if (confirm("Clear all strokes and stamps from this page?")) {
+                  pushUndo();
+                  setStrokes([]);
+                  setStamps([]);
+                }
+              }}
+              onExportImage={() => {
+                const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
+                if (!dataUrl) return;
+                const link = document.createElement("a");
+                link.download = `${currentPage || "canvas"}.png`;
+                link.href = dataUrl;
+                link.click();
+              }}
             />
 
             {!panelOpen && (
@@ -656,6 +680,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               activeColor={activeColor}
               strokeWidth={strokeWidth}
               tool={tool}
+              onToolChange={setTool}
               scrollX={scrollX}
               scrollY={scrollY}
               onViewportChange={handleViewportChange}

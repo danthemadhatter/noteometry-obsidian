@@ -3,7 +3,7 @@ import type { Stroke, StrokePoint, Stamp } from "../lib/inkEngine";
 import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from "../lib/inkEngine";
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
 
-export type CanvasTool = "select" | "pen" | "eraser";
+export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
 
 interface Props {
   strokes: Stroke[];
@@ -13,6 +13,7 @@ interface Props {
   activeColor: string;
   strokeWidth: number;
   tool: CanvasTool;
+  onToolChange?: (tool: CanvasTool) => void;
   scrollX: number;
   scrollY: number;
   onViewportChange: (scrollX: number, scrollY: number) => void;
@@ -20,10 +21,12 @@ interface Props {
   selectedStampId?: string | null;
 }
 
+const TOOL_CYCLE: CanvasTool[] = ["pen", "eraser", "grab"];
+
 export default function InkCanvas({
   strokes, onStrokesChange, stamps, onStampsChange,
   activeColor, strokeWidth,
-  tool, scrollX, scrollY, onViewportChange,
+  tool, onToolChange, scrollX, scrollY, onViewportChange,
   disabled = false, selectedStampId = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +45,14 @@ export default function InkCanvas({
   // Active drawing state
   const activeStrokeRef = useRef<StrokePoint[]>([]);
   const isDrawingRef = useRef(false);
+
+  // Grab-pan state (mouse/stylus)
+  const isGrabbingRef = useRef(false);
+  const grabLastRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Shape tool state
+  const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const shapeEndRef = useRef<{ x: number; y: number } | null>(null);
 
   // Touch pan state (shared between touch handler and main)
   const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -123,6 +134,29 @@ export default function InkCanvas({
       };
       drawStroke(ctx, active, scrollRef.current.x, scrollRef.current.y);
     }
+
+    // Shape preview
+    if (shapeStartRef.current && shapeEndRef.current) {
+      const s = shapeStartRef.current;
+      const e = shapeEndRef.current;
+      const ox = scrollRef.current.x, oy = scrollRef.current.y;
+      ctx.strokeStyle = colorRef.current;
+      ctx.lineWidth = widthRef.current;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      if (toolRef.current === "line" || toolRef.current === "arrow") {
+        ctx.moveTo(s.x - ox, s.y - oy);
+        ctx.lineTo(e.x - ox, e.y - oy);
+      } else if (toolRef.current === "rect") {
+        ctx.rect(s.x - ox, s.y - oy, e.x - s.x, e.y - s.y);
+      } else if (toolRef.current === "circle") {
+        const cx = (s.x + e.x) / 2 - ox, cy = (s.y + e.y) / 2 - oy;
+        const rx = Math.abs(e.x - s.x) / 2, ry = Math.abs(e.y - s.y) / 2;
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }, []);
 
   useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId]);
@@ -138,6 +172,22 @@ export default function InkCanvas({
     const x = e.clientX - rect.left + scrollRef.current.x;
     const y = e.clientY - rect.top + scrollRef.current.y;
     const pressure = e.pressure > 0 ? e.pressure : 0.5;
+
+    if (toolRef.current === "grab") {
+      isGrabbingRef.current = true;
+      grabLastRef.current = { x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    const isShapeTool = toolRef.current === "line" || toolRef.current === "arrow" || toolRef.current === "rect" || toolRef.current === "circle";
+    if (isShapeTool) {
+      shapeStartRef.current = { x, y };
+      shapeEndRef.current = { x, y };
+      isDrawingRef.current = true;
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
 
     if (toolRef.current === "eraser") {
       const tolerance = 10;
@@ -161,6 +211,20 @@ export default function InkCanvas({
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return;
+
+    if (isGrabbingRef.current && grabLastRef.current) {
+      const dx = e.clientX - grabLastRef.current.x;
+      const dy = e.clientY - grabLastRef.current.y;
+      grabLastRef.current = { x: e.clientX, y: e.clientY };
+      const newX = scrollRef.current.x - dx;
+      const newY = scrollRef.current.y - dy;
+      scrollRef.current = { x: newX, y: newY };
+      onViewportChange(newX, newY);
+      redrawGrid();
+      redrawInk();
+      return;
+    }
+
     if (!isDrawingRef.current) return;
 
     const canvas = inkCanvasRef.current;
@@ -169,6 +233,13 @@ export default function InkCanvas({
     const x = e.clientX - rect.left + scrollRef.current.x;
     const y = e.clientY - rect.top + scrollRef.current.y;
     const pressure = e.pressure > 0 ? e.pressure : 0.5;
+
+    // Shape preview
+    if (shapeStartRef.current && (toolRef.current === "line" || toolRef.current === "arrow" || toolRef.current === "rect" || toolRef.current === "circle")) {
+      shapeEndRef.current = { x, y };
+      redrawInk();
+      return;
+    }
 
     if (toolRef.current === "eraser") {
       const tolerance = 10;
@@ -188,10 +259,68 @@ export default function InkCanvas({
 
   const handlePointerUp = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return;
+
+    if (isGrabbingRef.current) {
+      isGrabbingRef.current = false;
+      grabLastRef.current = null;
+      return;
+    }
+
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
 
     if (toolRef.current === "eraser") return;
+
+    // Finalize shape tools → convert to stroke points
+    if (shapeStartRef.current && shapeEndRef.current) {
+      const s = shapeStartRef.current;
+      const end = shapeEndRef.current;
+      const pts: StrokePoint[] = [];
+      const pr = 0.5;
+
+      if (toolRef.current === "line" || toolRef.current === "arrow") {
+        pts.push({ x: s.x, y: s.y, pressure: pr }, { x: end.x, y: end.y, pressure: pr });
+        // Arrow: add arrowhead lines
+        if (toolRef.current === "arrow") {
+          const angle = Math.atan2(end.y - s.y, end.x - s.x);
+          const headLen = 15;
+          const a1x = end.x - headLen * Math.cos(angle - 0.4);
+          const a1y = end.y - headLen * Math.sin(angle - 0.4);
+          const a2x = end.x - headLen * Math.cos(angle + 0.4);
+          const a2y = end.y - headLen * Math.sin(angle + 0.4);
+          // Add as separate strokes for arrowhead
+          const head1: Stroke = { id: newStrokeId(), points: [{ x: end.x, y: end.y, pressure: pr }, { x: a1x, y: a1y, pressure: pr }], color: colorRef.current, width: widthRef.current };
+          const head2: Stroke = { id: newStrokeId(), points: [{ x: end.x, y: end.y, pressure: pr }, { x: a2x, y: a2y, pressure: pr }], color: colorRef.current, width: widthRef.current };
+          const line: Stroke = { id: newStrokeId(), points: pts, color: colorRef.current, width: widthRef.current };
+          onStrokesChange([...strokesRef.current, line, head1, head2]);
+          shapeStartRef.current = null;
+          shapeEndRef.current = null;
+          return;
+        }
+      } else if (toolRef.current === "rect") {
+        pts.push(
+          { x: s.x, y: s.y, pressure: pr }, { x: end.x, y: s.y, pressure: pr },
+          { x: end.x, y: end.y, pressure: pr }, { x: s.x, y: end.y, pressure: pr },
+          { x: s.x, y: s.y, pressure: pr },
+        );
+      } else if (toolRef.current === "circle") {
+        const cx = (s.x + end.x) / 2, cy = (s.y + end.y) / 2;
+        const rx = Math.abs(end.x - s.x) / 2, ry = Math.abs(end.y - s.y) / 2;
+        const steps = 48;
+        for (let i = 0; i <= steps; i++) {
+          const a = (i / steps) * Math.PI * 2;
+          pts.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), pressure: pr });
+        }
+      }
+
+      if (pts.length >= 2) {
+        const newStroke: Stroke = { id: newStrokeId(), points: pts, color: colorRef.current, width: widthRef.current };
+        onStrokesChange([...strokesRef.current, newStroke]);
+      }
+      shapeStartRef.current = null;
+      shapeEndRef.current = null;
+      return;
+    }
 
     const rawPoints = activeStrokeRef.current;
     activeStrokeRef.current = [];
@@ -214,7 +343,7 @@ export default function InkCanvas({
     const canvas = inkCanvasRef.current;
     if (!canvas) return;
 
-    const shouldListen = (tool === "pen" || tool === "eraser") && !disabled;
+    const shouldListen = tool !== "select" && !disabled;
     if (!shouldListen) return; // no listeners attached → click-through works
 
     canvas.addEventListener("pointerdown", handlePointerDown);
@@ -288,6 +417,33 @@ export default function InkCanvas({
     };
   }, [onViewportChange, redrawGrid, redrawInk]);
 
+  // ── Apple Pencil double-tap → cycle tools (pen → eraser → grab) ──
+  const lastTapRef = useRef(0);
+  useEffect(() => {
+    if (!onToolChange) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onDoubleTap = (e: PointerEvent) => {
+      // Only react to stylus (Apple Pencil)
+      if (e.pointerType !== "pen") return;
+      const now = Date.now();
+      if (now - lastTapRef.current < 400) {
+        // Double-tap detected — cycle tool
+        const idx = TOOL_CYCLE.indexOf(toolRef.current);
+        const next = TOOL_CYCLE[(idx + 1) % TOOL_CYCLE.length]!;
+        onToolChange(next);
+        lastTapRef.current = 0; // reset to avoid triple-tap
+        e.preventDefault();
+      } else {
+        lastTapRef.current = now;
+      }
+    };
+
+    container.addEventListener("pointerdown", onDoubleTap);
+    return () => container.removeEventListener("pointerdown", onDoubleTap);
+  }, [onToolChange]);
+
   // ── Resize observer ────────────────────────────────
   useEffect(() => {
     const container = containerRef.current;
@@ -325,7 +481,7 @@ export default function InkCanvas({
         ref={inkCanvasRef}
         className="noteometry-ink-layer"
         style={{
-          cursor: tool === "eraser" ? "cell" : tool === "pen" ? "crosshair" : "default",
+          cursor: tool === "grab" ? "grab" : tool === "eraser" ? "cell" : (tool === "pen" || tool === "line" || tool === "arrow" || tool === "rect" || tool === "circle") ? "crosshair" : "default",
           pointerEvents: (tool === "select" || disabled) ? "none" : "auto",
         }}
       />
