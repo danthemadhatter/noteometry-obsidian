@@ -81,12 +81,6 @@ export default function CanvasObjectLayer({
     };
   }, []);
 
-  const handleDelete = useCallback((e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    onObjectsChange(objects.filter(o => o.id !== id));
-    if (selectedObjectId === id) onSelectObject(null);
-  }, [objects, onObjectsChange, selectedObjectId, onSelectObject]);
-
   const handleObjectClick = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     onSelectObject(id);

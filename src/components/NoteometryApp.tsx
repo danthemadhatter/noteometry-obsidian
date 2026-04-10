@@ -11,7 +11,7 @@ import { newStampId } from "../lib/inkEngine";
 import { readInk, chat, solve } from "../lib/ai";
 import {
   savePage, loadPage, listSections, listPages,
-  createSection, createPage, migrateLegacy,
+  createSection, createPage, migrateLegacy, migrateJsonToMd,
   CanvasData,
 } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
@@ -297,6 +297,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      await migrateJsonToMd(plugin);
       const migrated = await migrateLegacy(plugin);
       const secs = await listSections(plugin);
       if (cancelled) return;

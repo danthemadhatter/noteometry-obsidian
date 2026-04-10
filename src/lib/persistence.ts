@@ -40,7 +40,7 @@ function sectionPath(plugin: NoteometryPlugin, section: string): string {
 }
 
 function pagePath(plugin: NoteometryPlugin, section: string, page: string): string {
-  return `${rootDir(plugin)}/${section}/${page}.json`;
+  return `${rootDir(plugin)}/${section}/${page}.md`;
 }
 
 /* ── Sections (folders) ──────────────────────────────── */
@@ -91,10 +91,10 @@ export async function listPages(plugin: NoteometryPlugin, section: string): Prom
     if (!(await adapter.exists(path))) return [];
     const listing = await adapter.list(path);
     return listing.files
-      .filter((f) => f.endsWith(".json"))
+      .filter((f) => f.endsWith(".md"))
       .map((f) => {
         const name = f.split("/").pop() ?? "";
-        return name.replace(/\.json$/, "");
+        return name.replace(/\.md$/, "");
       })
       .sort();
   } catch {
@@ -193,11 +193,37 @@ export async function savePage(
   }
 }
 
+/* ── Migrate .json → .md (Obsidian Sync only syncs .md) ── */
+
+export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
+  const root = rootDir(plugin);
+  const adapter = plugin.app.vault.adapter;
+  try {
+    if (!(await adapter.exists(root))) return;
+    const sections = await listSections(plugin);
+    for (const section of sections) {
+      const secPath = sectionPath(plugin, section);
+      const listing = await adapter.list(secPath);
+      const jsonFiles = listing.files.filter((f) => f.endsWith(".json"));
+      for (const jsonFile of jsonFiles) {
+        const mdFile = jsonFile.replace(/\.json$/, ".md");
+        if (!(await adapter.exists(mdFile))) {
+          const data = await adapter.read(jsonFile);
+          await adapter.write(mdFile, data);
+        }
+        await adapter.remove(jsonFile);
+      }
+    }
+  } catch (e) {
+    console.error("[Noteometry] json→md migration:", e);
+  }
+}
+
 /* ── Legacy migration ────────────────────────────────── */
 
 export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section: string; page: string } | null> {
   const dir = plugin.manifest.dir ?? `.obsidian/plugins/${plugin.manifest.id}`;
-  const legacyPath = `${dir}/canvas.json`;
+  const legacyPath = `${dir}/canvas.md`;
   const adapter = plugin.app.vault.adapter;
   try {
     if (await adapter.exists(legacyPath)) {
