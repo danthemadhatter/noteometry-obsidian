@@ -36,10 +36,6 @@ export function loadAllTableData(data: Record<string, string[][]>): void {
   }
 }
 
-export function clearTableData(): void {
-  tables.clear();
-}
-
 /* ── Rich text box data ──────────────────────────────── */
 
 const textBoxes = new Map<string, string>();

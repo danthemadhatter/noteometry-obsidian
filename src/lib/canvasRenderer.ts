@@ -149,7 +149,7 @@ export function drawAllStrokes(
 }
 
 /** Draw a stamp (dropped math symbol) on canvas */
-export function drawStamp(
+function drawStamp(
   ctx: CanvasRenderingContext2D,
   stamp: Stamp,
   scrollX: number,

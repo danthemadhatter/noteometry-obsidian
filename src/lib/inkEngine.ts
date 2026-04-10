@@ -46,7 +46,7 @@ export function stampIntersectsPolygon(
   // Check if center of stamp is inside polygon
   const cx = bb.x + bb.w / 2;
   const cy = bb.y + bb.h / 2;
-  return pointInPolygonExport(cx, cy, polygon);
+  return pointInPolygon(cx, cy, polygon);
 }
 
 /** Bounding box for spatial queries */
@@ -60,19 +60,6 @@ export interface BBox {
 /** Generate unique stroke ID */
 export function newStrokeId(): string {
   return crypto.randomUUID();
-}
-
-/** Compute bounding box of a stroke */
-export function strokeBBox(stroke: Stroke): BBox {
-  if (stroke.points.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of stroke.points) {
-    if (p.x < minX) minX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
-  }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
 /** Check if a point is within `tolerance` of any segment of a stroke */
@@ -158,13 +145,13 @@ export function strokeIntersectsPolygon(
 ): boolean {
   // Check if any point of the stroke is inside the polygon
   for (const p of stroke.points) {
-    if (pointInPolygonExport(p.x, p.y, polygon)) return true;
+    if (pointInPolygon(p.x, p.y, polygon)) return true;
   }
   return false;
 }
 
 /** Ray-casting point-in-polygon test */
-export function pointInPolygonExport(
+function pointInPolygon(
   x: number, y: number,
   polygon: { x: number; y: number }[]
 ): boolean {

@@ -1,12 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   stampBBox,
-  strokeBBox,
   pointNearStroke,
   smoothPoints,
   strokeIntersectsPolygon,
   stampIntersectsPolygon,
-  pointInPolygonExport,
   type Stroke,
   type StrokePoint,
   type Stamp,
@@ -43,23 +41,6 @@ describe("stampBBox", () => {
   });
 });
 
-describe("strokeBBox", () => {
-  it("returns zero-size for empty stroke", () => {
-    const bb = strokeBBox(mkStroke([]));
-    expect(bb.w).toBe(0);
-    expect(bb.h).toBe(0);
-  });
-
-  it("bounds all points", () => {
-    const s = mkStroke([pt(10, 20), pt(50, 80), pt(30, 40)]);
-    const bb = strokeBBox(s);
-    expect(bb.x).toBe(10);
-    expect(bb.y).toBe(20);
-    expect(bb.w).toBe(40); // 50 - 10
-    expect(bb.h).toBe(60); // 80 - 20
-  });
-});
-
 describe("pointNearStroke", () => {
   const s = mkStroke([pt(0, 0), pt(100, 0)]);
 
@@ -93,21 +74,6 @@ describe("smoothPoints", () => {
     const smoothed = smoothPoints(raw);
     expect(smoothed[0]!.x).toBe(0);
     expect(smoothed[smoothed.length - 1]!.x).toBe(30);
-  });
-});
-
-describe("pointInPolygonExport", () => {
-  const square = [
-    { x: 0, y: 0 }, { x: 100, y: 0 },
-    { x: 100, y: 100 }, { x: 0, y: 100 },
-  ];
-
-  it("detects point inside", () => {
-    expect(pointInPolygonExport(50, 50, square)).toBe(true);
-  });
-
-  it("rejects point outside", () => {
-    expect(pointInPolygonExport(150, 50, square)).toBe(false);
   });
 });
 
