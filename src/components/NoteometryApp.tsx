@@ -313,10 +313,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
         const pages = await listPages(plugin, sec);
         pg = pages[0] ?? "";
       } else {
-        sec = "General";
-        pg = "Page 1";
+        sec = "My Course";
+        pg = "Week 1";
         await createSection(plugin, sec);
-        await createPage(plugin, sec, pg);
+        for (let i = 1; i <= 16; i++) {
+          await createPage(plugin, sec, `Week ${i}`);
+        }
       }
 
       if (cancelled) return;

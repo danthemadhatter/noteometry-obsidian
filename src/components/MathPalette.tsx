@@ -329,6 +329,7 @@ export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Prop
                 key={`${tab.id}-${i}`}
                 className="noteometry-mathpal-btn"
                 draggable
+                onClick={() => onInsert(item.latex)}
                 onDragStart={(e) => handleDragStart(e, item)}
                 onTouchStart={(e) => onTouchStart(e, item)}
                 title={item.title ?? item.latex}

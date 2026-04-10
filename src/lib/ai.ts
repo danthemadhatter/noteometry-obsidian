@@ -112,26 +112,27 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are an expert at reading and extracting content from ANY image. You handle handwritten notes, typed text, screenshots, diagrams, photos of textbook pages, circuit schematics, graphs, tables, code snippets, mixed-media collages — literally anything visual.
+const VISION_SYSTEM = `You are a handwriting-to-LaTeX converter. Your ONLY job is to output the mathematical expression(s) you see, nothing else.
 
 RULES:
-1. Math/equations: output LaTeX wrapped in $$ delimiters. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
-2. Plain text: output as plain text, preserving line breaks and structure
-3. Diagrams/figures: describe precisely — note ALL labels, values, connections, component types, and relationships. Express any visible equations in LaTeX
-4. Circuit schematics: identify all components (resistors, capacitors, inductors, sources), their values, node names, and write the circuit equations (KVL/KCL) in LaTeX
-5. Mixed content: output everything — use $$ for math parts, plain text for the rest
-6. Screenshots/photos of problems: transcribe the FULL problem including all given information and the question
-7. Photos/images of real objects: describe what's relevant and extract any visible text, numbers, labels, or data
-8. NEVER describe symbols in words — use actual LaTeX commands
-9. Preserve the structure and order of the original content
-10. If the content looks messy, mixed, or collage-like — process ALL of it anyway, best effort`;
+1. Output ONLY the LaTeX expression(s) wrapped in $$...$$ delimiters
+2. NEVER explain what the expression is or what it represents
+3. NEVER say "This image shows..." or "The expression represents..." or any other commentary
+4. For plain text: output the text only, no commentary
+5. For circuit diagrams: output component values and node labels only
+6. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
+7. If you see multiple expressions, output each on its own line wrapped in $$...$$
+8. Transcribe EXACTLY what is written — do NOT add, remove, or infer any elements
+9. If there are no integral bounds written, output \\int (indefinite), NOT \\int_a^b (definite)
+10. Do NOT hallucinate subscripts, superscripts, or bounds that are not clearly written
+11. Capture the ENTIRE expression — every term, coefficient, variable, and operator`;
 
 export async function readInk(
   base64Png: string,
   settings: NoteometrySettings
 ): Promise<AIResult> {
   const data = base64Png.replace(/^data:image\/\w+;base64,/, "");
-  const prompt = "Extract everything from this image. For math, use $$...$$ LaTeX. For text, output plain text. For diagrams/circuits, describe the setup and express relationships as equations. For photos/screenshots, transcribe all visible content. Process everything you see regardless of format or quality.";
+  const prompt = "Convert to LaTeX. Output only the expression(s), no explanation.";
 
   if (settings.aiProvider === "lmstudio") {
     return callLMStudio(settings, settings.lmStudioVisionModel, VISION_SYSTEM, [

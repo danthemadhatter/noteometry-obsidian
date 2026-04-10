@@ -26,6 +26,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
   const [expandedSection, setExpandedSection] = useState(currentSection);
   const [open, setOpen] = useState(() => window.innerWidth >= 768);
   const [addingSection, setAddingSection] = useState(false);
+  const [addingCourse, setAddingCourse] = useState(false);
   const [addingPage, setAddingPage] = useState("");
   const [renamingItem, setRenamingItem] = useState<{ type: "section" | "page"; section: string; name: string } | null>(null);
   const [newName, setNewName] = useState("");
@@ -66,6 +67,27 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
       const p = await listPages(plugin, name);
       setPagesMap((prev) => ({ ...prev, [name]: p }));
       onSelect(name, "Page 1");
+    } finally { submitting.current = false; }
+  };
+
+  /* ── Add course (section + 16 week pages) ── */
+  const handleAddCourse = async () => {
+    if (submitting.current) return;
+    const name = newName.trim();
+    if (!name) return;
+    submitting.current = true;
+    try {
+      await createSection(plugin, name);
+      for (let i = 1; i <= 16; i++) {
+        await createPage(plugin, name, `Week ${i}`);
+      }
+      setNewName("");
+      setAddingSection(false);
+      await refreshSections();
+      setExpandedSection(name);
+      const p = await listPages(plugin, name);
+      setPagesMap((prev) => ({ ...prev, [name]: p }));
+      onSelect(name, "Week 1");
     } finally { submitting.current = false; }
   };
 
@@ -159,7 +181,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
         onChange={(e) => setNewName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); onSubmit(); }
-          if (e.key === "Escape") { setAddingPage(""); setAddingSection(false); setRenamingItem(null); setNewName(""); }
+          if (e.key === "Escape") { setAddingPage(""); setAddingSection(false); setAddingCourse(false); setRenamingItem(null); setNewName(""); }
         }}
         autoFocus
         placeholder="Name..."
@@ -288,13 +310,23 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
 
         {addingSection
           ? inlineInput(handleAddSection)
+          : addingCourse
+          ? inlineInput(handleAddCourse)
           : (
-            <button
-              className="noteometry-sidebar-add"
-              onClick={() => { setAddingSection(true); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
-            >
-              <IconPlus /> New section
-            </button>
+            <div className="noteometry-sidebar-add-buttons">
+              <button
+                className="noteometry-sidebar-add"
+                onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+              >
+                <IconPlus /> New section
+              </button>
+              <button
+                className="noteometry-sidebar-add"
+                onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+              >
+                <IconPlus /> New course
+              </button>
+            </div>
           )}
       </div>
     </>

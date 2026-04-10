@@ -1002,13 +1002,13 @@
   cursor: text;
 }
 .noteometry-chat-bubble.user {
-  background: var(--nm-accent);
-  color: #fff;
+  background: var(--nm-accent) !important;
+  color: #fff !important;
   border-radius: 18px 18px 4px 18px;
 }
 .noteometry-chat-bubble.assistant {
-  background: var(--nm-warm-bg-alt);
-  color: var(--text-normal);
+  background: var(--nm-warm-bg-alt) !important;
+  color: var(--text-normal) !important;
   border-radius: 18px 18px 18px 4px;
   border: 1px solid var(--nm-warm-border);
 }
