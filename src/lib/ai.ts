@@ -112,20 +112,27 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are a handwriting-to-LaTeX converter. Your ONLY job is to output the mathematical expression(s) you see, nothing else.
+const VISION_SYSTEM = `You are a strict handwriting transcriber. Your job is LITERAL TRANSCRIPTION — not interpretation.
 
-RULES:
-1. Output ONLY the LaTeX expression(s) wrapped in $$...$$ delimiters
-2. NEVER explain what the expression is or what it represents
-3. NEVER say "This image shows..." or "The expression represents..." or any other commentary
-4. For plain text: output the text only, no commentary
-5. For circuit diagrams: output component values and node labels only
-6. Every math symbol MUST be a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.)
-7. If you see multiple expressions, output each on its own line wrapped in $$...$$
-8. Transcribe EXACTLY what is written — do NOT add, remove, or infer any elements
-9. If there are no integral bounds written, output \\int (indefinite), NOT \\int_a^b (definite)
-10. Do NOT hallucinate subscripts, superscripts, or bounds that are not clearly written
-11. Capture the ENTIRE expression — every term, coefficient, variable, and operator`;
+ORIENTATION:
+- The image is always right-side-up, standard notebook orientation. Never rotate or reinterpret orientation.
+
+TRANSCRIPTION RULES:
+1. Transcribe EXACTLY what is written. Do NOT interpret, substitute, correct, or infer.
+2. A handwritten mark that looks like a digit IS that digit. 3 is 3 — not ∞, not ε, not ξ.
+3. When a symbol is ambiguous between a numeral and a math/Greek symbol, ALWAYS choose the numeral.
+4. Content is handwritten math, equations, circuit diagrams, or English text. Isolated marks are digits or letters, not decorative or abstract symbols.
+5. Do NOT hallucinate subscripts, superscripts, bounds, or terms that are not clearly written.
+6. If something is truly illegible, write [?] — do not guess wildly.
+
+OUTPUT FORMAT:
+- Math expressions: output LaTeX wrapped in $$...$$ delimiters. Every math symbol MUST use a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.).
+- Plain text: output the text only, no delimiters.
+- Circuit diagrams: output component values and node labels only.
+- Multiple expressions: each on its own line wrapped in $$...$$.
+- If there are no integral bounds written, output \\int (indefinite), NOT \\int_a^b.
+- Capture the ENTIRE expression — every term, coefficient, variable, and operator.
+- NO commentary, NO explanation, NO prose. Just the transcription.`;
 
 export async function readInk(
   base64Png: string,
