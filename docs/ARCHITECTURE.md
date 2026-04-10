@@ -11,7 +11,7 @@ Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, era
 - **Build:** esbuild (bundles to single `main.js`)
 - **Types:** TypeScript (strict, skipLibCheck)
 - **Math:** KaTeX 0.16 for LaTeX rendering and MathML output
-- **AI:** Claude API (Opus 4) via Obsidian's `requestUrl`, LM Studio (local) as alternative
+- **AI:** Claude API (`claude-sonnet-4-6` default) via Obsidian's `requestUrl`, LM Studio (local) as alternative
 - **Icons:** Custom inline SVGs (no external icon library in the bundle)
 - **Tests:** Vitest
 
@@ -31,7 +31,6 @@ noteometry-obsidian/
       canvasRenderer.ts      # Canvas 2D drawing (grid, strokes, stamps)
       canvasObjects.ts       # Canvas object types (textbox, table, image)
       tableStore.ts          # In-memory store for table/textbox data
-      geometry.ts            # Geometry utilities (legacy, unused)
     components/
       NoteometryApp.tsx      # Root component — all state management
       InkCanvas.tsx          # HTML5 Canvas drawing surface
@@ -76,7 +75,9 @@ User Input
     │
     ├── MathPalette → tap inserts LaTeX to Input, drag stamps canvas
     │
-    ├── Lasso → capture region → OCR button → AI vision → Input/Chat
+    ├── Lasso → capture region → action bar (OCR | Move)
+    │         ├── OCR → AI vision → Input/Chat
+    │         └── Move → drag delta → translate selected strokes/stamps
     │
     └── Chat → send text + attachments → Claude/LM Studio → MathML response
     

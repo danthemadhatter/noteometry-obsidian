@@ -45,12 +45,10 @@ interface BBox { x: number; y: number; w: number; h: number }
 | `newStrokeId` | `() => string` | UUID for new strokes |
 | `newStampId` | `() => string` | UUID for new stamps |
 | `stampBBox` | `(stamp: Stamp) => BBox` | Bounding box for stamp hit-testing |
-| `strokeBBox` | `(stroke: Stroke) => BBox` | Bounding box of all stroke points |
 | `pointNearStroke` | `(px, py, stroke, tolerance) => boolean` | Is point within tolerance of any stroke segment? |
 | `smoothPoints` | `(raw: StrokePoint[], tension?) => StrokePoint[]` | Catmull-Rom spline smoothing |
 | `strokeIntersectsPolygon` | `(stroke, polygon) => boolean` | Any stroke point inside polygon? |
 | `stampIntersectsPolygon` | `(stamp, polygon) => boolean` | Stamp center inside polygon? |
-| `pointInPolygonExport` | `(x, y, polygon) => boolean` | Ray-casting point-in-polygon test |
 
 ## Canvas Objects (`src/lib/canvasObjects.ts`)
 
@@ -140,6 +138,9 @@ interface CanvasData {
 | `savePage(plugin, section, name, data)` | Save page data as JSON |
 | `migrateJsonToMd(plugin)` | Rename .json files to .md |
 | `migrateLegacy(plugin)` | Migrate old canvas.json format |
+| `saveImageToVault(plugin, section, id, base64)` | Save image as vault file, returns vault path |
+| `loadImageFromVault(plugin, vaultPath)` | Load vault image, returns base64 data URL |
+| `migrateBase64Images(plugin, section, canvasObjects)` | Migrate legacy base64 images to vault files |
 
 ## AI (`src/lib/ai.ts`)
 
@@ -181,8 +182,9 @@ interface AIResult {
 **Props:** objects, onObjectsChange, scrollX, scrollY, tool, selectedObjectId, onSelectObject
 
 ### LassoOverlay
-**Props:** active, containerRef, onComplete, onCancel
-**Exports:** `LassoBounds = { points, minX, minY, maxX, maxY }`
+**Props:** active, containerRef, onCapture, onAction, onMoveComplete, onCancel
+**Exports:** `LassoBounds = { points, minX, minY, maxX, maxY }`, `LassoAction = "ocr" | "move"`
+**Behavior:** After capture shows floating action bar (OCR | Move). OCR calls `onCapture(imageData)`. Move calls `onMoveComplete(delta)` on drag end.
 
 ### MathPalette
 **Props:** onInsert, onDragStart?, onDropStamp?

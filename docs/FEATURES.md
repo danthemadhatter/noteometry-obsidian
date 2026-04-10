@@ -34,7 +34,8 @@
 
 ### Tool Cycling
 - Toolbar cycle button: Pen → Eraser → Grab → Pen
-- One tap to switch between the three most-used tools
+- Apple Pencil barrel double-tap cycles the same sequence (< 300ms, < 10px movement)
+- One tap / double-tap to switch between the three most-used tools
 
 ### Undo / Redo
 - Tracks strokes and stamps
@@ -63,7 +64,8 @@
 - Insert from photo library or camera
 - Drag to move, corner handle to resize
 - Captured by lasso OCR (AI can read image content)
-- Stored as base64 data URLs in page data
+- Stored as separate vault files (`Noteometry/<Section>/.attachments/<id>.png`)
+- Legacy base64 images auto-migrate to vault files on page load
 
 ### Object Management
 - Delete button (x) on each object's drag handle
@@ -75,16 +77,22 @@
 ### Lasso Selection
 - Freeform polygon drawing
 - Blue dashed outline with translucent fill
-- Stays visible after capture until OCR processes or user cancels
+- After capture, a floating action bar appears with **OCR** and **Move** buttons
+- Tap outside or press Escape to cancel
 - Captures strokes, stamps, AND canvas objects within the selection
 - Minimum 10 points to register (prevents accidental taps)
 
 ### OCR (READ INK)
-- Renders lasso region to high-resolution image (3x scale)
+- Action bar **OCR** button: renders lasso region to high-resolution image (3x scale)
 - Sends to Claude Vision API (or LM Studio vision model)
 - Handles ANY content: handwriting, printed text, screenshots, circuit diagrams, photos, mixed media
 - Extracted text goes to Input box, then auto-sends to Chat for solving
 - Image attachment included so AI can see diagrams/figures
+
+### Move
+- Action bar **Move** button: drag anywhere inside the lasso region
+- Translates all selected strokes and stamps by the drag delta
+- Supports undo
 
 ## Math Panel (Right Side)
 
