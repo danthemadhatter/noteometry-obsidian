@@ -219,6 +219,68 @@ export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
   }
 }
 
+/* ── Image vault sync ───────────────────────────────── */
+
+export async function saveImageToVault(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  imageId: string,
+  base64Data: string
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const attachDir = `${rootDir(plugin)}/${sectionName}/.attachments`;
+  if (!(await adapter.exists(attachDir))) {
+    await adapter.mkdir(attachDir);
+  }
+  // Strip data URL prefix
+  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+  // Convert base64 to ArrayBuffer
+  const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+  const vaultPath = `${attachDir}/${imageId}.png`;
+  await adapter.writeBinary(vaultPath, binary.buffer as ArrayBuffer);
+  return vaultPath;
+}
+
+export async function loadImageFromVault(
+  plugin: NoteometryPlugin,
+  vaultPath: string
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const buf = await adapter.readBinary(vaultPath);
+  const bytes = new Uint8Array(buf);
+  let binaryStr = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binaryStr += String.fromCharCode(bytes[i]!);
+  }
+  const b64 = btoa(binaryStr);
+  return `data:image/png;base64,${b64}`;
+}
+
+export async function migrateBase64Images(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  canvasObjects: CanvasObject[]
+): Promise<{ objects: CanvasObject[]; changed: boolean }> {
+  let changed = false;
+  const migrated: CanvasObject[] = [];
+  for (const obj of canvasObjects) {
+    if (obj.type === "image" && obj.dataURL.startsWith("data:")) {
+      try {
+        const imageId = obj.id;
+        const vaultPath = await saveImageToVault(plugin, sectionName, imageId, obj.dataURL);
+        migrated.push({ ...obj, dataURL: vaultPath });
+        changed = true;
+      } catch (e) {
+        console.error("[Noteometry] image migration failed:", e);
+        migrated.push(obj);
+      }
+    } else {
+      migrated.push(obj);
+    }
+  }
+  return { objects: migrated, changed };
+}
+
 /* ── Legacy migration ────────────────────────────────── */
 
 export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section: string; page: string } | null> {

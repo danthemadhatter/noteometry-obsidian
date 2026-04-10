@@ -57,6 +57,10 @@ export default function InkCanvas({
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const shapeEndRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Apple Pencil double-tap detection
+  const lastPenTapTimeRef = useRef(0);
+  const lastPenTapPosRef = useRef<{ x: number; y: number } | null>(null);
+
   // Touch pan state (shared between touch handler and main)
   const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPanRef = useRef<{ x: number; y: number } | null>(null);
@@ -168,6 +172,29 @@ export default function InkCanvas({
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return; // handled by touch pan effect
 
+    // Apple Pencil double-tap detection
+    if (e.pointerType === "pen") {
+      const now = performance.now();
+      const prev = lastPenTapPosRef.current;
+      const elapsed = now - lastPenTapTimeRef.current;
+      if (elapsed < 300 && prev) {
+        const dist = Math.hypot(e.clientX - prev.x, e.clientY - prev.y);
+        if (dist < 10) {
+          // Double-tap detected — cycle tool
+          lastPenTapTimeRef.current = 0;
+          lastPenTapPosRef.current = null;
+          e.preventDefault();
+          e.stopPropagation();
+          const idx = TOOL_CYCLE.indexOf(toolRef.current);
+          const next = TOOL_CYCLE[(idx + 1) % TOOL_CYCLE.length]!;
+          onToolChange?.(next);
+          return;
+        }
+      }
+      lastPenTapTimeRef.current = now;
+      lastPenTapPosRef.current = { x: e.clientX, y: e.clientY };
+    }
+
     const canvas = inkCanvasRef.current;
     if (!canvas) return;
 
@@ -211,7 +238,7 @@ export default function InkCanvas({
     isDrawingRef.current = true;
     activeStrokeRef.current = [{ x, y, pressure }];
     canvas.setPointerCapture(e.pointerId);
-  }, [onStrokesChange, onStampsChange]);
+  }, [onStrokesChange, onStampsChange, onToolChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return;

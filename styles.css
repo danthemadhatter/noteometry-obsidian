@@ -1497,3 +1497,35 @@
     border-top: 1px solid var(--nm-warm-border-strong);
   }
 }
+
+/* ── Lasso action bar ─────────────────────────────────── */
+
+.noteometry-lasso-action-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--nm-warm-bg);
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius-sm);
+  box-shadow: var(--nm-shadow-toolbar);
+  pointer-events: auto;
+}
+
+.noteometry-lasso-action-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-family: var(--nm-font);
+  font-weight: 600;
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius-sm);
+  background: var(--nm-warm-bg-alt);
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.noteometry-lasso-action-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+  color: var(--nm-accent);
+}

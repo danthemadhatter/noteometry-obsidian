@@ -1,6 +1,8 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import type { CanvasObject } from "../lib/canvasObjects";
 import type { CanvasTool } from "./InkCanvas";
+import type NoteometryPlugin from "../main";
+import { loadImageFromVault } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 
@@ -12,11 +14,56 @@ interface Props {
   tool: CanvasTool;
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
+  plugin?: NoteometryPlugin;
+}
+
+/** Resolves vault image paths to data URLs with caching */
+function useResolvedImageSrc(plugin: NoteometryPlugin | undefined, src: string): string {
+  const [resolved, setResolved] = useState(src);
+  const cacheRef = useRef<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!src || src.startsWith("data:") || !plugin) {
+      setResolved(src);
+      return;
+    }
+    // Check if it's a vault path (starts with Noteometry/ or similar)
+    if (!src.includes("/")) {
+      setResolved(src);
+      return;
+    }
+    const cached = cacheRef.current.get(src);
+    if (cached) {
+      setResolved(cached);
+      return;
+    }
+    let cancelled = false;
+    loadImageFromVault(plugin, src).then((dataUrl) => {
+      if (!cancelled) {
+        cacheRef.current.set(src, dataUrl);
+        setResolved(dataUrl);
+      }
+    }).catch(() => {
+      if (!cancelled) setResolved(src);
+    });
+    return () => { cancelled = true; };
+  }, [plugin, src]);
+
+  return resolved;
+}
+
+function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin }) {
+  const resolved = useResolvedImageSrc(plugin, src);
+  return (
+    <img src={resolved} alt="Inserted image"
+      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      draggable={false} />
+  );
 }
 
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
-  tool, selectedObjectId, onSelectObject,
+  tool, selectedObjectId, onSelectObject, plugin,
 }: Props) {
   const dragState = useRef<{
     id: string;
@@ -157,9 +204,7 @@ export default function CanvasObjectLayer({
             {obj.type === "textbox" && <RichTextEditor textBoxId={obj.id} />}
             {obj.type === "table" && <TableEditor tableId={obj.id} />}
             {obj.type === "image" && (
-              <img src={obj.dataURL} alt="Inserted image"
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                draggable={false} />
+              <VaultImage src={obj.dataURL} plugin={plugin} />
             )}
           </div>
 

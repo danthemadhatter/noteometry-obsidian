@@ -12,6 +12,7 @@ import { readInk, chat, solve } from "../lib/ai";
 import {
   savePage, loadPage, listSections, listPages,
   createSection, createPage, migrateLegacy, migrateJsonToMd,
+  saveImageToVault, loadImageFromVault, migrateBase64Images,
   CanvasData,
 } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
@@ -21,7 +22,7 @@ import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
 import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
-import type { LassoBounds } from "./LassoOverlay";
+import type { LassoBounds, LassoAction } from "./LassoOverlay";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback } from "../lib/tableStore";
 
 interface Props {
@@ -271,7 +272,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
       setChatMessages(data.chatMessages ?? []);
       setStrokes(data.strokes ?? []);
       setStamps(data.stamps ?? []);
-      setCanvasObjects(data.canvasObjects ?? []);
+      // Migrate base64 images to vault files
+      const objs = data.canvasObjects ?? [];
+      const imgResult = await migrateBase64Images(plugin, section, objs);
+      setCanvasObjects(imgResult.objects);
       setScrollX(data.viewport?.scrollX ?? 0);
       setScrollY(data.viewport?.scrollY ?? 0);
       loadAllTableData(data.tableData ?? {});
@@ -334,7 +338,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
           setChatMessages(data.chatMessages ?? []);
           setStrokes(data.strokes ?? []);
           setStamps(data.stamps ?? []);
-          setCanvasObjects(data.canvasObjects ?? []);
+          // Migrate base64 images to vault files
+          const objs = data.canvasObjects ?? [];
+          const imgResult = await migrateBase64Images(plugin, sec, objs);
+          setCanvasObjects(imgResult.objects);
           setScrollX(data.viewport?.scrollX ?? 0);
           setScrollY(data.viewport?.scrollY ?? 0);
           loadAllTableData(data.tableData ?? {});
@@ -454,6 +461,43 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
   }, [strokes, stamps, canvasObjects, scrollX, scrollY]);
 
+  /* ── Lasso action bar → OCR or Move ──────────────────── */
+  const handleLassoAction = useCallback((action: LassoAction, _bounds: LassoBounds) => {
+    if (action === "ocr") {
+      // Trigger existing OCR flow
+      handleReadInkRef.current();
+    }
+  }, []);
+
+  const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
+    // Convert lasso polygon from screen coords to scene coords
+    const scenePolygon = bounds.points.map((p) => ({
+      x: p.x + scrollX,
+      y: p.y + scrollY,
+    }));
+
+    pushUndo();
+
+    // Move strokes inside lasso
+    setStrokes(prev => prev.map(s => {
+      if (strokeIntersectsPolygon(s, scenePolygon)) {
+        return { ...s, points: s.points.map(p => ({ ...p, x: p.x + delta.dx, y: p.y + delta.dy })) };
+      }
+      return s;
+    }));
+
+    // Move stamps inside lasso
+    setStamps(prev => prev.map(s => {
+      if (stampIntersectsPolygon(s, scenePolygon)) {
+        return { ...s, x: s.x + delta.dx, y: s.y + delta.dy };
+      }
+      return s;
+    }));
+
+    setLassoActive(false);
+    pendingLassoCropRef.current = null;
+  }, [scrollX, scrollY, pushUndo]);
+
   /* ── Chat ────────────────────────────────────────────── */
   const handleSendChat = async (text: string, attachments: Attachment[]) => {
     await sendToChat(text, attachments);
@@ -506,11 +550,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
     e.target.value = "";
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const dataURL = ev.target?.result as string;
       if (dataURL) {
         const img = new window.Image();
-        img.onload = () => {
+        img.onload = async () => {
           const maxW = 400;
           const scale = Math.min(1, maxW / img.width);
           const obj = createImageObject(
@@ -519,13 +563,23 @@ export default function NoteometryApp({ plugin, app }: Props) {
             img.width * scale,
             img.height * scale
           );
+          // Save to vault if we have a section
+          const sec = sectionRef.current;
+          if (sec) {
+            try {
+              const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+              obj.dataURL = vaultPath;
+            } catch (err) {
+              console.error("[Noteometry] image vault save failed:", err);
+            }
+          }
           setCanvasObjects((prev) => [...prev, obj]);
         };
         img.src = dataURL;
       }
     };
     reader.readAsDataURL(file);
-  }, [scrollX, scrollY]);
+  }, [scrollX, scrollY, plugin]);
 
   // Paste listener for images
   useEffect(() => {
@@ -540,10 +594,19 @@ export default function NoteometryApp({ plugin, app }: Props) {
           if (blob) {
             e.preventDefault();
             const reader = new FileReader();
-            reader.onload = (ev) => {
+            reader.onload = async (ev) => {
               const dataURL = ev.target?.result as string;
               if (dataURL) {
                 const obj = createImageObject(scrollX + 150, scrollY + 150, dataURL);
+                const sec = sectionRef.current;
+                if (sec) {
+                  try {
+                    const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                    obj.dataURL = vaultPath;
+                  } catch (err) {
+                    console.error("[Noteometry] paste image vault save failed:", err);
+                  }
+                }
                 setCanvasObjects((prev) => [...prev, obj]);
               }
             };
@@ -555,7 +618,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     };
     el.addEventListener("paste", handler);
     return () => el.removeEventListener("paste", handler);
-  }, [scrollX, scrollY]);
+  }, [scrollX, scrollY, plugin]);
 
   /* ── Viewport change ─────────────────────────────────── */
   const handleViewportChange = useCallback((newX: number, newY: number) => {
@@ -750,6 +813,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               tool={tool}
               selectedObjectId={selectedObjectId}
               onSelectObject={setSelectedObjectId}
+              plugin={plugin}
             />
 
             {/* Lasso overlay */}
@@ -757,7 +821,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
               active={lassoActive}
               containerRef={canvasAreaRef as React.RefObject<HTMLDivElement>}
               onComplete={handleLassoComplete}
-              onCancel={() => {}}
+              onCancel={() => { setLassoActive(false); pendingLassoCropRef.current = null; }}
+              onAction={handleLassoAction}
+              onMoveComplete={handleLassoMoveComplete}
             />
           </div>
 
