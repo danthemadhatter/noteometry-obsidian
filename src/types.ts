@@ -15,7 +15,7 @@ export interface NoteometrySettings {
 export const DEFAULT_SETTINGS: NoteometrySettings = {
   aiProvider: "claude",
   claudeApiKey: "",
-  claudeModel: "claude-sonnet-4-20250514",
+  claudeModel: "claude-opus-4-20250514",
   lmStudioUrl: "http://localhost:1234",
   lmStudioTextModel: "qwen3-235b",
   lmStudioVisionModel: "qwen2-vl-72b",
