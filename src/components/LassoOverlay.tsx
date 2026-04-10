@@ -29,6 +29,10 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
   const moveDragRef = useRef<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const boundsRef = useRef<LassoBounds | null>(null);
 
+  // Ghost preview state for move mode
+  const snapshotRef = useRef<{ canvas: HTMLCanvasElement; sx: number; sy: number } | null>(null);
+  const ghostCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   // Keep latest callbacks in refs so the effect doesn't re-run on every render
   const onCompleteRef = useRef(onComplete);
   const onCancelRef = useRef(onCancel);
@@ -59,11 +63,60 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     setActionBar(null);
   }, []);
 
+  // Capture a snapshot of the lasso region from the ink canvas
+  const captureSnapshot = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !boundsRef.current) return;
+    const inkCanvas = container.querySelector<HTMLCanvasElement>(".noteometry-ink-layer");
+    if (!inkCanvas) return;
+    const bounds = boundsRef.current;
+
+    // Clamp region to ink canvas dimensions
+    const sx = Math.max(0, Math.floor(bounds.minX));
+    const sy = Math.max(0, Math.floor(bounds.minY));
+    const sw = Math.min(inkCanvas.width - sx, Math.ceil(bounds.maxX - bounds.minX));
+    const sh = Math.min(inkCanvas.height - sy, Math.ceil(bounds.maxY - bounds.minY));
+    if (sw <= 0 || sh <= 0) return;
+
+    const offscreen = document.createElement("canvas");
+    offscreen.width = sw;
+    offscreen.height = sh;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(inkCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    snapshotRef.current = { canvas: offscreen, sx, sy };
+  }, [containerRef]);
+
+  // Draw the ghost preview on the ghost canvas
+  const drawGhost = useCallback((dx: number, dy: number) => {
+    const gc = ghostCanvasRef.current;
+    const snap = snapshotRef.current;
+    if (!gc || !snap) return;
+    const ctx = gc.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, gc.width, gc.height);
+    ctx.globalAlpha = 0.5;
+    ctx.drawImage(snap.canvas, snap.sx + dx, snap.sy + dy);
+    ctx.globalAlpha = 1.0;
+  }, []);
+
   // Move mode: drag handling via effect on the container
   useEffect(() => {
     if (!moveMode || !active) return;
     const container = containerRef.current;
     if (!container) return;
+
+    // Set up ghost canvas dimensions
+    const gc = ghostCanvasRef.current;
+    if (gc) {
+      const rect = container.getBoundingClientRect();
+      gc.width = rect.width;
+      gc.height = rect.height;
+    }
+
+    // Capture snapshot of the lasso region at move-mode start
+    captureSnapshot();
 
     const onDown = (e: PointerEvent) => {
       e.preventDefault();
@@ -79,6 +132,10 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       e.stopImmediatePropagation();
       moveDragRef.current.currentX = e.clientX;
       moveDragRef.current.currentY = e.clientY;
+      const dx = e.clientX - moveDragRef.current.startX;
+      const dy = e.clientY - moveDragRef.current.startY;
+      // Update ghost canvas directly for smooth rendering (avoid React re-render overhead)
+      drawGhost(dx, dy);
     };
 
     const onUp = (e: PointerEvent) => {
@@ -89,6 +146,7 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       const dx = moveDragRef.current.currentX - moveDragRef.current.startX;
       const dy = moveDragRef.current.currentY - moveDragRef.current.startY;
       moveDragRef.current = null;
+      snapshotRef.current = null;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         onMoveCompleteRef.current?.({ dx, dy }, boundsRef.current);
       }
@@ -111,8 +169,9 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       overlay.removeEventListener("pointermove", onMove, true);
       overlay.removeEventListener("pointerup", onUp, true);
       overlay.remove();
+      snapshotRef.current = null;
     };
-  }, [moveMode, active, containerRef]);
+  }, [moveMode, active, containerRef, captureSnapshot, drawGhost]);
 
   useEffect(() => {
     if (!active) return;
@@ -246,7 +305,28 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, containerRef]);
 
-  if (!active || !actionBar || moveMode) return null;
+  if (!active) return null;
+
+  // Move mode: render the ghost preview canvas
+  if (moveMode) {
+    return (
+      <canvas
+        ref={ghostCanvasRef}
+        className="noteometry-lasso-ghost"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 305,
+          pointerEvents: "none",
+        }}
+      />
+    );
+  }
+
+  if (!actionBar) return null;
 
   return (
     <div
