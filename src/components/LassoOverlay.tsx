@@ -70,22 +70,31 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     const inkCanvas = container.querySelector<HTMLCanvasElement>(".noteometry-ink-layer");
     if (!inkCanvas) return;
     const bounds = boundsRef.current;
+    const dpr = window.devicePixelRatio || 1;
 
-    // Clamp region to ink canvas dimensions
-    const sx = Math.max(0, Math.floor(bounds.minX));
-    const sy = Math.max(0, Math.floor(bounds.minY));
-    const sw = Math.min(inkCanvas.width - sx, Math.ceil(bounds.maxX - bounds.minX));
-    const sh = Math.min(inkCanvas.height - sy, Math.ceil(bounds.maxY - bounds.minY));
-    if (sw <= 0 || sh <= 0) return;
+    // bounds coords are CSS pixels; inkCanvas internal size is CSS * dpr
+    const cssSx = Math.max(0, Math.floor(bounds.minX));
+    const cssSy = Math.max(0, Math.floor(bounds.minY));
+    const cssSw = Math.ceil(bounds.maxX - bounds.minX);
+    const cssSh = Math.ceil(bounds.maxY - bounds.minY);
+    if (cssSw <= 0 || cssSh <= 0) return;
 
+    // Source region in canvas pixel space
+    const pxSx = Math.floor(cssSx * dpr);
+    const pxSy = Math.floor(cssSy * dpr);
+    const pxSw = Math.min(inkCanvas.width - pxSx, Math.ceil(cssSw * dpr));
+    const pxSh = Math.min(inkCanvas.height - pxSy, Math.ceil(cssSh * dpr));
+    if (pxSw <= 0 || pxSh <= 0) return;
+
+    // Offscreen canvas in CSS pixels for ghost rendering
     const offscreen = document.createElement("canvas");
-    offscreen.width = sw;
-    offscreen.height = sh;
+    offscreen.width = cssSw;
+    offscreen.height = cssSh;
     const ctx = offscreen.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(inkCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    ctx.drawImage(inkCanvas, pxSx, pxSy, pxSw, pxSh, 0, 0, cssSw, cssSh);
 
-    snapshotRef.current = { canvas: offscreen, sx, sy };
+    snapshotRef.current = { canvas: offscreen, sx: cssSx, sy: cssSy };
   }, [containerRef]);
 
   // Draw the ghost preview on the ghost canvas
@@ -107,7 +116,7 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     const container = containerRef.current;
     if (!container) return;
 
-    // Set up ghost canvas dimensions
+    // Set up ghost canvas dimensions — must happen before captureSnapshot draws to it
     const gc = ghostCanvasRef.current;
     if (gc) {
       const rect = container.getBoundingClientRect();
@@ -115,8 +124,11 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       gc.height = rect.height;
     }
 
-    // Capture snapshot of the lasso region at move-mode start
-    captureSnapshot();
+    // Small rAF delay to ensure the ghost canvas is fully mounted and sized
+    // before we try to draw to it
+    const rafId = requestAnimationFrame(() => {
+      captureSnapshot();
+    });
 
     const onDown = (e: PointerEvent) => {
       e.preventDefault();
@@ -165,6 +177,7 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     overlay.addEventListener("pointerup", onUp, true);
 
     return () => {
+      cancelAnimationFrame(rafId);
       overlay.removeEventListener("pointerdown", onDown, true);
       overlay.removeEventListener("pointermove", onMove, true);
       overlay.removeEventListener("pointerup", onUp, true);
