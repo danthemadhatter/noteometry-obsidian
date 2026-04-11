@@ -32,8 +32,17 @@
   --nm-canvas-bg: #e5d4a5;
   --nm-canvas-bg-edge: #d1bf8a;
 
-  /* Gunmetal — the dark metal trim between cream faceplate panels.
-   * Bezels, dividers, raised edges on equipment seams. */
+  /* Battleship gray — the Tek 545A cabinet. Warm mid blue-gray, the
+   * painted metal body the cream faceplate panels are mounted on.
+   * Shows through as the seam between adjacent cream panels and as
+   * the background behind the whole plugin view. */
+  --nm-cabinet: #6b7a8a;
+  --nm-cabinet-light: #8493a4;     /* highlight / raised bezel edge */
+  --nm-cabinet-dark: #4d5968;      /* shadow / recessed trim */
+  --nm-cabinet-deep: #323c48;      /* deepest inset shadow */
+
+  /* Gunmetal — reserved for very dark accents. Primary dark surface
+   * is now --nm-cabinet (battleship gray). */
   --nm-gunmetal: #3a4050;
   --nm-gunmetal-light: #5a6072;
   --nm-gunmetal-dark: #1f232e;
@@ -57,19 +66,21 @@
   --nm-danger: #c8382c;            /* signal red — warning light */
   --nm-success: #6b7140;           /* military olive — ready state */
 
-  /* Borders — gunmetal trim at moderate opacity */
-  --nm-warm-border: rgba(58, 64, 80, 0.24);
-  --nm-warm-border-strong: rgba(58, 64, 80, 0.42);
+  /* Borders — battleship-gray trim at moderate opacity. Reads as the
+   * seam where two cream faceplate panels meet, with the gray cabinet
+   * showing through. */
+  --nm-warm-border: rgba(77, 89, 104, 0.35);
+  --nm-warm-border-strong: rgba(77, 89, 104, 0.60);
 
   /* Section selection — pressed-in recessed faceplate with amber glow */
   --nm-section-active: var(--nm-faceplate-recessed);
 
   /* Legacy name aliases so existing rules keep working.
-   * Everything maps onto the new cream/gunmetal scheme. */
+   * Everything maps onto the new cream/cabinet-gray scheme. */
   --nm-warm-bg: var(--nm-faceplate);
   --nm-warm-bg-alt: var(--nm-faceplate-alt);
-  --nm-chassis: var(--nm-gunmetal);            /* dark metal frames */
-  --nm-chassis-dark: var(--nm-gunmetal-dark);
+  --nm-chassis: var(--nm-cabinet);             /* Tek cabinet gray */
+  --nm-chassis-dark: var(--nm-cabinet-dark);
   --nm-chassis-light: var(--nm-faceplate-light);
   --nm-chassis-fg: var(--nm-ink);
   --nm-paper: var(--nm-faceplate);             /* "paper" IS the faceplate */
@@ -120,9 +131,32 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-  background: var(--nm-warm-bg);
+  /* Battleship gray Tek 545A cabinet — the metal body behind the
+   * cream faceplate panels. Where panels don't cover the full surface
+   * (borders, seams, padding), the cabinet shows through. */
+  background: var(--nm-cabinet);
   color: var(--text-normal);
   font-family: var(--nm-font);
+  /* Thin cabinet bezel around the whole plugin view */
+  padding: 2px;
+  box-sizing: border-box;
+  gap: 2px;
+}
+
+/* Give the main (canvas + toolbar) area its own explicit gap so the
+ * cabinet gray reads as a seam between sidebar and main, and between
+ * main and right panel. */
+.noteometry-main {
+  gap: 0;
+}
+
+/* Visible battleship-gray trim strips between panels (replaces the
+ * old thin borders so the cabinet reads as a real metal seam). */
+.noteometry-sidebar {
+  border-right: 2px solid var(--nm-cabinet-dark);
+}
+.noteometry-right {
+  border-left: 2px solid var(--nm-cabinet-dark);
 }
 
 .noteometry-main {
