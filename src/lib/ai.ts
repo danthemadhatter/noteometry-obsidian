@@ -214,8 +214,10 @@ FORMAT RULES:
 export async function chat(
   messages: ChatMessage[],
   attachments: Attachment[],
-  settings: NoteometrySettings
+  settings: NoteometrySettings,
+  systemOverride?: string,
 ): Promise<AIResult> {
+  const systemPrompt = systemOverride ?? CHAT_SYSTEM;
   if (settings.aiProvider === "lmstudio") {
     // Build OpenAI-format messages
     const formatted = messages.map((m, i) => {
@@ -238,7 +240,7 @@ export async function chat(
     return callLMStudio(
       settings,
       attachments.length ? settings.lmStudioVisionModel : settings.lmStudioTextModel,
-      CHAT_SYSTEM,
+      systemPrompt,
       formatted,
       0.3
     );
@@ -262,5 +264,5 @@ export async function chat(
     return { role: m.role, content: m.text ?? "" };
   });
 
-  return callClaude(settings, CHAT_SYSTEM, formatted, 0.3);
+  return callClaude(settings, systemPrompt, formatted, 0.3);
 }
