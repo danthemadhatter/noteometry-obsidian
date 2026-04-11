@@ -3,7 +3,7 @@ import {
   IconSelect, IconPen, IconEraser, IconHand, IconLasso, IconScan,
   IconType, IconTable, IconImage, IconUndo, IconRedo,
   IconLine, IconArrow, IconRect, IconCircle,
-  IconDownload, IconTrash, IconSliders, IconRefresh,
+  IconDownload, IconTrash, IconSliders,
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
 
@@ -86,7 +86,7 @@ export default function CanvasToolbar({
 
   return (
     <div className="noteometry-canvas-toolbar">
-      {/* ── Core drawing tools + cycle ── */}
+      {/* ── Core drawing tools ── */}
       <div className="noteometry-toolbar-group">
         <Btn active={tool === "pen" && !lassoActive} onClick={() => onToolChange("pen")} title="Pen">
           <IconPen />
@@ -99,16 +99,6 @@ export default function CanvasToolbar({
         </Btn>
         <Btn active={tool === "select" && !lassoActive} onClick={() => onToolChange("select")} title="Select">
           <IconSelect />
-        </Btn>
-        <Btn
-          onClick={() => {
-            const cycle: CanvasTool[] = ["pen", "eraser", "grab"];
-            const idx = cycle.indexOf(tool);
-            onToolChange(cycle[(idx + 1) % cycle.length]!);
-          }}
-          title="Cycle tool (Pen → Eraser → Grab)"
-        >
-          <IconRefresh />
         </Btn>
       </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Notice } from "obsidian";
 import {
   IconPlus, IconTrash, IconFolder, IconFile,
   IconChevDown, IconChevRight, IconMenu, IconX, IconPen,
@@ -124,9 +125,9 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
           if (!(await adapter.exists(newPath))) await adapter.mkdir(newPath);
           const pages = await listPages(plugin, renamingItem.name);
           for (const p of pages) {
-            const data = await adapter.read(`${oldPath}/${p}.json`);
-            await adapter.write(`${newPath}/${p}.json`, data);
-            await adapter.remove(`${oldPath}/${p}.json`);
+            const data = await adapter.read(`${oldPath}/${p}.md`);
+            await adapter.write(`${newPath}/${p}.md`, data);
+            await adapter.remove(`${oldPath}/${p}.md`);
           }
           await adapter.rmdir(oldPath, false);
         }
@@ -134,8 +135,8 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
         if (currentSection === renamingItem.name) onSelect(name, currentPage);
       } else {
         const sec = renamingItem.section;
-        const oldPath = `${root}/${sec}/${renamingItem.name}.json`;
-        const newPath = `${root}/${sec}/${name}.json`;
+        const oldPath = `${root}/${sec}/${renamingItem.name}.md`;
+        const newPath = `${root}/${sec}/${name}.md`;
         if (await adapter.exists(oldPath)) {
           const data = await adapter.read(oldPath);
           await adapter.write(newPath, data);
@@ -153,19 +154,31 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
   };
 
   const handleDeleteSection = async (name: string) => {
-    if (!confirm(`Delete "${name}" and all its pages?`)) return;
+  if (!confirm(`Delete "${name}" and all its pages?`)) return;
+  try {
     await deleteSection(plugin, name);
+    new Notice(`✅ Deleted section "${name}"`, 3000);
     await refreshSections();
     if (currentSection === name) onSelect("", "");
-  };
+  } catch (err) {
+    console.error("[Noteometry] deleteSection failed:", err);
+    new Notice(`❌ Failed to delete section "${name}"`, 8000);
+  }
+};
 
-  const handleDeletePage = async (section: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+const handleDeletePage = async (section: string, name: string) => {
+  if (!confirm(`Delete "${name}"?`)) return;
+  try {
     await deletePage(plugin, section, name);
+    new Notice(`✅ Deleted page "${name}"`, 3000);
     const updated = await listPages(plugin, section);
     setPagesMap((prev) => ({ ...prev, [section]: updated }));
     if (currentPage === name) onSelect(section, updated[0] ?? "");
-  };
+  } catch (err) {
+    console.error("[Noteometry] deletePage failed:", err);
+    new Notice(`❌ Failed to delete page "${name}"`, 8000);
+  }
+};
 
   const selectPage = (section: string, page: string) => {
     onSelect(section, page);

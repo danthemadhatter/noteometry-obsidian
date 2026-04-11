@@ -17,12 +17,14 @@ interface Props {
   plugin?: NoteometryPlugin;
 }
 
-/** Resolves vault image paths to data URLs with caching */
-function useResolvedImageSrc(plugin: NoteometryPlugin | undefined, src: string): string {
+/** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
+function useResolvedImageSrc(plugin: NoteometryPlugin | undefined, src: string): { src: string; error: boolean } {
   const [resolved, setResolved] = useState(src);
+  const [error, setError] = useState(false);
   const cacheRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
+    setError(false);
     if (!src || src.startsWith("data:") || !plugin) {
       setResolved(src);
       return;
@@ -44,16 +46,47 @@ function useResolvedImageSrc(plugin: NoteometryPlugin | undefined, src: string):
         setResolved(dataUrl);
       }
     }).catch(() => {
-      if (!cancelled) setResolved(src);
+      if (!cancelled) setError(true);
     });
     return () => { cancelled = true; };
   }, [plugin, src]);
 
-  return resolved;
+  return { src: resolved, error };
 }
 
 function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin }) {
-  const resolved = useResolvedImageSrc(plugin, src);
+  const { src: resolved, error } = useResolvedImageSrc(plugin, src);
+  if (error) {
+    const filename = src.split("/").pop() ?? src;
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px",
+          background: "repeating-linear-gradient(45deg, #f4e9d0, #f4e9d0 8px, #e8dcbf 8px, #e8dcbf 16px)",
+          border: "1px dashed #c8382c",
+          color: "#c8382c",
+          fontSize: "12px",
+          fontFamily: "monospace",
+          textAlign: "center",
+          padding: "8px",
+          boxSizing: "border-box",
+          userSelect: "none",
+        }}
+        title={`Missing file: ${src}`}
+      >
+        <span style={{ fontWeight: 700, letterSpacing: "0.05em" }}>MISSING</span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+          {filename}
+        </span>
+      </div>
+    );
+  }
   return (
     <img src={resolved} alt="Inserted image"
       style={{ width: "100%", height: "100%", objectFit: "contain" }}

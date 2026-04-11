@@ -1,3 +1,4 @@
+import { Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
 import type { ChatMessage } from "../types";
 import type { Stroke, Stamp } from "./inkEngine";
@@ -170,6 +171,7 @@ export async function loadPage(
     }
   } catch (e) {
     console.error("[Noteometry] load failed:", e);
+    new Notice(`Failed to load "${section}/${name}" — file may be corrupt (see console)`, 10000);
   }
   return { ...EMPTY_PAGE };
 }
@@ -190,6 +192,7 @@ export async function savePage(
     await adapter.write(path, JSON.stringify(data, null, 0));
   } catch (e) {
     console.error("[Noteometry] save failed:", e);
+    new Notice(`Failed to save "${section}/${name}" — changes may not persist (see console)`, 10000);
   }
 }
 
@@ -216,6 +219,56 @@ export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
     }
   } catch (e) {
     console.error("[Noteometry] json→md migration:", e);
+    new Notice("Noteometry: .json → .md migration failed (see console)", 8000);
+  }
+}
+
+/* ── Migrate .attachments → attachments (dot-folders break sync) ── */
+
+export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<void> {
+  const root = rootDir(plugin);
+  const adapter = plugin.app.vault.adapter;
+  try {
+    if (!(await adapter.exists(root))) return;
+    const sections = await listSections(plugin);
+    for (const section of sections) {
+      const oldDir = `${root}/${section}/.attachments`;
+      const newDir = `${root}/${section}/attachments`;
+
+      // Move PNGs if the dot-folder exists
+      if (await adapter.exists(oldDir)) {
+        if (!(await adapter.exists(newDir))) await adapter.mkdir(newDir);
+        const listing = await adapter.list(oldDir);
+        for (const f of listing.files) {
+          const name = f.split("/").pop() ?? "";
+          const target = `${newDir}/${name}`;
+          if (!(await adapter.exists(target))) {
+            const buf = await adapter.readBinary(f);
+            await adapter.writeBinary(target, buf);
+          }
+          await adapter.remove(f);
+        }
+        try { await adapter.rmdir(oldDir, false); } catch { /* ignore */ }
+      }
+
+      // Rewrite any page JSON that references the old path
+      const secPath = `${root}/${section}`;
+      if (await adapter.exists(secPath)) {
+        const listing = await adapter.list(secPath);
+        for (const f of listing.files.filter((x) => x.endsWith(".md"))) {
+          try {
+            const raw = await adapter.read(f);
+            if (raw.includes("/.attachments/")) {
+              const fixed = raw.split("/.attachments/").join("/attachments/");
+              await adapter.write(f, fixed);
+            }
+          } catch { /* ignore individual file errors */ }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[Noteometry] dot-attachments migration:", e);
+    new Notice("Noteometry: attachment folder migration failed (see console)", 8000);
   }
 }
 
@@ -228,7 +281,7 @@ export async function saveImageToVault(
   base64Data: string
 ): Promise<string> {
   const adapter = plugin.app.vault.adapter;
-  const attachDir = `${rootDir(plugin)}/${sectionName}/.attachments`;
+  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
   if (!(await adapter.exists(attachDir))) {
     await adapter.mkdir(attachDir);
   }

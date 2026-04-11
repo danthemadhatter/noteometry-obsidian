@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { App } from "obsidian";
+import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
 import type { ChatMessage, Attachment } from "../types";
 import type { Stroke, Stamp } from "../lib/inkEngine";
@@ -11,7 +11,7 @@ import { newStampId } from "../lib/inkEngine";
 import { readInk, chat, solve } from "../lib/ai";
 import {
   savePage, loadPage, listSections, listPages,
-  createSection, createPage, migrateLegacy, migrateJsonToMd,
+  createSection, createPage, migrateLegacy, migrateJsonToMd, migrateDotAttachments,
   saveImageToVault, loadImageFromVault, migrateBase64Images,
   CanvasData,
 } from "../lib/persistence";
@@ -302,6 +302,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     let cancelled = false;
     (async () => {
       await migrateJsonToMd(plugin);
+      await migrateDotAttachments(plugin);
       const migrated = await migrateLegacy(plugin);
       const secs = await listSections(plugin);
       if (cancelled) return;
@@ -476,6 +477,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
       y: p.y + scrollY,
     }));
 
+    // Scene-space bounding box of the lasso (matches handleLassoComplete's object selection)
+    const regionBounds = {
+      minX: bounds.minX + scrollX,
+      minY: bounds.minY + scrollY,
+      maxX: bounds.maxX + scrollX,
+      maxY: bounds.maxY + scrollY,
+    };
+
     pushUndo();
 
     // Move strokes inside lasso
@@ -492,6 +501,19 @@ export default function NoteometryApp({ plugin, app }: Props) {
         return { ...s, x: s.x + delta.dx, y: s.y + delta.dy };
       }
       return s;
+    }));
+
+    // Move canvas objects (text boxes, tables, images) whose bbox overlaps the lasso bounds.
+    // Uses the same overlap test as handleLassoComplete's OCR selection for consistency.
+    setCanvasObjects(prev => prev.map(obj => {
+      const objRight = obj.x + obj.w;
+      const objBottom = obj.y + obj.h;
+      const overlaps = !(objRight < regionBounds.minX || obj.x > regionBounds.maxX ||
+                         objBottom < regionBounds.minY || obj.y > regionBounds.maxY);
+      if (overlaps) {
+        return { ...obj, x: obj.x + delta.dx, y: obj.y + delta.dy };
+      }
+      return obj;
     }));
 
     setLassoActive(false);
@@ -571,6 +593,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               obj.dataURL = vaultPath;
             } catch (err) {
               console.error("[Noteometry] image vault save failed:", err);
+              new Notice("Image save failed — kept in memory only, may not sync across devices", 8000);
             }
           }
           setCanvasObjects((prev) => [...prev, obj]);
@@ -605,6 +628,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     obj.dataURL = vaultPath;
                   } catch (err) {
                     console.error("[Noteometry] paste image vault save failed:", err);
+                    new Notice("Pasted image save failed — kept in memory only, may not sync across devices", 8000);
                   }
                 }
                 setCanvasObjects((prev) => [...prev, obj]);

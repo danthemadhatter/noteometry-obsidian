@@ -82,8 +82,16 @@ export default class NoteometryPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const data = (await this.loadData()) ?? {};
-    this.settings = { ...DEFAULT_SETTINGS, ...data };
+    const data = ((await this.loadData()) ?? {}) as Record<string, unknown>;
+    // Allow-list: only keys that exist in DEFAULT_SETTINGS survive. Unknown
+    // fields (stale migrations, old plugin iterations) are dropped on next save.
+    const next: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+      if (key in data) {
+        next[key] = data[key];
+      }
+    }
+    this.settings = next as unknown as NoteometrySettings;
   }
 
   async saveSettings() {
