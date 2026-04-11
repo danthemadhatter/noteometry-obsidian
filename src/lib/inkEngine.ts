@@ -69,6 +69,16 @@ export function pointNearStroke(
   tolerance: number
 ): boolean {
   const pts = stroke.points;
+  if (pts.length === 0) return false;
+
+  // Single-point stroke (a dot): check distance to the point itself.
+  // Without this, the segment loop below runs 0 iterations for a 1-point
+  // stroke and the function returns false, making dots un-erasable.
+  if (pts.length === 1) {
+    const p = pts[0]!;
+    return Math.hypot(px - p.x, py - p.y) < tolerance;
+  }
+
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i]!;
     const b = pts[i + 1]!;

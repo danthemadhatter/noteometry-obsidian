@@ -55,6 +55,29 @@ describe("pointNearStroke", () => {
   it("detects point near endpoint", () => {
     expect(pointNearStroke(2, 0, s, 5)).toBe(true);
   });
+
+  // Regression: the old implementation treated a dot (single-point stroke)
+  // as never erasable because its segment loop ran zero iterations.
+  // These tests guard against that bug ever coming back.
+  describe("single-point strokes (dots)", () => {
+    const dot = mkStroke([pt(50, 50)]);
+
+    it("detects point exactly on a dot", () => {
+      expect(pointNearStroke(50, 50, dot, 5)).toBe(true);
+    });
+
+    it("detects point within tolerance of a dot", () => {
+      expect(pointNearStroke(53, 54, dot, 10)).toBe(true);
+    });
+
+    it("rejects point outside tolerance of a dot", () => {
+      expect(pointNearStroke(80, 80, dot, 5)).toBe(false);
+    });
+
+    it("rejects empty stroke", () => {
+      expect(pointNearStroke(0, 0, mkStroke([]), 100)).toBe(false);
+    });
+  });
 });
 
 describe("smoothPoints", () => {
