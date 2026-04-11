@@ -191,23 +191,14 @@ export default function CanvasObjectLayer({
         width: "100%", height: "100%",
         pointerEvents: "none",
         zIndex: 50,
+        // Apply zoom directly to the layer so child overlays scale
+        // together with the ink canvas's ctx.scale. transformOrigin 0 0
+        // matches the ink canvas's origin. At zoom === 1 this is a no-op
+        // transform; children render exactly as they did pre-Phase-4.
+        transformOrigin: "0 0",
+        transform: zoom === 1 ? undefined : `scale(${zoom})`,
       }}
     >
-      <div
-        className="noteometry-object-layer-scaled"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 0,
-          height: 0,
-          // Child overlays position absolutely in world-space coords
-          // (obj.x - scrollX, obj.y - scrollY). This wrapper applies the
-          // zoom scale so everything tracks the ink canvas's ctx.scale.
-          transformOrigin: "0 0",
-          transform: `scale(${zoom})`,
-        }}
-      >
       {objects.map(obj => (
         <div
           key={obj.id}
@@ -277,7 +268,6 @@ export default function CanvasObjectLayer({
           />
         </div>
       ))}
-      </div>
     </div>
   );
 }
