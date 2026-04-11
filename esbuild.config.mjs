@@ -4,18 +4,41 @@ import { builtinModules } from 'node:module';
 import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Auto-deploy built files to Obsidian Sync vault after production builds
-const SYNC_VAULT_PLUGIN = join(
-  process.env.HOME || "",
-  "Documents/Noteometry/.obsidian/plugins/noteometry"
-);
+// Auto-deploy built files to Dan's single Obsidian Sync vault. Dan's
+// rule: one vault, and that vault is the one connected to Obsidian Sync
+// (remote: "Noteometry 4-11-26"), which lives locally at
+// ~/Documents/Noteometry. Sync propagates pages + plugin data to his
+// iPad / Android / other Macs automatically.
+//
+// Cross-device distribution of the plugin CODE (not data) happens via
+// GitHub releases + BRAT — see .github/workflows/release.yml. Dan
+// pushes a tag, the workflow builds the bundle and attaches it to a
+// GitHub release, and BRAT on each device pulls the new version.
+const HOME = process.env.HOME || "";
+const VAULT_PLUGIN_PATHS = [
+  join(HOME, "Documents/Noteometry/.obsidian/plugins/noteometry"),
+];
 
-function deployToVault() {
-  if (!existsSync(SYNC_VAULT_PLUGIN)) return;
-  for (const f of ["main.js", "styles.css", "manifest.json"]) {
-    try { copyFileSync(f, join(SYNC_VAULT_PLUGIN, f)); } catch {}
+function deployToVaults() {
+  for (const dest of VAULT_PLUGIN_PATHS) {
+    if (!existsSync(dest)) {
+      // Don't silently skip — log so we notice if a vault path rot
+      // develops. mkdir here is intentional so a fresh vault picks up
+      // the build automatically once the dir is created.
+      console.log(`[deploy] skipping missing vault: ${dest}`);
+      continue;
+    }
+    let ok = 0;
+    for (const f of ["main.js", "styles.css", "manifest.json"]) {
+      try {
+        copyFileSync(f, join(dest, f));
+        ok++;
+      } catch (e) {
+        console.log(`[deploy] failed ${f} → ${dest}: ${e.message}`);
+      }
+    }
+    console.log(`[deploy] ${ok}/3 files → ${dest}`);
   }
-  console.log("Deployed to Obsidian Sync vault");
 }
 
 const banner =
@@ -59,7 +82,7 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
-	deployToVault();
+	deployToVaults();
 	process.exit(0);
 } else {
 	await context.watch();

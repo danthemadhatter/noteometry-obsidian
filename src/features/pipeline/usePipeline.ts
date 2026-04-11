@@ -32,6 +32,12 @@ export interface UsePipelineReturn {
   setChatMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setActivePresetId: (id: string) => void;
   sendToChat: (userText: string, atts?: Attachment[]) => Promise<void>;
+  /** Soft-cancel the in-flight chat request: drop the response when it
+   * returns and immediately clear the loading flag. Because Obsidian's
+   * requestUrl does not expose an AbortController, we can't actually
+   * stop the network round-trip — but the user sees loading end and
+   * the abandoned response never lands in the conversation. */
+  stopChat: () => void;
   processCrop: (dataURL: string) => Promise<boolean>;
   handleSolveInput: () => Promise<void>;
   handleInsertSymbol: (sym: string) => void;
@@ -58,6 +64,11 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
   const activePresetRef = useRef<PromptPreset>(activePreset);
   activePresetRef.current = activePreset;
 
+  // Soft-cancel token for the in-flight chat request. Each send starts
+  // with a fresh { cancelled: false } object. stopChat flips it; the
+  // awaited response then sees the flag and discards the result.
+  const chatAbortRef = useRef<{ cancelled: boolean } | null>(null);
+
   const setActivePresetId = useCallback((id: string) => {
     setActivePresetIdState(id);
   }, []);
@@ -67,19 +78,41 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
     const newHistory = [...chatMessagesRef.current, userMsg];
     setChatMessages(newHistory);
     setChatLoading(true);
+    // Fresh cancel token for this request. Captured in closure so that
+    // a later send doesn't get confused with an earlier abort.
+    const token = { cancelled: false };
+    chatAbortRef.current = token;
     try {
       // Use the active preset's system prompt. This is what makes "Solve"
       // behave differently from "Explain" from "Circuit" etc.
       const res = await chat(newHistory, atts, plugin.settings, activePresetRef.current.system);
+      // If the user hit Stop while we were waiting on the network, drop
+      // this response silently. Their "user" message still lives in the
+      // history — we don't roll that back, since they presumably still
+      // wanted to say it.
+      if (token.cancelled) return;
       setChatMessages((prev) => [...prev, {
         role: "assistant",
         text: res.ok ? res.text : (res.error ?? "No response"),
       }]);
     } catch {
+      if (token.cancelled) return;
       setChatMessages((prev) => [...prev, { role: "assistant", text: "AI request failed." }]);
+    } finally {
+      if (chatAbortRef.current === token) {
+        chatAbortRef.current = null;
+        setChatLoading(false);
+      }
     }
-    setChatLoading(false);
   }, [plugin]);
+
+  const stopChat = useCallback(() => {
+    const token = chatAbortRef.current;
+    if (!token) return;
+    token.cancelled = true;
+    chatAbortRef.current = null;
+    setChatLoading(false);
+  }, []);
 
   /**
    * Process a base64 PNG crop (from lasso OCR) through the vision model,
@@ -144,6 +177,7 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
     setChatMessages,
     setActivePresetId,
     sendToChat,
+    stopChat,
     processCrop,
     handleSolveInput,
     handleInsertSymbol,

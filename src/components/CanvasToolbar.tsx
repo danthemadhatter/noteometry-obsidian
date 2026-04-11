@@ -6,6 +6,7 @@ import {
   IconDownload, IconTrash, IconSliders,
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
+import type { LassoMode } from "../features/lasso/useLassoStack";
 
 // Traditional ink palette — dark colors that read on the pale engineering
 // paper canvas. Default is fountain pen navy (reads as black, feels like
@@ -37,7 +38,11 @@ interface Props {
   tool: CanvasTool;
   onToolChange: (tool: CanvasTool) => void;
   lassoActive: boolean;
-  onLassoToggle: () => void;
+  /** Which lasso mode is currently selected. Matters only while lassoActive. */
+  lassoMode: LassoMode;
+  /** Toggle lasso with a specific mode. Passing the currently-active mode
+   * deactivates; passing a different mode while active switches modes. */
+  onLassoToggle: (mode: LassoMode) => void;
   activeColor: string;
   onColorChange: (color: string) => void;
   strokeWidth: number;
@@ -70,7 +75,7 @@ function Btn({ active, disabled, onClick, title, children }: {
 
 export default function CanvasToolbar({
   tool, onToolChange,
-  lassoActive, onLassoToggle,
+  lassoActive, lassoMode, onLassoToggle,
   activeColor, onColorChange,
   strokeWidth, onStrokeWidthChange,
   onInsertTextBox, onInsertTable, onInsertImage,
@@ -128,10 +133,21 @@ export default function CanvasToolbar({
         </Btn>
       </div>
 
-      {/* ── Lasso ── */}
+      {/* ── Lasso (freehand + rectangular) ── */}
       <div className="noteometry-toolbar-group">
-        <Btn active={lassoActive} onClick={onLassoToggle} title="Lasso select">
+        <Btn
+          active={lassoActive && lassoMode === "freehand"}
+          onClick={() => onLassoToggle("freehand")}
+          title="Lasso select (freehand polygon — trace any shape)"
+        >
           <IconLasso />
+        </Btn>
+        <Btn
+          active={lassoActive && lassoMode === "rect"}
+          onClick={() => onLassoToggle("rect")}
+          title="Rectangle lasso (drag a box — great for cropping dropped images)"
+        >
+          <IconRect />
         </Btn>
       </div>
 

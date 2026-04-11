@@ -121,12 +121,39 @@
 
 /* v7: primary chassis is blue, so default text is cream stencil.
  * Components that render on cream faceplate inserts (chat bubbles,
- * text boxes, canvas) override locally with --nm-paper-ink. */
+ * text boxes, canvas) override locally with --nm-paper-ink.
+ *
+ * IMPORTANT: --text-muted and --text-faint must be CREAM-derived at
+ * the container level, because most labels that reach for these vars
+ * (panel headers, chat titles, sidebar items) live on the BLUE chassis.
+ * Setting them to --nm-ink-muted made them invisible on blue. Cream
+ * surfaces re-scope these vars locally (see cream-surface rule below). */
 .noteometry-container {
   color: var(--nm-chassis-fg);
   --text-normal: var(--nm-chassis-fg);
+  --text-muted: rgba(237, 232, 210, 0.72);
+  --text-faint: rgba(237, 232, 210, 0.5);
+}
+
+/* Cream-surface text scope — Dan's rule: "font for everything needs to
+ * be black if it's in a white icon box". Inside any cream/paper/faceplate
+ * surface we flip the color defaults AND re-scope --text-normal/muted/faint
+ * so descendant elements that reach for those vars resolve to dark navy. */
+.noteometry-canvas-topbar,
+.noteometry-table-editor,
+.noteometry-richtext,
+.noteometry-panel-box,
+.noteometry-panel-textarea,
+.noteometry-chat-textarea,
+.noteometry-chat-bubble.assistant,
+.noteometry-canvas-object,
+.noteometry-zoom-btn,
+.noteometry-mathpal,
+.noteometry-mathpal-btn {
+  color: var(--nm-paper-ink);
+  --text-normal: var(--nm-paper-ink);
   --text-muted: var(--nm-ink-muted);
-  --text-faint: var(--nm-ink-muted);
+  --text-faint: rgba(26, 35, 53, 0.52);
 }
 
 .noteometry-root {
@@ -702,8 +729,8 @@
   align-items: center;
   gap: 2px;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--nm-warm-border);
-  background: var(--nm-warm-bg-alt);
+  border-bottom: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate-recessed);
   flex-shrink: 0;
 }
 
@@ -741,10 +768,10 @@
 .noteometry-richtext-select {
   padding: 2px 4px;
   font-size: 11px;
-  border: 1px solid var(--nm-warm-border);
+  border: 1px solid var(--nm-paper-border);
   border-radius: 4px;
-  background: var(--nm-warm-bg);
-  color: var(--text-normal);
+  background: var(--nm-faceplate);
+  color: var(--nm-paper-ink);
   cursor: pointer;
 }
 
@@ -862,10 +889,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--nm-warm-border-strong);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius);
   margin: 0 10px;
-  background: var(--nm-chassis-light);
+  background: var(--nm-faceplate);
   box-shadow: var(--nm-shadow-soft);
 }
 
@@ -957,8 +984,8 @@
 
 .noteometry-mathpal {
   flex-shrink: 0;
-  border-top: 1px solid var(--nm-warm-border);
-  background: var(--nm-warm-bg-alt);
+  border-top: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate);
 }
 
 .noteometry-mathpal-tabs {
@@ -1024,9 +1051,9 @@
   width: 34px;
   height: 30px;
   padding: 0;
-  background: var(--nm-chassis-light);
-  color: var(--nm-ink);
-  border: 1px solid var(--nm-warm-border);
+  background: var(--nm-faceplate-light);
+  color: var(--nm-paper-ink);
+  border: 1px solid var(--nm-paper-border);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.1s;
@@ -1183,26 +1210,42 @@
   border: 1px solid var(--nm-warm-border-strong);
 }
 
-/* Copy button on assistant messages */
+/* Action row at the bottom of assistant messages (Copy for Word + Drop onto canvas) */
+.noteometry-chat-bubble-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Copy + Drop buttons on assistant messages */
 .noteometry-chat-copy-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-faint);
-  background: none;
-  border: 1px solid var(--nm-warm-border);
+  color: var(--nm-ink-muted);
+  background: var(--nm-faceplate-recessed);
+  border: 1px solid var(--nm-paper-border);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.12s;
 }
 .noteometry-chat-copy-btn:hover {
-  color: var(--nm-accent);
+  color: var(--nm-paper-ink);
   border-color: var(--nm-accent);
-  background: var(--nm-accent-light);
+  background: var(--nm-faceplate-light);
+}
+
+/* Stop button replaces the send button while a request is in flight.
+ * Same shape/position so the UI doesn't jump — just a red accent. */
+.noteometry-chat-stop-btn {
+  background: var(--nm-danger) !important;
+}
+.noteometry-chat-stop-btn:hover {
+  filter: brightness(1.08);
 }
 
 .noteometry-chat-attachments {
@@ -1584,7 +1627,12 @@
 .noteometry-katex-output {
   line-height: 1.7;
   font-size: 14px;
-  color: var(--text-normal);
+  /* Inherit color from the bubble/box we're rendered inside. Previously
+   * this read var(--text-normal) which resolves to cream at the container
+   * level — that made user chat bubbles (amber bg, dark ink parent color)
+   * show as cream-on-amber because the child's explicit color rule wins
+   * over inherited color, even from a parent with !important. */
+  color: inherit;
   word-wrap: break-word;
 }
 .noteometry-katex-output .katex-display {
@@ -1639,6 +1687,10 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  /* Phase 5A: 44px minimum touch targets per Apple HIG / Material Design.
+   * Previous values (36px buttons, 14px color dots) were designed for
+   * mouse precision — on an iPad with a finger they're unhittable. */
+
   /* Toolbar: still centered bottom, but compact */
   .noteometry-canvas-toolbar {
     bottom: 8px;
@@ -1646,16 +1698,117 @@
     border-radius: 14px;
   }
   .noteometry-toolbar-btn {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
   }
   .noteometry-toolbar-colors .noteometry-color-dot {
-    width: 14px !important;
-    height: 14px !important;
-    min-width: 14px !important;
-    min-height: 14px !important;
-    max-width: 14px !important;
-    max-height: 14px !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-width: 28px !important;
+    max-height: 28px !important;
+    margin: 0 3px;
+  }
+
+  /* Lasso action bar — was desktop density, now finger-friendly */
+  .noteometry-lasso-action-btn {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+  .noteometry-lasso-count {
+    min-height: 44px;
+    font-size: 12px;
+    padding: 10px 10px;
+  }
+
+  /* Zoom controls in the top bar */
+  .noteometry-zoom-btn {
+    min-width: 60px;
+    height: 44px;
+    font-size: 12px;
+    padding: 0 12px;
+  }
+  .noteometry-zoom-percent { min-width: 60px; }
+  .noteometry-zoom-lock { min-width: 44px; }
+
+  /* Math palette — both the tab row and the symbol grid */
+  .noteometry-mathpal-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+  }
+  .noteometry-mathpal-tab {
+    padding: 12px 14px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+
+  /* Panel action buttons (Solve, Clear Input, close ✕) */
+  .noteometry-panel-action,
+  .noteometry-panel-clear,
+  .noteometry-panel-solve,
+  .noteometry-panel-readink {
+    min-height: 36px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* Chat send + attach buttons — bigger hit zones */
+  .noteometry-chat-send-btn,
+  .noteometry-chat-attach-btn {
+    padding: 12px;
+  }
+  .noteometry-chat-clear {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .noteometry-chat-copy-btn {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  /* Preset selector button in chat header */
+  .noteometry-preset-btn {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+  .noteometry-preset-menu-item {
+    min-height: 56px;
+    padding: 12px 14px;
+  }
+
+  /* Rich text editor toolbar buttons */
+  .noteometry-richtext-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .noteometry-richtext-select {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  /* Sidebar page / section items */
+  .noteometry-sidebar-item,
+  .noteometry-sidebar-page-item,
+  .noteometry-sidebar-section-item {
+    min-height: 44px;
+  }
+  .noteometry-sidebar-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+
+  /* Settings fields and top-right panel close on touch */
+  .noteometry-canvas-action-btn {
+    min-height: 40px;
+    padding: 10px 14px;
+    font-size: 13px;
   }
 
   /* Stack canvas + panel vertically */
@@ -1688,18 +1841,29 @@
   font-size: 12px;
   font-family: var(--nm-font);
   font-weight: 600;
-  border: 1px solid var(--nm-warm-border-strong);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius-sm);
-  background: var(--nm-warm-bg-alt);
-  color: var(--text-normal);
+  background: var(--nm-faceplate-light);
+  color: var(--nm-paper-ink);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .noteometry-lasso-action-btn:hover {
-  background: var(--nm-accent-light);
-  border-color: var(--nm-accent);
-  color: var(--nm-accent);
+  background: var(--nm-phosphor);
+  border-color: var(--nm-paper-border);
+  color: var(--nm-paper-ink);
+}
+
+/* "N regions" label that sits next to the lasso action buttons */
+.noteometry-lasso-count {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--nm-chassis-fg);
+  align-self: center;
 }
 
 /* ── Phase 3 Pt 3: preset selector ─────────────────────── */

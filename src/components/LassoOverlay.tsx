@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import type { LassoRegion } from "../features/lasso/useLassoStack";
+import type { LassoMode, LassoRegion } from "../features/lasso/useLassoStack";
 
 interface LassoBounds {
   points: { x: number; y: number }[];
@@ -10,6 +10,10 @@ export type { LassoBounds };
 
 interface Props {
   active: boolean;
+  /** "freehand" = trace polygon with pen; "rect" = drag axis-aligned
+   * rectangle (drag one corner to the opposite corner). Rect mode is
+   * optimized for capturing printed material from pasted screenshots. */
+  mode: LassoMode;
   containerRef: React.RefObject<HTMLDivElement>;
   /** Completed regions in the current lasso stack (drawn persistently as outlines). */
   regions: LassoRegion[];
@@ -27,6 +31,7 @@ interface Props {
 
 export default function LassoOverlay({
   active,
+  mode,
   containerRef,
   regions,
   onComplete,
@@ -38,6 +43,9 @@ export default function LassoOverlay({
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
+  // Rect-mode anchor point — the corner where the drag started. The
+  // opposite corner is wherever the pointer currently is.
+  const rectStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Mirror regions into a ref so the main drawing effect can read the latest
   // list without needing regions in its deps (which would cause listener
@@ -233,6 +241,7 @@ export default function LassoOverlay({
       ctx: CanvasRenderingContext2D,
       pts: { x: number; y: number }[],
       fillAlpha: number,
+      closed: boolean = false,
     ) => {
       if (pts.length > 2) {
         // Phosphor amber fill, very low alpha — the "active selection" tint
@@ -255,6 +264,10 @@ export default function LassoOverlay({
         ctx.beginPath();
         ctx.moveTo(pts[0]!.x, pts[0]!.y);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
+        // Rect mode wants a visible closing edge so all four sides show.
+        // Freehand mode leaves the path open — visually you see the pen
+        // tracing, and the close happens conceptually on pointerup.
+        if (closed) ctx.closePath();
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -274,18 +287,39 @@ export default function LassoOverlay({
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw persistent region outlines from the stack (subtle fill)
+      // Draw persistent region outlines from the stack (subtle fill).
+      // Persisted regions are always drawn closed — they're committed
+      // selections, not in-progress drags.
       for (const region of regionsRef.current) {
-        drawPolygon(ctx, region.bounds.points, 0.08);
+        drawPolygon(ctx, region.bounds.points, 0.08, true);
       }
 
-      // Draw in-progress polygon on top (brighter fill)
-      drawPolygon(ctx, pointsRef.current, 0.15);
+      // Draw in-progress polygon on top (brighter fill). Rect mode draws
+      // closed so all four sides are visible; freehand mode leaves the
+      // path open so the user sees their pen trail live.
+      drawPolygon(ctx, pointsRef.current, 0.15, mode === "rect");
     };
 
     // Expose redraw so the regions-watching effect can trigger paints
     // without re-running this setup.
     redrawRef.current = redraw;
+
+    const buildRectPoints = (s: { x: number; y: number }, p: { x: number; y: number }) => {
+      // Always return corners in TL, TR, BR, BL order regardless of which
+      // direction the user dragged. This keeps the bounds math and the
+      // drawn polygon stable no matter whether the drag went down-right,
+      // up-left, or anything else.
+      const x0 = Math.min(s.x, p.x);
+      const y0 = Math.min(s.y, p.y);
+      const x1 = Math.max(s.x, p.x);
+      const y1 = Math.max(s.y, p.y);
+      return [
+        { x: x0, y: y0 },
+        { x: x1, y: y0 },
+        { x: x1, y: y1 },
+        { x: x0, y: y1 },
+      ];
+    };
 
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
@@ -301,7 +335,14 @@ export default function LassoOverlay({
 
       canvas.setPointerCapture(e.pointerId);
       drawingRef.current = true;
-      pointsRef.current = [getPoint(e)];
+      const p = getPoint(e);
+      if (mode === "rect") {
+        // Start a 1x1 rect at the anchor. pointermove will grow it.
+        rectStartRef.current = p;
+        pointsRef.current = buildRectPoints(p, p);
+      } else {
+        pointsRef.current = [p];
+      }
       redraw();
     };
 
@@ -310,7 +351,14 @@ export default function LassoOverlay({
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      pointsRef.current.push(getPoint(e));
+      const p = getPoint(e);
+      if (mode === "rect") {
+        const s = rectStartRef.current;
+        if (!s) return;
+        pointsRef.current = buildRectPoints(s, p);
+      } else {
+        pointsRef.current.push(p);
+      }
       redraw();
     };
 
@@ -323,7 +371,21 @@ export default function LassoOverlay({
       drawingRef.current = false;
 
       const pts = pointsRef.current;
-      if (pts.length >= 10) {
+      let valid = false;
+      if (mode === "rect") {
+        // Rect is valid if it has non-trivial area — 8px minimum on each
+        // side filters out accidental clicks without a drag.
+        if (pts.length >= 4) {
+          const w = pts[2]!.x - pts[0]!.x;
+          const h = pts[2]!.y - pts[0]!.y;
+          if (w >= 8 && h >= 8) valid = true;
+        }
+      } else {
+        // Freehand needs at least 10 points to count as a real trace.
+        if (pts.length >= 10) valid = true;
+      }
+
+      if (valid) {
         const xs = pts.map((p) => p.x);
         const ys = pts.map((p) => p.y);
         const bounds: LassoBounds = {
@@ -337,12 +399,14 @@ export default function LassoOverlay({
         // regions, and the regions-watching effect will then redraw
         // with the new persistent outline.
         pointsRef.current = [];
+        rectStartRef.current = null;
         redraw();
         onCompleteRef.current(bounds);
       } else {
         // Short drag / click — dismiss the WIP attempt and let the user retry.
         onCancelRef.current();
         pointsRef.current = [];
+        rectStartRef.current = null;
         redraw();
       }
     };
@@ -363,10 +427,11 @@ export default function LassoOverlay({
       canvasRef.current = null;
       drawingRef.current = false;
       pointsRef.current = [];
+      rectStartRef.current = null;
       redrawRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, containerRef]);
+  }, [active, mode, containerRef]);
 
   // Trigger redraws when regions change (without re-running the setup effect)
   useEffect(() => {

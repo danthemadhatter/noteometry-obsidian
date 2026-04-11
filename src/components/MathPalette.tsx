@@ -194,6 +194,118 @@ const TABS: TabDef[] = [
     ],
   },
   {
+    // Circuit schematic helpers — component label prefixes, supply rail
+    // names, transistor terminal symbols, and drop-on-canvas symbols
+    // (ground, AC/DC markers) that survive as text stamps on the canvas.
+    id: "circuit", label: "⎓",
+    items: [
+      // ── Ground / reference symbols (drop these on the canvas) ──
+      { latex: "\\text{GND}", display: "⏚", stamp: "⏚", title: "Earth ground" },
+      { latex: "\\text{CGND}", display: "⏛", stamp: "⏛", title: "Chassis ground" },
+      { latex: "\\text{DC}", display: "⎓", stamp: "⎓", title: "DC supply marker" },
+      { latex: "\\text{AC}", display: "∿", stamp: "∿", title: "AC source marker" },
+      // ── Current source markers (dot-in-circle / cross-in-circle) ──
+      { latex: "\\odot ", display: "⊙", stamp: "⊙", title: "Current out of page" },
+      { latex: "\\otimes ", display: "⊗", stamp: "⊗", title: "Current into page" },
+      { latex: "\\oplus ", display: "⊕", stamp: "⊕", title: "Positive / source" },
+      { latex: "\\ominus ", display: "⊖", stamp: "⊖", title: "Negative / sink" },
+      // ── Component label prefixes (click to insert into input) ──
+      { latex: "R_{}", display: "R₁", title: "Resistor label" },
+      { latex: "C_{}", display: "C₁", title: "Capacitor label" },
+      { latex: "L_{}", display: "L₁", title: "Inductor label" },
+      { latex: "Q_{}", display: "Q₁", title: "Transistor label" },
+      { latex: "D_{}", display: "D₁", title: "Diode label" },
+      { latex: "M_{}", display: "M₁", title: "MOSFET label" },
+      // ── Thevenin / Norton equivalents ──
+      { latex: "V_{Th}", display: "V_Th", title: "Thevenin voltage" },
+      { latex: "R_{Th}", display: "R_Th", title: "Thevenin resistance" },
+      { latex: "I_{N}", display: "I_N", title: "Norton current" },
+      { latex: "R_{N}", display: "R_N", title: "Norton resistance" },
+      { latex: "R_{eq}", display: "R_eq", title: "Equivalent resistance" },
+      // ── Supply rails ──
+      { latex: "V_{CC}", display: "V_CC", title: "Collector supply" },
+      { latex: "V_{EE}", display: "V_EE", title: "Emitter supply" },
+      { latex: "V_{DD}", display: "V_DD", title: "Drain supply" },
+      { latex: "V_{SS}", display: "V_SS", title: "Source supply" },
+      { latex: "V_{ref}", display: "V_ref", title: "Reference voltage" },
+      { latex: "V_{in}", display: "V_in", title: "Input voltage" },
+      { latex: "V_{out}", display: "V_out", title: "Output voltage" },
+      // ── BJT terminal voltages and currents ──
+      { latex: "V_{BE}", display: "V_BE", title: "Base-emitter voltage" },
+      { latex: "V_{CE}", display: "V_CE", title: "Collector-emitter voltage" },
+      { latex: "I_{C}", display: "I_C", title: "Collector current" },
+      { latex: "I_{B}", display: "I_B", title: "Base current" },
+      { latex: "I_{E}", display: "I_E", title: "Emitter current" },
+      // ── MOSFET terminal voltages and currents ──
+      { latex: "V_{GS}", display: "V_GS", title: "Gate-source voltage" },
+      { latex: "V_{DS}", display: "V_DS", title: "Drain-source voltage" },
+      { latex: "V_{TH}", display: "V_th", title: "Threshold voltage" },
+      { latex: "I_{D}", display: "I_D", title: "Drain current" },
+      { latex: "g_{m}", display: "g_m", title: "Transconductance" },
+      // ── Unit prefixes ──
+      { latex: "\\text{k}", display: "k", title: "kilo (10³)" },
+      { latex: "\\text{M}", display: "M", title: "mega (10⁶)" },
+      { latex: "\\mu ", display: "µ", title: "micro (10⁻⁶)" },
+      { latex: "\\text{n}", display: "n", title: "nano (10⁻⁹)" },
+      { latex: "\\text{p}", display: "p", title: "pico (10⁻¹²)" },
+      { latex: "\\text{f}", display: "f", title: "femto (10⁻¹⁵)" },
+    ],
+  },
+  {
+    // One-click EE formula templates. Click inserts the full LaTeX into
+    // the panel Input; the Preview renders it via KaTeX immediately.
+    // Drag-to-canvas stamps the plain text form as a canvas label.
+    id: "formulas", label: "∫V",
+    items: [
+      // ── DC fundamentals ──
+      { latex: "V = IR", display: "V=IR", stamp: "V=IR", title: "Ohm's law" },
+      { latex: "P = VI", display: "P=VI", stamp: "P=VI", title: "Power = V×I" },
+      { latex: "P = I^{2}R", display: "P=I²R", stamp: "P=I²R", title: "Power dissipated in R" },
+      { latex: "P = \\frac{V^{2}}{R}", display: "P=V²/R", stamp: "P=V²/R", title: "Power from V across R" },
+      // ── Kirchhoff ──
+      { latex: "\\sum V = 0", display: "ΣV=0", stamp: "ΣV=0", title: "KVL" },
+      { latex: "\\sum I = 0", display: "ΣI=0", stamp: "ΣI=0", title: "KCL" },
+      // ── AC impedance ──
+      { latex: "Z = R + jX", display: "Z=R+jX", stamp: "Z=R+jX", title: "Impedance" },
+      { latex: "Z_{C} = \\frac{1}{j\\omega C}", display: "Zc=1/jωC", title: "Capacitor impedance" },
+      { latex: "Z_{L} = j\\omega L", display: "Zl=jωL", title: "Inductor impedance" },
+      { latex: "\\omega = 2\\pi f", display: "ω=2πf", stamp: "ω=2πf", title: "Angular frequency" },
+      // ── Resonance and time constants ──
+      { latex: "\\omega_{0} = \\frac{1}{\\sqrt{LC}}", display: "ω₀=1/√LC", title: "Resonance" },
+      { latex: "\\tau = RC", display: "τ=RC", stamp: "τ=RC", title: "RC time constant" },
+      { latex: "\\tau = \\frac{L}{R}", display: "τ=L/R", stamp: "τ=L/R", title: "RL time constant" },
+      { latex: "Q = \\omega_{0} RC", display: "Q=ω₀RC", title: "Quality factor (RC)" },
+      // ── Capacitor / inductor defining equations ──
+      { latex: "i_{C} = C \\frac{dv}{dt}", display: "i=Cdv/dt", title: "Capacitor i–v" },
+      { latex: "v_{L} = L \\frac{di}{dt}", display: "v=Ldi/dt", title: "Inductor v–i" },
+      { latex: "W_{C} = \\tfrac{1}{2}CV^{2}", display: "½CV²", title: "Capacitor energy" },
+      { latex: "W_{L} = \\tfrac{1}{2}LI^{2}", display: "½LI²", title: "Inductor energy" },
+      // ── AC power ──
+      { latex: "S = P + jQ", display: "S=P+jQ", stamp: "S=P+jQ", title: "Complex power" },
+      { latex: "P = V_{rms} I_{rms} \\cos\\phi", display: "P=VI cosφ", title: "Real power" },
+      { latex: "\\text{pf} = \\cos\\phi", display: "pf=cosφ", title: "Power factor" },
+      // ── Transfer functions and filters ──
+      { latex: "H(s) = \\frac{Y(s)}{X(s)}", display: "H=Y/X", title: "Transfer function" },
+      { latex: "H(j\\omega) = \\frac{1}{1 + j\\omega RC}", display: "LPF", title: "First-order low-pass" },
+      { latex: "H(j\\omega) = \\frac{j\\omega RC}{1 + j\\omega RC}", display: "HPF", title: "First-order high-pass" },
+      // ── Amplifier gains ──
+      { latex: "A_{v} = -g_{m} R_{L}", display: "Av=-gmRL", title: "Common-emitter / CS gain" },
+      { latex: "A_{v} = 1 + \\frac{R_{f}}{R_{1}}", display: "non-inv", title: "Non-inverting op-amp" },
+      { latex: "A_{v} = -\\frac{R_{f}}{R_{1}}", display: "inverting", title: "Inverting op-amp" },
+      // ── Time-domain signals ──
+      { latex: "v(t) = V_{m}\\cos(\\omega t + \\phi)", display: "Vmcos", title: "Sinusoid" },
+      { latex: "V_{rms} = \\frac{V_{m}}{\\sqrt{2}}", display: "Vm/√2", title: "RMS of sinusoid" },
+      // ── Divider rules ──
+      { latex: "V_{out} = V_{in}\\frac{R_{2}}{R_{1}+R_{2}}", display: "÷V", title: "Voltage divider" },
+      { latex: "I_{1} = I\\frac{R_{2}}{R_{1}+R_{2}}", display: "÷I", title: "Current divider" },
+      // ── Maxwell (compact forms) ──
+      { latex: "\\nabla \\cdot \\vec{E} = \\frac{\\rho}{\\epsilon_{0}}", display: "∇·E=ρ/ε", title: "Gauss's law" },
+      { latex: "\\nabla \\times \\vec{E} = -\\frac{\\partial \\vec{B}}{\\partial t}", display: "∇×E", title: "Faraday's law" },
+      { latex: "\\nabla \\cdot \\vec{B} = 0", display: "∇·B=0", title: "No monopoles" },
+      { latex: "\\nabla \\times \\vec{B} = \\mu_{0}\\vec{J} + \\mu_{0}\\epsilon_{0}\\frac{\\partial \\vec{E}}{\\partial t}", display: "∇×B", title: "Ampère-Maxwell" },
+    ],
+  },
+  {
     id: "logic", label: "∀∃",
     items: [
       { latex: "\\forall ", display: "∀" }, { latex: "\\exists ", display: "∃" },

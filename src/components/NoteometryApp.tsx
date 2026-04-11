@@ -13,7 +13,7 @@ import ChatPanel from "./ChatPanel";
 import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
-import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback } from "../lib/tableStore";
+import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
@@ -45,7 +45,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Lasso stack feature: multi-region selection ─── */
   const {
-    lassoActive, setLassoActive, regions: lassoRegions,
+    lassoActive, lassoMode, setLassoActive, regions: lassoRegions,
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
 
@@ -61,7 +61,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     inputCode, chatMessages, isReading, chatLoading,
     presets, activePreset,
     setInputCode, setChatMessages, setActivePresetId,
-    sendToChat, processCrop, handleSolveInput, handleInsertSymbol,
+    sendToChat, stopChat, processCrop, handleSolveInput, handleInsertSymbol,
     hydrate: hydratePipeline,
   } = usePipeline(plugin);
 
@@ -417,6 +417,29 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedObjectId(obj.id);
   }, [scrollX, scrollY]);
 
+  /* ── Drop AI chat response onto the canvas ──────────────
+   * Creates a new text box at the top-left of the current viewport
+   * pre-populated with the rendered HTML (LaTeX already converted to
+   * MathML by ChatPanel before calling us). User can then drag/resize
+   * or edit the text around the rendered math. */
+  const handleDropChatToCanvas = useCallback((html: string) => {
+    // Position near the top-left of what the user is currently looking
+    // at. Stack subsequent drops diagonally so they don't fully overlap.
+    const existingDropCount = canvasObjects.filter((o) => o.type === "textbox").length;
+    const offset = 40 + (existingDropCount % 6) * 24;
+    const x = scrollX + offset;
+    const y = scrollY + offset;
+    const obj = createTextBox(x, y);
+    // Wider/taller than default so a full DLP-format solution fits.
+    const sized = { ...obj, w: 460, h: 280 };
+    // Seed the textbox HTML BEFORE the component mounts, so RichTextEditor
+    // reads the content from tableStore on first render and shows it.
+    setTextBoxData(sized.id, html);
+    setCanvasObjects((prev) => [...prev, sized]);
+    setTool("select");
+    setSelectedObjectId(sized.id);
+  }, [scrollX, scrollY, canvasObjects, setCanvasObjects, setSelectedObjectId]);
+
   const handleInsertTable = useCallback(() => {
     const obj = createTable(scrollX + 200, scrollY + 200);
     setCanvasObjects((prev) => [...prev, obj]);
@@ -645,9 +668,13 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 tool={tool}
                 onToolChange={(t) => { setTool(t); setLassoActive(false); }}
                 lassoActive={lassoActive}
-                onLassoToggle={() => {
+                lassoMode={lassoMode}
+                onLassoToggle={(requestedMode) => {
+                  // Entering lasso mode swaps the active tool out of any
+                  // drawing mode so pen strokes don't leak through — same
+                  // behavior the old single-button toggle had.
                   if (!lassoActive) setTool("pen");
-                  toggleLasso();
+                  toggleLasso(requestedMode);
                 }}
                 activeColor={activeColor}
                 onColorChange={setActiveColor}
@@ -740,6 +767,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 scrollX={scrollX}
                 scrollY={scrollY}
                 zoom={zoom}
+                zoomLocked={zoomLocked}
+                onZoomChange={(z) => setZoom(clampZoom(z))}
                 onViewportChange={handleViewportChange}
                 disabled={lassoActive}
                 selectedStampId={selectedStampId}
@@ -762,6 +791,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   so the lasso can't be drawn over the top toolbar */}
               <LassoOverlay
                 active={lassoActive}
+                mode={lassoMode}
                 containerRef={viewportRef as React.RefObject<HTMLDivElement>}
                 regions={lassoRegions}
                 onComplete={handleLassoComplete}
@@ -789,11 +819,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   onInsertSymbol={handleInsertSymbol}
                   onStampSymbol={(sym) => setPendingSymbol(sym)}
                   onDropStamp={(display, screenX, screenY) => {
-                    // Direct stamp placement from touch drag
+                    // Direct stamp placement from touch drag. Divide
+                    // by zoom before adding scroll so the drop lands
+                    // under the finger at any zoom level — same screen
+                    // → world math used by InkCanvas pointer handlers.
                     const rect = canvasAreaRef.current?.getBoundingClientRect();
                     if (!rect) return;
-                    const x = screenX - rect.left + scrollX;
-                    const y = screenY - rect.top + scrollY;
+                    const x = (screenX - rect.left) / zoom + scrollX;
+                    const y = (screenY - rect.top) / zoom + scrollY;
                     setStamps(prev => [...prev, {
                       id: newStampId(), x, y,
                       text: display, fontSize: 28, color: activeColor,
@@ -812,11 +845,13 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   <ChatPanel
                     messages={chatMessages}
                     onSend={sendToChat}
+                    onStop={stopChat}
                     onClear={() => setChatMessages([])}
                     loading={chatLoading}
                     presets={presets}
                     activePresetId={activePreset.id}
                     onPresetChange={setActivePresetId}
+                    onDropToCanvas={handleDropChatToCanvas}
                   />
                 </div>
               </div>

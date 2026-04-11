@@ -20,6 +20,10 @@ interface Props {
   /** Current zoom scale (1.0 = 100%). Drawing and pointer math are
    *  scaled accordingly. Default 1.0 if the caller doesn't pass it. */
   zoom?: number;
+  /** If true, pinch-zoom is a no-op. Matches the toolbar lock button. */
+  zoomLocked?: boolean;
+  /** Called when the user pinches to zoom. Parent should clamp + setZoom. */
+  onZoomChange?: (zoom: number) => void;
   disabled?: boolean;
   selectedStampId?: string | null;
   onEraseStart?: () => void;
@@ -33,6 +37,8 @@ export default function InkCanvas({
   activeColor, strokeWidth,
   tool, onToolChange, scrollX, scrollY, onViewportChange,
   zoom = 1,
+  zoomLocked = false,
+  onZoomChange,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
 }: Props) {
@@ -70,6 +76,16 @@ export default function InkCanvas({
   const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const lastPanRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Pinch-zoom state — set when a second finger lands, cleared when
+  // we drop back to zero or one fingers.
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(1);
+
+  // Ref mirrors for pinch-zoom props so the touch effect doesn't need
+  // to re-attach listeners every time onZoomChange or zoomLocked changes.
+  const onZoomChangeRef = useRef(onZoomChange);
+  const zoomLockedRef = useRef(zoomLocked);
+
   // Keep refs in sync
   useEffect(() => { strokesRef.current = strokes; }, [strokes]);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
@@ -79,6 +95,8 @@ export default function InkCanvas({
   useEffect(() => { scrollRef.current = { x: scrollX, y: scrollY }; }, [scrollX, scrollY]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { selectedStampIdRef.current = selectedStampId; }, [selectedStampId]);
+  useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
+  useEffect(() => { zoomLockedRef.current = zoomLocked; }, [zoomLocked]);
 
   // ── Canvas sizing ──────────────────────────────────
   const sizeRef = useRef({ w: 0, h: 0 });
@@ -428,21 +446,68 @@ export default function InkCanvas({
     };
   }, [handlePointerDown, handlePointerMove, handlePointerUp, tool, disabled]);
 
-  // ── Touch panning — ALWAYS active, on the container ─
+  // ── Touch panning + pinch-zoom — ALWAYS active, on the container ─
+  //
+  // Single-finger drag → pan (existing behavior).
+  // Two-finger pinch → zoom, driven by the ratio between the current
+  // and initial distance between the two fingers. We update zoomRef
+  // and redraw synchronously for smooth feedback, then call
+  // onZoomChange() so the parent state catches up on the next render.
+  //
+  // touch-action: none on .noteometry-ink-layer plus the preventTouch
+  // handler below keeps the OS from eating our gestures (double-tap
+  // zoom, rubber-band scroll, etc.). All canvas gestures are ours.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const getPinchDist = (): number => {
+      const vals = Array.from(touchesRef.current.values());
+      if (vals.length < 2) return 0;
+      const [a, b] = vals;
+      return Math.hypot(b!.x - a!.x, b!.y - a!.y);
+    };
 
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touchesRef.current.size === 1) {
         lastPanRef.current = { x: e.clientX, y: e.clientY };
+        pinchStartDistRef.current = null;
+      } else if (touchesRef.current.size === 2) {
+        // Second finger landed — start a pinch. Freeze the single-finger
+        // pan so pinch and pan don't fight for the same scroll delta.
+        pinchStartDistRef.current = getPinchDist();
+        pinchStartZoomRef.current = zoomRef.current;
+        lastPanRef.current = null;
       }
     };
+
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Pinch-zoom path (2 fingers)
+      if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
+        if (zoomLockedRef.current) return;
+        const currentDist = getPinchDist();
+        if (currentDist <= 0) return;
+        const ratio = currentDist / pinchStartDistRef.current;
+        // Clamp to [0.5, 4] matching the Cmd+wheel limits in NoteometryApp.
+        const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
+        if (Math.abs(newZoom - zoomRef.current) < 0.001) return;
+        // Update ref + redraw synchronously so the canvas tracks fingers
+        // without waiting for a React re-render round-trip.
+        zoomRef.current = newZoom;
+        redrawGrid();
+        redrawInk();
+        // Tell the parent so object layer, zoom percent readout, and
+        // everything else that mirrors the state stays in sync.
+        onZoomChangeRef.current?.(newZoom);
+        return;
+      }
+
+      // Single-finger pan path
       if (lastPanRef.current) {
         const touch = touchesRef.current.values().next().value;
         if (touch) {
@@ -459,11 +524,17 @@ export default function InkCanvas({
         }
       }
     };
+
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.delete(e.pointerId);
-      if (touchesRef.current.size === 0) lastPanRef.current = null;
-      else {
+      if (touchesRef.current.size === 0) {
+        lastPanRef.current = null;
+        pinchStartDistRef.current = null;
+      } else if (touchesRef.current.size === 1) {
+        // One finger remains after a pinch — resume pan from where
+        // that finger currently is, not from its stale pre-pinch spot.
+        pinchStartDistRef.current = null;
         const r = touchesRef.current.values().next().value;
         if (r) lastPanRef.current = { x: r.x, y: r.y };
       }

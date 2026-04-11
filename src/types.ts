@@ -1,9 +1,11 @@
-export type AIProvider = "claude" | "lmstudio";
+export type AIProvider = "claude" | "lmstudio" | "perplexity";
 
 export interface NoteometrySettings {
   aiProvider: AIProvider;
   claudeApiKey: string;
   claudeModel: string;
+  perplexityApiKey: string;
+  perplexityModel: string;
   lmStudioUrl: string;
   lmStudioTextModel: string;
   lmStudioVisionModel: string;
@@ -13,9 +15,11 @@ export interface NoteometrySettings {
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
-  aiProvider: "claude",
+  aiProvider: "perplexity",
   claudeApiKey: "",
   claudeModel: "claude-opus-4-6",
+  perplexityApiKey: "",
+  perplexityModel: "openai/gpt-5.4",
   lmStudioUrl: "http://localhost:1234",
   lmStudioTextModel: "qwen3-235b",
   lmStudioVisionModel: "qwen2-vl-72b",

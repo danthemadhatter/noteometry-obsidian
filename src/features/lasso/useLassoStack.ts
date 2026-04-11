@@ -1,4 +1,4 @@
-import { useState, useCallback, Dispatch, SetStateAction } from "react";
+import { useState, useCallback, useRef, Dispatch, SetStateAction } from "react";
 import type { LassoBounds } from "../../components/LassoOverlay";
 
 /**
@@ -18,6 +18,12 @@ import type { LassoBounds } from "../../components/LassoOverlay";
  * and the pipeline.
  */
 
+/** Lasso drawing mode. "freehand" = polygon traced with pen; "rect" =
+ * axis-aligned rectangle (drag a corner to the opposite corner). Rect mode
+ * exists for capturing printed material from dropped images or pasted
+ * screenshots where a clean rectangle is faster/cleaner than a scribble. */
+export type LassoMode = "freehand" | "rect";
+
 export interface LassoRegion {
   id: string;
   bounds: LassoBounds;
@@ -27,17 +33,29 @@ export interface LassoRegion {
 
 export interface UseLassoStackReturn {
   lassoActive: boolean;
+  lassoMode: LassoMode;
   regions: LassoRegion[];
   setLassoActive: Dispatch<SetStateAction<boolean>>;
+  setLassoMode: Dispatch<SetStateAction<LassoMode>>;
   pushRegion: (region: LassoRegion) => void;
   clearStack: () => void;
   removeRegion: (id: string) => void;
-  toggleLasso: () => void;
+  /** Toggle lasso on/off. If `mode` is provided, switching between modes
+   * while active keeps the stack; clicking the same mode while active
+   * deactivates AND wipes the stack. Omitting `mode` is a plain on/off
+   * toggle that preserves whatever mode is currently selected. */
+  toggleLasso: (mode?: LassoMode) => void;
 }
 
 export function useLassoStack(): UseLassoStackReturn {
   const [lassoActive, setLassoActive] = useState(false);
+  const [lassoMode, setLassoMode] = useState<LassoMode>("freehand");
   const [regions, setRegions] = useState<LassoRegion[]>([]);
+
+  // Ref mirror so toggleLasso can read the latest mode without rebinding
+  // every time mode changes.
+  const lassoModeRef = useRef<LassoMode>(lassoMode);
+  lassoModeRef.current = lassoMode;
 
   const pushRegion = useCallback((region: LassoRegion) => {
     setRegions((prev) => [...prev, region]);
@@ -51,19 +69,33 @@ export function useLassoStack(): UseLassoStackReturn {
     setRegions((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
-  const toggleLasso = useCallback(() => {
+  const toggleLasso = useCallback((mode?: LassoMode) => {
     setLassoActive((prev) => {
-      // Deactivating lasso mode also wipes any pending stack — the user
-      // either processed it or abandoned it.
-      if (prev) setRegions([]);
-      return !prev;
+      if (mode === undefined) {
+        // Simple toggle — preserve current mode.
+        if (prev) setRegions([]);
+        return !prev;
+      }
+      const currentMode = lassoModeRef.current;
+      if (prev && currentMode === mode) {
+        // Same mode clicked while active → deactivate and wipe stack.
+        setRegions([]);
+        return false;
+      }
+      // Switching modes while active keeps the stack so the user can
+      // mix freehand and rect captures into one batch. Also covers the
+      // "activate in a specific mode" case.
+      setLassoMode(mode);
+      return true;
     });
   }, []);
 
   return {
     lassoActive,
+    lassoMode,
     regions,
     setLassoActive,
+    setLassoMode,
     pushRegion,
     clearStack,
     removeRegion,

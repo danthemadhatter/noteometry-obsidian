@@ -62,6 +62,124 @@ async function callClaude(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Perplexity Agent API                                               */
+/* ------------------------------------------------------------------ */
+
+/* Perplexity routes through a single /v1/agent endpoint that accepts
+ * any backing model via the `model` field (e.g. "openai/gpt-5.4",
+ * "anthropic/claude-4.5-sonnet", "xai/grok-4-1"). The input format is
+ * their own — an array of "message" items whose `content` is either a
+ * plain string or an array of typed content parts (input_text /
+ * input_image). We translate Claude-style messages into that format. */
+
+type ClaudeContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+
+type ClaudeMessage = { role: string; content: string | ClaudeContentPart[] };
+
+interface PerplexityInputItem {
+  type: "message";
+  role: string;
+  content: string | Array<
+    | { type: "input_text"; text: string }
+    | { type: "input_image"; image_url: string }
+  >;
+}
+
+function claudeToPerplexityInput(messages: ClaudeMessage[]): PerplexityInputItem[] {
+  return messages.map((m) => {
+    if (typeof m.content === "string") {
+      return { type: "message", role: m.role, content: m.content };
+    }
+    const parts = m.content.map((p) => {
+      if (p.type === "text") return { type: "input_text" as const, text: p.text };
+      return {
+        type: "input_image" as const,
+        image_url: `data:${p.source.media_type};base64,${p.source.data}`,
+      };
+    });
+    return { type: "message", role: m.role, content: parts };
+  });
+}
+
+function extractPerplexityText(data: unknown): string {
+  // Response shape: { output: [ { type: "message", content: [ { type: "output_text", text: "..." } ] } ] }
+  // Concatenate every output_text across every message item.
+  if (!data || typeof data !== "object") return "";
+  const output = (data as { output?: unknown }).output;
+  if (!Array.isArray(output)) return "";
+  const chunks: string[] = [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (part && typeof part === "object") {
+        const p = part as { type?: string; text?: string };
+        if (p.type === "output_text" && typeof p.text === "string") {
+          chunks.push(p.text);
+        }
+      }
+    }
+  }
+  return chunks.join("\n").trim();
+}
+
+async function callPerplexity(
+  settings: NoteometrySettings,
+  system: string,
+  messages: ClaudeMessage[],
+  temperature = 0,
+  maxTokens = 4096
+): Promise<AIResult> {
+  if (!settings.perplexityApiKey) {
+    return { ok: false, text: "", error: "No Perplexity API key — set it in Settings → Noteometry" };
+  }
+
+  try {
+    const body: Record<string, unknown> = {
+      model: settings.perplexityModel || "openai/gpt-5.4",
+      instructions: system,
+      input: claudeToPerplexityInput(messages),
+      max_output_tokens: maxTokens,
+      stream: false,
+    };
+    // Only pass temperature if the caller cared — some routed models
+    // (reasoning ones) reject non-default temperature values.
+    if (temperature !== 0) body.temperature = temperature;
+
+    const res = await requestUrl({
+      url: "https://api.perplexity.ai/v1/agent",
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${settings.perplexityApiKey}`,
+      },
+      body: JSON.stringify(body),
+      throw: false,
+    });
+
+    if (res.status !== 200) {
+      return {
+        ok: false,
+        text: "",
+        error: `Perplexity HTTP ${res.status}: ${res.text.slice(0, 300)}`,
+      };
+    }
+
+    const text = extractPerplexityText(res.json);
+    if (!text) {
+      return { ok: false, text: "", error: "Empty response from Perplexity" };
+    }
+    return { ok: true, text };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Network error";
+    return { ok: false, text: "", error: `Perplexity: ${msg}` };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  LM Studio (OpenAI-compatible)                                      */
 /* ------------------------------------------------------------------ */
 
@@ -153,16 +271,22 @@ export async function readInk(
     ]);
   }
 
-  // Claude
-  return callClaude(settings, VISION_SYSTEM, [
+  // Claude-style message shape — both callClaude and callPerplexity
+  // consume this. callPerplexity translates it into input_text/input_image.
+  const visionMsg = [
     {
       role: "user",
       content: [
-        { type: "image", source: { type: "base64", media_type: "image/png", data } },
-        { type: "text", text: prompt },
+        { type: "image" as const, source: { type: "base64" as const, media_type: "image/png", data } },
+        { type: "text" as const, text: prompt },
       ],
     },
-  ]);
+  ];
+
+  if (settings.aiProvider === "perplexity") {
+    return callPerplexity(settings, VISION_SYSTEM, visionMsg);
+  }
+  return callClaude(settings, VISION_SYSTEM, visionMsg);
 }
 
 /* ------------------------------------------------------------------ */
@@ -195,6 +319,9 @@ export async function solve(
 
   if (settings.aiProvider === "lmstudio") {
     return callLMStudio(settings, settings.lmStudioTextModel, DLP_SYSTEM, messages);
+  }
+  if (settings.aiProvider === "perplexity") {
+    return callPerplexity(settings, DLP_SYSTEM, messages);
   }
   return callClaude(settings, DLP_SYSTEM, messages);
 }
@@ -246,11 +373,13 @@ export async function chat(
     );
   }
 
-  // Claude format
+  // Claude-shaped message format — shared by callClaude and callPerplexity.
+  // callPerplexity translates it into Perplexity's input_text/input_image
+  // shape at the last moment.
   const formatted = messages.map((m, i) => {
     const isLastUser = m.role === "user" && i === messages.length - 1;
     if (isLastUser && attachments.length) {
-      const content: unknown[] = [];
+      const content: ClaudeContentPart[] = [];
       for (const att of attachments) {
         const d = att.data.replace(/^data:[^;]+;base64,/, "");
         content.push({
@@ -264,5 +393,8 @@ export async function chat(
     return { role: m.role, content: m.text ?? "" };
   });
 
+  if (settings.aiProvider === "perplexity") {
+    return callPerplexity(settings, systemPrompt, formatted, 0.3);
+  }
   return callClaude(settings, systemPrompt, formatted, 0.3);
 }

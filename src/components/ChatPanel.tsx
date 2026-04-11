@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
+import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck, IconType } from "./Icons";
 import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
 import type { PromptPreset } from "../features/pipeline/presets";
@@ -8,10 +8,16 @@ interface Props {
   messages: ChatMessage[];
   onSend: (text: string, attachments: Attachment[]) => void;
   onClear: () => void;
+  /** Optional: stop an in-flight chat request (streaming). */
+  onStop?: () => void;
   loading: boolean;
   presets: PromptPreset[];
   activePresetId: string;
   onPresetChange: (id: string) => void;
+  /** Called when the user clicks "Drop onto canvas" on an assistant message.
+   * Receives the pre-rendered HTML (LaTeX → MathML) ready to drop into a
+   * contenteditable text box on the canvas. */
+  onDropToCanvas?: (html: string) => void;
 }
 
 /**
@@ -64,8 +70,9 @@ function toMathMLForClipboard(text: string): string {
 }
 
 export default function ChatPanel({
-  messages, onSend, onClear, loading,
+  messages, onSend, onClear, onStop, loading,
   presets, activePresetId, onPresetChange,
+  onDropToCanvas,
 }: Props) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -206,14 +213,26 @@ export default function ChatPanel({
                 dangerouslySetInnerHTML={{ __html: renderAsMathML(m.text) }}
               />
               {m.role === "assistant" && (
-                <button
-                  className="noteometry-chat-copy-btn"
-                  onClick={() => copyAsMathML(m.text, i)}
-                  title="Copy as MathML (paste into Word)"
-                >
-                  {copiedIdx === i ? <IconCheck /> : <IconCopy />}
-                  {copiedIdx === i ? "Copied!" : "Copy for Word"}
-                </button>
+                <div className="noteometry-chat-bubble-actions">
+                  <button
+                    className="noteometry-chat-copy-btn"
+                    onClick={() => copyAsMathML(m.text, i)}
+                    title="Copy as MathML (paste into Word)"
+                  >
+                    {copiedIdx === i ? <IconCheck /> : <IconCopy />}
+                    {copiedIdx === i ? "Copied!" : "Copy for Word"}
+                  </button>
+                  {onDropToCanvas && (
+                    <button
+                      className="noteometry-chat-copy-btn"
+                      onClick={() => onDropToCanvas(toMathMLForClipboard(m.text))}
+                      title="Drop this response onto the canvas as an editable text box"
+                    >
+                      <IconType />
+                      Drop onto canvas
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -273,13 +292,24 @@ export default function ChatPanel({
           placeholder="Type a problem or question... (Enter to send)"
           rows={2}
         />
-        <button
-          className="noteometry-chat-send-btn"
-          onClick={send}
-          disabled={loading || (!input.trim() && !attachments.length)}
-        >
-          <IconSend />
-        </button>
+        {loading && onStop ? (
+          <button
+            className="noteometry-chat-send-btn noteometry-chat-stop-btn"
+            onClick={onStop}
+            title="Stop the in-flight request"
+            aria-label="Stop"
+          >
+            <IconX />
+          </button>
+        ) : (
+          <button
+            className="noteometry-chat-send-btn"
+            onClick={send}
+            disabled={loading || (!input.trim() && !attachments.length)}
+          >
+            <IconSend />
+          </button>
+        )}
       </div>
     </div>
   );
