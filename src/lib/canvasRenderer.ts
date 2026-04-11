@@ -11,16 +11,15 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 24;
 const GRID_MAJOR = GRID_MINOR * 4; // 96px
 
-// Very subtle grid so the canvas reads as a clean writing surface
-// rather than graph paper. Dan called the previous grid "EKG" — this
-// version is barely visible: a hint of ruling for spatial awareness,
-// not a printed quadrille pad.
-const GRID_MINOR_COLOR = "rgba(80, 92, 106, 0.06)";
-const GRID_MAJOR_COLOR = "rgba(80, 92, 106, 0.12)";
+// Whisper-subtle grid — cool navy-blue at very low alpha, barely
+// visible as a ghost of drafting paper rule. No longer looks like
+// EKG / quadrille.
+const GRID_MINOR_COLOR = "rgba(51, 69, 88, 0.06)";
+const GRID_MAJOR_COLOR = "rgba(51, 69, 88, 0.12)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 0.75;
 
-// Pale warm canvas — matches --nm-canvas-bg in styles.css
+// Canvas cream — matches --nm-canvas-bg in styles.css
 const GRID_BG_COLOR = "#f7f4e8";
 
 /** Set up canvas for Retina (call once on mount and resize) */

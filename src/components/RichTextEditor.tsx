@@ -44,21 +44,35 @@ export default function RichTextEditor({ textBoxId }: Props) {
   const handleFontSize = useCallback((size: number) => {
     setFontSize(size);
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && editorRef.current) {
+    if (!editorRef.current) return;
+
+    if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
       if (!range.collapsed && editorRef.current.contains(range.commonAncestorContainer)) {
-        // Wrap the selected text in a span with the chosen font size
-        const span = document.createElement("span");
-        span.style.fontSize = `${size}px`;
-        range.surroundContents(span);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        handleInput();
-      } else {
-        // No selection — set default for new text
-        editorRef.current.style.fontSize = `${size}px`;
+        // surroundContents() throws "Failed to execute 'surroundContents'
+        // on 'Range': The Range has partially selected a non-text node"
+        // whenever the selection crosses element boundaries — e.g., spans
+        // two paragraphs or overlaps a <b>/<i> run. That's Dan's "I clicked
+        // 16pt and it blew up the code" bug.
+        try {
+          const span = document.createElement("span");
+          span.style.fontSize = `${size}px`;
+          range.surroundContents(span);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          handleInput();
+          return;
+        } catch {
+          // Fall through to whole-editor fallback below.
+        }
       }
     }
+
+    // No selection, or surroundContents refused the range — set the font
+    // size on the editor as a whole. Future typing uses the new size.
+    // Existing per-span font sizes stay intact because inline styles win.
+    editorRef.current.style.fontSize = `${size}px`;
+    handleInput();
   }, [handleInput]);
 
   return (

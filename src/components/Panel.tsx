@@ -101,12 +101,16 @@ export default function Panel({
           <div className="noteometry-panel-box-actions">
             {inputCode.trim() && (
               <button className="noteometry-panel-solve" onClick={onSolve}>
-                SOLVE
+                Solve
               </button>
             )}
             {inputCode && (
-              <button className="noteometry-panel-clear" onClick={() => setInputCode("")}>
-                Clear
+              <button
+                className="noteometry-panel-clear"
+                onClick={() => setInputCode("")}
+                title="Clear the LaTeX input box (does not clear chat)"
+              >
+                Clear Input
               </button>
             )}
           </div>

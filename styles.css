@@ -21,80 +21,84 @@
    * this for three palette iterations — now it's right.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Faceplate — pale warm off-white.
-   * v6 tones down the v5 tan (#d6c095) which Dan called "atomic blue
-   * with a hint of radiation" when combined with the amber/gray palette.
-   * Now it's a pale, cleaner cream that reads more like a polished
-   * iPad note app than a piece of Cold War test gear. */
-  --nm-faceplate: #ede8d2;         /* pale warm off-white */
-  --nm-faceplate-alt: #dfd9bf;     /* slightly darker for recessed panels */
-  --nm-faceplate-light: #f5f0dc;   /* raised highlights, button faces */
-  --nm-faceplate-recessed: #c8c0a0; /* inset controls, pressed state */
+  /* ══════════════════════════════════════════════════════════════════
+   * v7 — 1950s industrial BLUE dominant. Structural chassis is
+   * painted navy-blue industrial enamel (IBM System/360 cabinet,
+   * Siemens machine enclosure, Navy shipboard equipment). Cream
+   * "paper" inserts provide the reading surfaces on top of the blue.
+   * Previous iterations had cream as the dominant surface with blue
+   * accents — this flips it: BLUE chassis, cream cards on top.
+   * ══════════════════════════════════════════════════════════════════ */
 
-  /* Canvas — near-white with a whisper of warmth. Reads clean, holds
-   * dark ink, no longer looks like graph paper (the "EKG" complaint). */
+  /* Chassis — industrial blue enamel. DOMINANT surface color.
+   * Used for sidebar, right panel outer, toolbar, frame around
+   * everything. This is what the app "is". */
+  --nm-chassis: #334558;           /* primary industrial blue */
+  --nm-chassis-light: #46596e;     /* raised / highlight surfaces */
+  --nm-chassis-dark: #22303f;      /* recessed / shadow */
+  --nm-chassis-deep: #141c27;      /* deepest inset wells */
+  --nm-chassis-fg: #ede8d2;        /* cream stencil text on blue */
+
+  /* Faceplate — cream paper inserts that sit ON the blue chassis.
+   * Used for: canvas drawing surface, chat bubbles, text boxes,
+   * LaTeX input areas. Everything readable lives on cream paper. */
+  --nm-faceplate: #ede8d2;
+  --nm-faceplate-alt: #dfd9bf;
+  --nm-faceplate-light: #f5f0dc;
+  --nm-faceplate-recessed: #c8c0a0;
+
+  /* Canvas — the drawing paper clipped to the bench. Near-white so
+   * dark ink reads clean. */
   --nm-canvas-bg: #f7f4e8;
   --nm-canvas-bg-edge: #ebe6cf;
 
-  /* Cabinet gray — lighter and cooler than v5. Still a Tek 545A
-   * body color, just less saturated so it reads as "soft painted
-   * metal" rather than "battleship steel". Used mainly for the thin
-   * frame bezel + seams between panels. */
-  --nm-cabinet: #8591a0;
-  --nm-cabinet-light: #a3afbd;     /* highlight / raised bezel edge */
-  --nm-cabinet-dark: #6a7684;      /* shadow / recessed trim */
-  --nm-cabinet-deep: #4d5864;      /* deepest inset shadow */
+  /* Cabinet aliases — keep for v5.1-v6 rules that referenced them. */
+  --nm-cabinet: var(--nm-chassis);
+  --nm-cabinet-light: var(--nm-chassis-light);
+  --nm-cabinet-dark: var(--nm-chassis-dark);
+  --nm-cabinet-deep: var(--nm-chassis-deep);
 
-  /* Gunmetal — reserved for very dark accents. Primary dark surface
-   * is now --nm-cabinet (battleship gray). */
-  --nm-gunmetal: #3a4050;
-  --nm-gunmetal-light: #5a6072;
-  --nm-gunmetal-dark: #1f232e;
+  /* Gunmetal — reserved for very dark borders on cream surfaces */
+  --nm-gunmetal: #2a3543;
+  --nm-gunmetal-light: #46596e;
+  --nm-gunmetal-dark: #141c27;
 
-  /* Ink — dark navy, not warm-black. Reads cleanly on the pale
-   * faceplate without feeling "ancient typewriter ribbon". */
-  --nm-ink: #23283a;
-  --nm-ink-muted: #626875;         /* secondary labels */
+  /* Ink — dark navy for text ON CREAM faceplate surfaces */
+  --nm-ink: #1a2335;
+  --nm-ink-muted: #525a6e;
 
-  /* Accent — soft warm olive, much less saturated than brass.
-   * v5 used bright brass + amber for hover/active which Dan called
-   * "atomic blue with radiation". Now we use a muted olive for
-   * hover and reserve amber for genuinely active states only. */
-  --nm-accent: #7a7340;
-  --nm-accent-light: rgba(122, 115, 64, 0.14);
-  --nm-accent-hover: #605a30;
+  /* Accent — warm brass knob tone for hover highlights on blue chassis */
+  --nm-accent: #b89258;
+  --nm-accent-light: rgba(184, 146, 88, 0.18);
+  --nm-accent-hover: #d4ae74;
 
-  /* Phosphor — amber kept but used SPARINGLY. Only the currently-
-   * selected tool button gets the phosphor "on" glow; hovers and
-   * secondary affordances use the muted olive accent above. */
-  --nm-phosphor: #e9a825;
-  --nm-phosphor-light: rgba(233, 168, 37, 0.22);
+  /* Phosphor — amber LED for active/selected indicators. On the
+   * industrial blue chassis this reads exactly like a lit control
+   * on real 1950s equipment. */
+  --nm-phosphor: #ffb91a;
+  --nm-phosphor-light: rgba(255, 185, 26, 0.28);
 
   /* Semantic states */
-  --nm-danger: #b73e34;            /* signal red */
-  --nm-success: #6b7140;           /* olive */
+  --nm-danger: #d64838;            /* signal red LED */
+  --nm-success: #7fa63d;           /* olive/green ready */
 
-  /* Borders — soft cabinet-gray trim at lower opacity. The old v5
-   * 0.35/0.60 alpha was too heavy and read as "equipment seams";
-   * 0.18/0.30 is subtle enough to feel like modern UI hairlines. */
-  --nm-warm-border: rgba(80, 92, 106, 0.18);
-  --nm-warm-border-strong: rgba(80, 92, 106, 0.30);
+  /* Borders — cream at low alpha for subtle hairlines on blue chassis */
+  --nm-warm-border: rgba(237, 232, 210, 0.18);
+  --nm-warm-border-strong: rgba(237, 232, 210, 0.32);
 
-  /* Section selection — pressed-in recessed faceplate with amber glow */
-  --nm-section-active: var(--nm-faceplate-recessed);
+  /* Section selection */
+  --nm-section-active: var(--nm-chassis-light);
 
-  /* Legacy name aliases so existing rules keep working.
-   * Everything maps onto the new cream/cabinet-gray scheme. */
-  --nm-warm-bg: var(--nm-faceplate);
-  --nm-warm-bg-alt: var(--nm-faceplate-alt);
-  --nm-chassis: var(--nm-cabinet);             /* Tek cabinet gray */
-  --nm-chassis-dark: var(--nm-cabinet-dark);
-  --nm-chassis-light: var(--nm-faceplate-light);
-  --nm-chassis-fg: var(--nm-ink);
-  --nm-paper: var(--nm-faceplate);             /* "paper" IS the faceplate */
-  --nm-paper-ink: var(--nm-ink);
+  /* Legacy aliases — v7 flips the primary surface from cream to blue.
+   * Rules that reference --nm-warm-bg / --nm-warm-bg-alt now render
+   * as blue chassis. Rules that reference --nm-paper render as cream.
+   * Components that need "dark text on cream" use --nm-paper-ink. */
+  --nm-warm-bg: var(--nm-chassis);              /* primary = blue */
+  --nm-warm-bg-alt: var(--nm-chassis-dark);     /* darker nested = darker blue */
+  --nm-paper: var(--nm-faceplate);              /* cream paper inserts */
+  --nm-paper-ink: var(--nm-ink);                /* dark navy on cream */
   --nm-paper-muted: var(--nm-ink-muted);
-  --nm-paper-border: var(--nm-warm-border-strong);
+  --nm-paper-border: rgba(26, 35, 53, 0.24);    /* navy hairlines on cream */
 
   /* Geometry — machined, not extruded */
   --nm-radius: 4px;
@@ -111,11 +115,12 @@
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
 }
 
-/* Force stencil-dark as the default text inside our scope. Anything
- * inheriting --text-normal / --text-muted gets the new warm ink. */
+/* v7: primary chassis is blue, so default text is cream stencil.
+ * Components that render on cream faceplate inserts (chat bubbles,
+ * text boxes, canvas) override locally with --nm-paper-ink. */
 .noteometry-container {
-  color: var(--nm-ink);
-  --text-normal: var(--nm-ink);
+  color: var(--nm-chassis-fg);
+  --text-normal: var(--nm-chassis-fg);
   --text-muted: var(--nm-ink-muted);
   --text-faint: var(--nm-ink-muted);
 }
