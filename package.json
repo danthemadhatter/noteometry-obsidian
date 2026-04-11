@@ -1,6 +1,6 @@
 {
 	"name": "noteometry",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Ink-first STEM notebook for Obsidian. Pencil + eraser + AI-powered math & circuit tools.",
 	"main": "main.js",
 	"type": "module",
