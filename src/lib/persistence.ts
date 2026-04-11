@@ -1,36 +1,30 @@
 import { Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
-import type { ChatMessage } from "../types";
-import type { Stroke, Stamp } from "./inkEngine";
 import type { CanvasObject } from "./canvasObjects";
+import {
+  CanvasData,
+  EMPTY_PAGE,
+  packToV3,
+  unpackFromV3,
+  isV3Page,
+} from "./pageFormat";
 
-export interface CanvasData {
-  version?: number;
-  strokes: Stroke[];
-  stamps: Stamp[];
-  canvasObjects: CanvasObject[];
-  viewport: { scrollX: number; scrollY: number };
-  panelInput: string;
-  chatMessages: ChatMessage[];
-  tableData: Record<string, string[][]>;
-  textBoxData: Record<string, string>;
-  lastSaved: string;
-  // Legacy fields (read-only, for migration)
-  excalidrawElements?: unknown[];
-}
-
-const EMPTY_PAGE: CanvasData = {
-  version: 2,
-  strokes: [],
-  stamps: [],
-  canvasObjects: [],
-  viewport: { scrollX: 0, scrollY: 0 },
-  panelInput: "",
-  chatMessages: [],
-  tableData: {},
-  textBoxData: {},
-  lastSaved: "",
-};
+// Re-export so existing consumers don't have to change their imports.
+export type { CanvasData } from "./pageFormat";
+export {
+  packToV3,
+  unpackFromV3,
+  isV3Page,
+} from "./pageFormat";
+export type {
+  NoteometryPageV3,
+  PageElementV3,
+  StrokeElementV3,
+  StampElementV3,
+  TextboxElementV3,
+  TableElementV3,
+  ImageElementV3,
+} from "./pageFormat";
 
 function rootDir(plugin: NoteometryPlugin): string {
   return plugin.settings.vaultFolder || "Noteometry";
@@ -111,7 +105,9 @@ export async function createPage(
   const path = pagePath(plugin, section, name);
   const adapter = plugin.app.vault.adapter;
   if (!(await adapter.exists(path))) {
-    await adapter.write(path, JSON.stringify({ ...EMPTY_PAGE, lastSaved: new Date().toISOString() }, null, 0));
+    const empty: CanvasData = { ...EMPTY_PAGE, lastSaved: new Date().toISOString() };
+    const v3 = packToV3(empty);
+    await adapter.write(path, JSON.stringify(v3, null, 0));
   }
 }
 
@@ -139,10 +135,14 @@ export async function loadPage(
       const raw = await adapter.read(path);
       const parsed = JSON.parse(raw);
 
-      // v2 format (new ink engine)
-      if (parsed.version === 2 || parsed.strokes) {
+      // v3 format (current) — unpack elements[] to legacy in-memory shape
+      if (isV3Page(parsed)) {
+        return unpackFromV3(parsed);
+      }
+
+      // v2 format (pre-v3) — separate arrays + sidecar dictionaries
+      if (parsed.version === 2 || Array.isArray(parsed.strokes)) {
         return {
-          version: 2,
           strokes: parsed.strokes ?? [],
           stamps: parsed.stamps ?? [],
           canvasObjects: parsed.canvasObjects ?? [],
@@ -155,9 +155,8 @@ export async function loadPage(
         };
       }
 
-      // v1 format (Excalidraw) — migrate what we can
+      // v1 format (legacy Excalidraw) — keep text-only content
       return {
-        version: 2,
         strokes: [],
         stamps: [],
         canvasObjects: [],
@@ -189,7 +188,10 @@ export async function savePage(
       await adapter.mkdir(secPath);
     }
     const path = pagePath(plugin, section, name);
-    await adapter.write(path, JSON.stringify(data, null, 0));
+    // Always write v3 format to disk. v2 files load correctly because
+    // loadPage has a v2 fallback, and get rewritten to v3 on next save.
+    const v3 = packToV3(data);
+    await adapter.write(path, JSON.stringify(v3, null, 0));
   } catch (e) {
     console.error("[Noteometry] save failed:", e);
     new Notice(`Failed to save "${section}/${name}" — changes may not persist (see console)`, 10000);

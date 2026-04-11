@@ -612,8 +612,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onRedo={handleRedoWrapped}
               canUndo={canUndo}
               canRedo={canRedo}
-              onReadInk={handleReadInk}
-              isReading={isReading}
               onClearCanvas={() => {
                 if (confirm("Clear all strokes and stamps from this page?")) {
                   pushUndo();

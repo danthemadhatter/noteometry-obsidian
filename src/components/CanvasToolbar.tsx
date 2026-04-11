@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  IconSelect, IconPen, IconEraser, IconHand, IconLasso, IconScan,
+  IconSelect, IconPen, IconEraser, IconHand, IconLasso,
   IconType, IconTable, IconImage, IconUndo, IconRedo,
   IconLine, IconArrow, IconRect, IconCircle,
   IconDownload, IconTrash, IconSliders,
@@ -46,8 +46,6 @@ interface Props {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  onReadInk: () => void;
-  isReading: boolean;
   onClearCanvas: () => void;
   onExportImage: () => void;
 }
@@ -74,7 +72,6 @@ export default function CanvasToolbar({
   strokeWidth, onStrokeWidthChange,
   onInsertTextBox, onInsertTable, onInsertImage,
   onUndo, onRedo, canUndo, canRedo,
-  onReadInk, isReading,
   onClearCanvas, onExportImage,
 }: Props) {
   const [popup, setPopup] = useState<"" | "shapes" | "widths" | "insert" | "more">("");
@@ -128,20 +125,11 @@ export default function CanvasToolbar({
         </Btn>
       </div>
 
-      {/* ── Lasso + OCR ── */}
+      {/* ── Lasso ── */}
       <div className="noteometry-toolbar-group">
         <Btn active={lassoActive} onClick={onLassoToggle} title="Lasso select">
           <IconLasso />
         </Btn>
-        <button
-          className={`noteometry-toolbar-btn noteometry-toolbar-readink ${isReading ? "reading" : ""}`}
-          onClick={onReadInk}
-          disabled={isReading}
-          title="Read lassoed ink"
-        >
-          <IconScan />
-          <span className="noteometry-toolbar-label">{isReading ? "..." : "OCR"}</span>
-        </button>
       </div>
 
       {/* ── Colors ── */}
