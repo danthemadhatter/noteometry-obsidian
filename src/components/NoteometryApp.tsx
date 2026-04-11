@@ -12,14 +12,16 @@ import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
 import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
-import type { LassoBounds, LassoAction } from "./LassoOverlay";
+import type { LassoBounds } from "./LassoOverlay";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
-import { useLasso } from "../features/lasso/useLasso";
+import { useLassoStack } from "../features/lasso/useLassoStack";
+import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
 import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
+import { compositeRegions } from "../features/lasso/composite";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -41,10 +43,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
     onEraseStart, onEraseEnd,
   } = useInk();
 
-  /* ── Lasso feature: active state + pending OCR crop ─── */
+  /* ── Lasso stack feature: multi-region selection ─── */
   const {
-    lassoActive, setLassoActive, pendingCropRef: pendingLassoCropRef,
-  } = useLasso();
+    lassoActive, setLassoActive, regions: lassoRegions,
+    pushRegion, clearStack, toggleLasso,
+  } = useLassoStack();
 
   /* ── Objects feature: canvas objects + selection ─── */
   const {
@@ -262,24 +265,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => { flushSave = null; };
   }, [saveNow]);
 
-  /* ── READ INK → OCR → auto-solve (composition coordinator) ── */
-
-  const handleReadInk = useCallback(async () => {
-    const lassoCrop = pendingLassoCropRef.current;
-    if (!lassoCrop) {
-      setLassoActive(true);
-      return;
-    }
-    pendingLassoCropRef.current = null;
-    setLassoActive(false);
-    await processCrop(lassoCrop);
-  }, [pendingLassoCropRef, setLassoActive, processCrop]);
-
-  // Keep a ref to handleReadInk so handleLassoComplete can call the latest version
-  const handleReadInkRef = useRef(handleReadInk);
-  handleReadInkRef.current = handleReadInk;
-
-  /* ── Lasso complete → rasterize the visible region via dumb pipe ── */
+  /* ── Lasso complete → rasterize + push to stack ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
     const container = canvasAreaRef.current;
     if (!container) {
@@ -287,12 +273,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
       return;
     }
 
-    // Container-relative bounds (the lasso was drawn in screen coords
-    // relative to canvasAreaRef). The rasterizer captures whatever is
-    // visible in the region — ink strokes, stamps, canvas objects,
-    // text box contents, table cells, everything — by treating the DOM
-    // as an opaque pixel source. No filtering, no interpretation,
-    // no model-level reasoning about what's in the region.
+    // Rasterize the visible region through the dumb pipe.
+    // html2canvas captures ink strokes, text box contents, table cells,
+    // images, everything. Zero data-model interpretation.
     const dataUrl = await rasterizeRegion(container, {
       minX: bounds.minX,
       minY: bounds.minY,
@@ -300,23 +283,42 @@ export default function NoteometryApp({ plugin, app }: Props) {
       maxY: bounds.maxY,
     });
 
-    if (dataUrl) {
-      pendingLassoCropRef.current = dataUrl;
-      // Lasso stays visible — user taps OCR in the action bar to process.
-    } else {
-      // Capture failed — dismiss lasso and surface the error.
-      setLassoActive(false);
+    if (!dataUrl) {
       new Notice("Lasso capture failed — see console", 8000);
+      return;
     }
-  }, [setLassoActive, pendingLassoCropRef]);
 
-  /* ── Lasso action bar → OCR or Move ──────────────────── */
-  const handleLassoAction = useCallback((action: LassoAction, _bounds: LassoBounds) => {
-    if (action === "ocr") {
-      // Trigger existing OCR flow
-      handleReadInkRef.current();
+    // Add the captured region to the stack. The user can either process
+    // the stack now (via the action bar) or draw more regions first.
+    const region: LassoRegion = {
+      id: crypto.randomUUID(),
+      bounds,
+      capturedImage: dataUrl,
+    };
+    pushRegion(region);
+  }, [setLassoActive, pushRegion]);
+
+  /* ── Process the lasso stack: composite + send to AI pipeline ── */
+  const handleProcessStack = useCallback(async () => {
+    // Snapshot the current stack so the async work is decoupled from state.
+    const snapshot = lassoRegions;
+    if (snapshot.length === 0) return;
+
+    // Composite all region images into one tall labeled PNG
+    const composite = await compositeRegions(snapshot.map((r) => r.capturedImage));
+    if (!composite) {
+      new Notice("Failed to composite lasso regions — see console", 8000);
+      return;
     }
-  }, []);
+
+    // Clear the stack and deactivate lasso mode before sending to the AI
+    // so the user can't accidentally add more regions mid-flight.
+    clearStack();
+    setLassoActive(false);
+
+    // Hand off to the pipeline (OCR + solve + chat with image attached)
+    await processCrop(composite);
+  }, [lassoRegions, clearStack, setLassoActive, processCrop]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
     // Convert lasso polygon from screen coords to scene coords
@@ -365,8 +367,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }));
 
     setLassoActive(false);
-    pendingLassoCropRef.current = null;
-  }, [scrollX, scrollY, pushUndo]);
+    clearStack();
+  }, [scrollX, scrollY, pushUndo, setLassoActive, clearStack]);
 
   // Chat send, solve from input, and symbol insertion all live in usePipeline now.
 
@@ -584,11 +586,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onToolChange={(t) => { setTool(t); setLassoActive(false); }}
               lassoActive={lassoActive}
               onLassoToggle={() => {
-                setLassoActive((prev) => {
-                  if (!prev) setTool("pen");
-                  else pendingLassoCropRef.current = null;
-                  return !prev;
-                });
+                if (!lassoActive) setTool("pen");
+                toggleLasso();
               }}
               activeColor={activeColor}
               onColorChange={setActiveColor}
@@ -665,9 +664,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
             <LassoOverlay
               active={lassoActive}
               containerRef={canvasAreaRef as React.RefObject<HTMLDivElement>}
+              regions={lassoRegions}
               onComplete={handleLassoComplete}
-              onCancel={() => { setLassoActive(false); pendingLassoCropRef.current = null; }}
-              onAction={handleLassoAction}
+              onCancel={clearStack}
+              onClear={clearStack}
+              onProcess={handleProcessStack}
               onMoveComplete={handleLassoMoveComplete}
             />
           </div>

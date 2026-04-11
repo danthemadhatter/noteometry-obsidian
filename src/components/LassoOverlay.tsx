@@ -1,92 +1,118 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import type { LassoRegion } from "../features/lasso/useLassoStack";
 
 interface LassoBounds {
   points: { x: number; y: number }[];
   minX: number; minY: number; maxX: number; maxY: number;
 }
 
-export type LassoAction = "ocr" | "move";
+export type { LassoBounds };
 
 interface Props {
   active: boolean;
   containerRef: React.RefObject<HTMLDivElement>;
+  /** Completed regions in the current lasso stack (drawn persistently as outlines). */
+  regions: LassoRegion[];
+  /** Called when the user finishes drawing a new lasso. Parent should rasterize and pushRegion. */
   onComplete: (bounds: LassoBounds) => void;
+  /** Called when the user draws an invalid (too-short) lasso. */
   onCancel: () => void;
-  onAction?: (action: LassoAction, bounds: LassoBounds) => void;
+  /** Called when user clicks Clear — wipes the stack. */
+  onClear: () => void;
+  /** Called when user clicks OCR/Process — composites the stack and sends to AI. */
+  onProcess: () => void;
+  /** Optional Move action — only shown when the stack has exactly one region. */
   onMoveComplete?: (delta: { dx: number; dy: number }, bounds: LassoBounds) => void;
 }
 
-export type { LassoBounds };
-
-export default function LassoOverlay({ active, containerRef, onComplete, onCancel, onAction, onMoveComplete }: Props) {
+export default function LassoOverlay({
+  active,
+  containerRef,
+  regions,
+  onComplete,
+  onCancel,
+  onClear,
+  onProcess,
+  onMoveComplete,
+}: Props) {
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
 
-  // Action bar state
-  const [actionBar, setActionBar] = useState<{ x: number; y: number; bounds: LassoBounds } | null>(null);
+  // Mirror regions into a ref so the main drawing effect can read the latest
+  // list without needing regions in its deps (which would cause listener
+  // re-attachment on every stack change).
+  const regionsRef = useRef(regions);
+  regionsRef.current = regions;
+
+  // Redraw function handle, exposed from the setup effect so the
+  // regions-watching effect below can trigger a redraw without re-running
+  // the setup.
+  const redrawRef = useRef<(() => void) | null>(null);
+
+  // Move mode state (only meaningful when stack has exactly 1 region)
   const [moveMode, setMoveMode] = useState(false);
   const moveDragRef = useRef<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
-  const boundsRef = useRef<LassoBounds | null>(null);
-
-  // Ghost preview state for move mode
+  const moveBoundsRef = useRef<LassoBounds | null>(null);
   const snapshotRef = useRef<{ canvas: HTMLCanvasElement; sx: number; sy: number } | null>(null);
   const ghostCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Keep latest callbacks in refs so the effect doesn't re-run on every render
+  // Callback refs so the setup effect doesn't re-run when parent re-renders
   const onCompleteRef = useRef(onComplete);
   const onCancelRef = useRef(onCancel);
-  const onActionRef = useRef(onAction);
   const onMoveCompleteRef = useRef(onMoveComplete);
   onCompleteRef.current = onComplete;
   onCancelRef.current = onCancel;
-  onActionRef.current = onAction;
   onMoveCompleteRef.current = onMoveComplete;
 
-  // Reset state when deactivated
+  // Action bar position: top-center of the MOST RECENT region.
+  // When a new region is pushed, the bar visually "follows" it.
+  const actionBarPos = useMemo(() => {
+    if (regions.length === 0) return null;
+    const last = regions[regions.length - 1]!.bounds;
+    const x = (last.minX + last.maxX) / 2;
+    const y = Math.max(10, last.minY - 10);
+    return { x, y };
+  }, [regions]);
+
+  // Reset move state when deactivated
   useEffect(() => {
     if (!active) {
-      setActionBar(null);
       setMoveMode(false);
       moveDragRef.current = null;
-      boundsRef.current = null;
+      moveBoundsRef.current = null;
     }
   }, [active]);
 
-  const handleOCR = useCallback(() => {
-    if (!boundsRef.current) return;
-    onActionRef.current?.("ocr", boundsRef.current);
-  }, []);
-
   const handleMove = useCallback(() => {
+    // Move only makes sense when there's exactly one region.
+    const current = regionsRef.current;
+    if (current.length !== 1) return;
+    moveBoundsRef.current = current[0]!.bounds;
     setMoveMode(true);
-    setActionBar(null);
   }, []);
 
-  // Capture a snapshot of the lasso region from the ink canvas
+  // Capture a snapshot of the lasso region from the ink canvas for ghost rendering
   const captureSnapshot = useCallback(() => {
     const container = containerRef.current;
-    if (!container || !boundsRef.current) return;
+    if (!container || !moveBoundsRef.current) return;
     const inkCanvas = container.querySelector<HTMLCanvasElement>(".noteometry-ink-layer");
     if (!inkCanvas) return;
-    const bounds = boundsRef.current;
+    const bounds = moveBoundsRef.current;
     const dpr = window.devicePixelRatio || 1;
 
-    // bounds coords are CSS pixels; inkCanvas internal size is CSS * dpr
     const cssSx = Math.max(0, Math.floor(bounds.minX));
     const cssSy = Math.max(0, Math.floor(bounds.minY));
     const cssSw = Math.ceil(bounds.maxX - bounds.minX);
     const cssSh = Math.ceil(bounds.maxY - bounds.minY);
     if (cssSw <= 0 || cssSh <= 0) return;
 
-    // Source region in canvas pixel space
     const pxSx = Math.floor(cssSx * dpr);
     const pxSy = Math.floor(cssSy * dpr);
     const pxSw = Math.min(inkCanvas.width - pxSx, Math.ceil(cssSw * dpr));
     const pxSh = Math.min(inkCanvas.height - pxSy, Math.ceil(cssSh * dpr));
     if (pxSw <= 0 || pxSh <= 0) return;
 
-    // Offscreen canvas in CSS pixels for ghost rendering
     const offscreen = document.createElement("canvas");
     offscreen.width = cssSw;
     offscreen.height = cssSh;
@@ -97,7 +123,6 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     snapshotRef.current = { canvas: offscreen, sx: cssSx, sy: cssSy };
   }, [containerRef]);
 
-  // Draw the ghost preview on the ghost canvas
   const drawGhost = useCallback((dx: number, dy: number) => {
     const gc = ghostCanvasRef.current;
     const snap = snapshotRef.current;
@@ -116,7 +141,6 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     const container = containerRef.current;
     if (!container) return;
 
-    // Set up ghost canvas dimensions — must happen before captureSnapshot draws to it
     const gc = ghostCanvasRef.current;
     if (gc) {
       const rect = container.getBoundingClientRect();
@@ -124,8 +148,6 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       gc.height = rect.height;
     }
 
-    // Small rAF delay to ensure the ghost canvas is fully mounted and sized
-    // before we try to draw to it
     const rafId = requestAnimationFrame(() => {
       captureSnapshot();
     });
@@ -146,26 +168,25 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       moveDragRef.current.currentY = e.clientY;
       const dx = e.clientX - moveDragRef.current.startX;
       const dy = e.clientY - moveDragRef.current.startY;
-      // Update ghost canvas directly for smooth rendering (avoid React re-render overhead)
       drawGhost(dx, dy);
     };
 
     const onUp = (e: PointerEvent) => {
-      if (!moveDragRef.current || !boundsRef.current) return;
+      if (!moveDragRef.current || !moveBoundsRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const dx = moveDragRef.current.currentX - moveDragRef.current.startX;
       const dy = moveDragRef.current.currentY - moveDragRef.current.startY;
+      const bounds = moveBoundsRef.current;
       moveDragRef.current = null;
       snapshotRef.current = null;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-        onMoveCompleteRef.current?.({ dx, dy }, boundsRef.current);
+        onMoveCompleteRef.current?.({ dx, dy }, bounds);
       }
       setMoveMode(false);
     };
 
-    // Use a transparent overlay div for move dragging
     const overlay = document.createElement("div");
     overlay.style.cssText =
       "position:absolute;top:0;left:0;width:100%;height:100%;z-index:310;" +
@@ -186,13 +207,13 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     };
   }, [moveMode, active, containerRef, captureSnapshot, drawGhost]);
 
+  // Main drawing effect — attaches pointer listeners and provides redraw()
   useEffect(() => {
     if (!active) return;
 
     const container = containerRef.current;
     if (!container) return;
 
-    // Create an overlay canvas
     const canvas = document.createElement("canvas");
     canvas.style.cssText =
       "position:absolute;top:0;left:0;width:100%;height:100%;z-index:300;" +
@@ -201,20 +222,18 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
-
     const getPoint = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
-    const redraw = () => {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const pts = pointsRef.current;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    const drawPolygon = (
+      ctx: CanvasRenderingContext2D,
+      pts: { x: number; y: number }[],
+      fillAlpha: number,
+    ) => {
       if (pts.length > 2) {
-        ctx.fillStyle = "rgba(74, 144, 217, 0.08)";
+        ctx.fillStyle = `rgba(74, 144, 217, ${fillAlpha})`;
         ctx.beginPath();
         ctx.moveTo(pts[0]!.x, pts[0]!.y);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -235,18 +254,46 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       }
     };
 
-    let captured = false;
+    const redraw = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Ensure canvas pixel dimensions match the container's current size.
+      // (May have changed since the canvas was created if the view resized.)
+      const rect = container.getBoundingClientRect();
+      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw persistent region outlines from the stack (subtle fill)
+      for (const region of regionsRef.current) {
+        drawPolygon(ctx, region.bounds.points, 0.08);
+      }
+
+      // Draw in-progress polygon on top (brighter fill)
+      drawPolygon(ctx, pointsRef.current, 0.15);
+    };
+
+    // Expose redraw so the regions-watching effect can trigger paints
+    // without re-running this setup.
+    redrawRef.current = redraw;
 
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0 || captured) return;
+      if (e.button !== 0) return;
+      // Don't intercept clicks that land on the action bar — let those
+      // flow through to the buttons. Also ignore clicks on any UI that
+      // the canvas shouldn't steal.
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".noteometry-lasso-action-bar")) return;
+
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
 
       canvas.setPointerCapture(e.pointerId);
-      const r = canvas.getBoundingClientRect();
-      canvas.width = r.width;
-      canvas.height = r.height;
       drawingRef.current = true;
       pointsRef.current = [getPoint(e)];
       redraw();
@@ -273,9 +320,6 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       if (pts.length >= 10) {
         const xs = pts.map((p) => p.x);
         const ys = pts.map((p) => p.y);
-        captured = true;
-        // Let clicks pass through to toolbar/OCR button
-        canvas.style.pointerEvents = "none";
         const bounds: LassoBounds = {
           points: [...pts],
           minX: Math.min(...xs),
@@ -283,27 +327,27 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
           maxX: Math.max(...xs),
           maxY: Math.max(...ys),
         };
-        boundsRef.current = bounds;
-        // Show action bar near top of lasso bounding box
-        const barX = (bounds.minX + bounds.maxX) / 2;
-        const barY = bounds.minY - 10;
-        setActionBar({ x: barX, y: Math.max(10, barY), bounds });
+        // Clear WIP points. The parent will async rasterize + push to
+        // regions, and the regions-watching effect will then redraw
+        // with the new persistent outline.
+        pointsRef.current = [];
+        redraw();
         onCompleteRef.current(bounds);
-        // Keep the lasso drawing visible — don't clear canvas.
-        // It stays until the effect cleanup removes the canvas element.
       } else {
-        // Short drag / click — clear and let user retry
+        // Short drag / click — dismiss the WIP attempt and let the user retry.
         onCancelRef.current();
         pointsRef.current = [];
-        const ctx = canvas.getContext("2d");
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        redraw();
       }
     };
 
-    // CAPTURE phase to intercept before canvas layers
+    // CAPTURE phase so we intercept before the ink/object layers
     container.addEventListener("pointerdown", onDown, true);
     container.addEventListener("pointermove", onMove, true);
     container.addEventListener("pointerup", onUp, true);
+
+    // Initial paint — show any pre-existing regions on reactivation
+    redraw();
 
     return () => {
       container.removeEventListener("pointerdown", onDown, true);
@@ -313,14 +357,19 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
       canvasRef.current = null;
       drawingRef.current = false;
       pointsRef.current = [];
+      redrawRef.current = null;
     };
-    // Only re-run when active changes — callbacks stored in refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, containerRef]);
 
+  // Trigger redraws when regions change (without re-running the setup effect)
+  useEffect(() => {
+    redrawRef.current?.();
+  }, [regions]);
+
   if (!active) return null;
 
-  // Move mode: render the ghost preview canvas
+  // Move mode: render the ghost preview canvas over everything
   if (moveMode) {
     return (
       <canvas
@@ -339,21 +388,31 @@ export default function LassoOverlay({ active, containerRef, onComplete, onCance
     );
   }
 
-  if (!actionBar) return null;
+  // No regions drawn yet → no action bar, just the drawing canvas (created above).
+  if (!actionBarPos || regions.length === 0) return null;
+
+  const regionCount = regions.length;
+  const canMove = regionCount === 1;
 
   return (
     <div
       className="noteometry-lasso-action-bar"
       style={{
         position: "absolute",
-        left: actionBar.x,
-        top: actionBar.y,
+        left: actionBarPos.x,
+        top: actionBarPos.y,
         transform: "translate(-50%, -100%)",
         zIndex: 320,
       }}
     >
-      <button className="noteometry-lasso-action-btn" onClick={handleOCR}>OCR</button>
-      <button className="noteometry-lasso-action-btn" onClick={handleMove}>Move</button>
+      <span className="noteometry-lasso-count">
+        {regionCount} {regionCount === 1 ? "region" : "regions"}
+      </span>
+      <button className="noteometry-lasso-action-btn" onClick={onProcess}>OCR</button>
+      <button className="noteometry-lasso-action-btn" onClick={onClear}>Clear</button>
+      {canMove && (
+        <button className="noteometry-lasso-action-btn" onClick={handleMove}>Move</button>
+      )}
     </div>
   );
 }
