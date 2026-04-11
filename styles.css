@@ -457,7 +457,39 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* Grid is drawn on the canvas layer (canvasRenderer.ts) so it scrolls with content */
+  /* No background here — the viewport draws the canvas color, the top
+   * bar has its own faceplate color. Keeping canvas-area transparent
+   * lets the cabinet gray show through if anything gets mis-sized. */
+  background: transparent;
+}
+
+/* ── Canvas top bar (Phase 4 pt 2 polish) ──────────────────
+   Holds the CanvasToolbar on the left and the zoom controls on
+   the right. Static flex row, not floating. Replaces the old
+   position: absolute toolbar at the bottom of the canvas area. */
+.noteometry-canvas-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--nm-faceplate-light);
+  border-bottom: 2px solid var(--nm-cabinet-dark);
+  box-shadow: var(--nm-shadow-soft);
+  /* The toolbar is a horizontal scroll container if it overflows
+   * on narrow windows; zoom controls stay visible on the right. */
+  min-height: 0;
+  overflow: visible;
+}
+
+/* The drawing surface below the top bar. This is what InkCanvas,
+ * CanvasObjectLayer, and LassoOverlay render into. */
+.noteometry-canvas-viewport {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
   background-color: var(--nm-canvas-bg);
 }
 
@@ -1258,23 +1290,20 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 .noteometry-canvas-toolbar {
-  position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100% - 16px);
-  z-index: 200;
+  /* Static flex child inside .noteometry-canvas-topbar.
+   * Previously this was position: absolute bottom: 12px; now it sits
+   * inline at the top of the canvas area, embedded in the frame. */
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 6px 8px;
-  /* Raised cream faceplate panel — the equipment front panel where
-   * the controls are mounted. Gunmetal border, soft warm shadow. */
-  background: var(--nm-faceplate-light);
+  padding: 0;
+  background: transparent;
   color: var(--nm-ink);
-  border: 1px solid var(--nm-warm-border-strong);
-  border-radius: var(--nm-radius);
-  box-shadow: var(--nm-shadow-toolbar);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   pointer-events: auto;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1770,22 +1799,20 @@
 }
 
 /* ── Phase 4 Pt 2: zoom controls ─────────────────────── */
-/* Top-right so it doesn't compete with the bottom-center canvas toolbar */
+/* Flex child of .noteometry-canvas-topbar — sits to the right of the
+ * main tool row. No longer absolute-positioned. */
 .noteometry-zoom-controls {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  flex-shrink: 0;
   display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--nm-faceplate-light);
-  border: 1px solid var(--nm-warm-border-strong);
-  border-radius: var(--nm-radius);
-  box-shadow: var(--nm-shadow-toolbar);
-  z-index: 400;
+  gap: 3px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   font-family: var(--nm-font-mono);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.03em;
   user-select: none;
 }
 
@@ -1793,18 +1820,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 28px;
+  min-width: 52px;
+  height: 30px;
   padding: 0 10px;
-  background: var(--nm-faceplate-light);
+  background: var(--nm-faceplate);
   color: var(--nm-ink);
-  border: 1px solid var(--nm-warm-border);
+  border: 1px solid var(--nm-warm-border-strong);
   border-radius: var(--nm-radius-sm);
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
   font-weight: inherit;
+  letter-spacing: inherit;
   line-height: 1;
+  white-space: nowrap;
   transition: background 100ms, border-color 100ms;
 }
 

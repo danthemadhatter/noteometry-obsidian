@@ -70,6 +70,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [scrollY, setScrollY] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [zoomLocked, setZoomLocked] = useState(false);
+  // viewportRef = the drawing-surface sub-area below the top toolbar.
+  // Lasso, rasterization, and zoom wheel events all key off this, not the
+  // full canvas-area (which now includes the top bar).
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   // Zoom controls — bounds and step.
   const ZOOM_MIN = 0.25;
@@ -296,7 +300,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Lasso complete → rasterize + push to stack ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
-    const container = canvasAreaRef.current;
+    const container = viewportRef.current;
     if (!container) {
       setLassoActive(false);
       return;
@@ -510,7 +514,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Cmd/Ctrl + wheel → zoom (desktop) ─────────────────── */
   useEffect(() => {
-    const el = canvasAreaRef.current;
+    const el = viewportRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -635,133 +639,141 @@ export default function NoteometryApp({ plugin, app }: Props) {
               className="noteometry-hidden"
             />
 
-            {/* Floating toolbar */}
-            <CanvasToolbar
-              tool={tool}
-              onToolChange={(t) => { setTool(t); setLassoActive(false); }}
-              lassoActive={lassoActive}
-              onLassoToggle={() => {
-                if (!lassoActive) setTool("pen");
-                toggleLasso();
-              }}
-              activeColor={activeColor}
-              onColorChange={setActiveColor}
-              strokeWidth={strokeWidth}
-              onStrokeWidthChange={setStrokeWidth}
-              onInsertTextBox={handleInsertTextBox}
-              onInsertTable={handleInsertTable}
-              onInsertImage={handleInsertImage}
-              onUndo={handleUndoWrapped}
-              onRedo={handleRedoWrapped}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onClearCanvas={() => {
-                if (confirm("Clear all strokes and stamps from this page?")) {
-                  pushUndo();
-                  setStrokes([]);
-                  setStamps([]);
-                }
-              }}
-              onExportImage={() => {
-                const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
-                if (!dataUrl) return;
-                const link = document.createElement("a");
-                link.download = `${currentPage || "canvas"}.png`;
-                link.href = dataUrl;
-                link.click();
-              }}
-            />
+            {/* ── Top bar: tools on the left, zoom controls on the right ── */}
+            <div className="noteometry-canvas-topbar">
+              <CanvasToolbar
+                tool={tool}
+                onToolChange={(t) => { setTool(t); setLassoActive(false); }}
+                lassoActive={lassoActive}
+                onLassoToggle={() => {
+                  if (!lassoActive) setTool("pen");
+                  toggleLasso();
+                }}
+                activeColor={activeColor}
+                onColorChange={setActiveColor}
+                strokeWidth={strokeWidth}
+                onStrokeWidthChange={setStrokeWidth}
+                onInsertTextBox={handleInsertTextBox}
+                onInsertTable={handleInsertTable}
+                onInsertImage={handleInsertImage}
+                onUndo={handleUndoWrapped}
+                onRedo={handleRedoWrapped}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onClearCanvas={() => {
+                  if (confirm("Clear all strokes and stamps from this page?")) {
+                    pushUndo();
+                    setStrokes([]);
+                    setStamps([]);
+                  }
+                }}
+                onExportImage={() => {
+                  const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
+                  if (!dataUrl) return;
+                  const link = document.createElement("a");
+                  link.download = `${currentPage || "canvas"}.png`;
+                  link.href = dataUrl;
+                  link.click();
+                }}
+              />
 
-            {!panelOpen && (
-              <div className="noteometry-canvas-actions">
+              <div className="noteometry-zoom-controls">
                 <button
-                  className="noteometry-canvas-action-btn"
-                  onClick={() => setPanelOpen(true)}
-                  title="Open panel"
+                  className="noteometry-zoom-btn"
+                  onClick={zoomOut}
+                  disabled={zoomLocked || zoom <= 0.25}
+                  title="Zoom out"
+                  aria-label="Zoom out"
                 >
-                  ◨ Panel
+                  ZOOM −
+                </button>
+                <button
+                  className="noteometry-zoom-btn noteometry-zoom-percent"
+                  onClick={resetZoom}
+                  disabled={zoomLocked}
+                  title="Reset zoom to 100%"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  className="noteometry-zoom-btn"
+                  onClick={zoomIn}
+                  disabled={zoomLocked || zoom >= 4}
+                  title="Zoom in"
+                  aria-label="Zoom in"
+                >
+                  ZOOM +
+                </button>
+                <button
+                  className={`noteometry-zoom-btn noteometry-zoom-lock ${zoomLocked ? "locked" : ""}`}
+                  onClick={toggleZoomLock}
+                  title={zoomLocked ? "Unlock zoom (currently LOCKED)" : "Lock zoom (prevents accidental changes)"}
+                  aria-label={zoomLocked ? "Unlock zoom" : "Lock zoom"}
+                >
+                  {zoomLocked ? "LOCK" : "UNLK"}
                 </button>
               </div>
-            )}
+            </div>
 
-            {/* Ink canvas */}
-            <InkCanvas
-              strokes={strokes}
-              onStrokesChange={handleStrokesChange}
-              stamps={stamps}
-              onStampsChange={handleStampsChange}
-              onEraseStart={onEraseStart}
-              onEraseEnd={onEraseEnd}
-              activeColor={activeColor}
-              strokeWidth={strokeWidth}
-              tool={tool}
-              onToolChange={setTool}
-              scrollX={scrollX}
-              scrollY={scrollY}
-              zoom={zoom}
-              onViewportChange={handleViewportChange}
-              disabled={lassoActive}
-              selectedStampId={selectedStampId}
-            />
+            {/* ── Viewport: the actual drawing surface ── */}
+            <div ref={viewportRef} className="noteometry-canvas-viewport">
+              {!panelOpen && (
+                <div className="noteometry-canvas-actions">
+                  <button
+                    className="noteometry-canvas-action-btn"
+                    onClick={() => setPanelOpen(true)}
+                    title="Open panel"
+                  >
+                    ◨ Panel
+                  </button>
+                </div>
+              )}
 
-            {/* Canvas object overlays (text boxes, tables, images) */}
-            <CanvasObjectLayer
-              objects={canvasObjects}
-              onObjectsChange={setCanvasObjects}
-              scrollX={scrollX}
-              scrollY={scrollY}
-              zoom={zoom}
-              tool={tool}
-              selectedObjectId={selectedObjectId}
-              onSelectObject={setSelectedObjectId}
-              plugin={plugin}
-            />
+              {/* Ink canvas */}
+              <InkCanvas
+                strokes={strokes}
+                onStrokesChange={handleStrokesChange}
+                stamps={stamps}
+                onStampsChange={handleStampsChange}
+                onEraseStart={onEraseStart}
+                onEraseEnd={onEraseEnd}
+                activeColor={activeColor}
+                strokeWidth={strokeWidth}
+                tool={tool}
+                onToolChange={setTool}
+                scrollX={scrollX}
+                scrollY={scrollY}
+                zoom={zoom}
+                onViewportChange={handleViewportChange}
+                disabled={lassoActive}
+                selectedStampId={selectedStampId}
+              />
 
-            {/* Lasso overlay */}
-            <LassoOverlay
-              active={lassoActive}
-              containerRef={canvasAreaRef as React.RefObject<HTMLDivElement>}
-              regions={lassoRegions}
-              onComplete={handleLassoComplete}
-              onCancel={clearStack}
-              onClear={clearStack}
-              onProcess={handleProcessStack}
-              onMoveComplete={handleLassoMoveComplete}
-            />
+              {/* Canvas object overlays (text boxes, tables, images) */}
+              <CanvasObjectLayer
+                objects={canvasObjects}
+                onObjectsChange={setCanvasObjects}
+                scrollX={scrollX}
+                scrollY={scrollY}
+                zoom={zoom}
+                tool={tool}
+                selectedObjectId={selectedObjectId}
+                onSelectObject={setSelectedObjectId}
+                plugin={plugin}
+              />
 
-            {/* Zoom controls — floating pill, bottom-right */}
-            <div className="noteometry-zoom-controls">
-              <button
-                className="noteometry-zoom-btn"
-                onClick={zoomOut}
-                disabled={zoomLocked || zoom <= 0.25}
-                title="Zoom out"
-              >
-                −
-              </button>
-              <button
-                className="noteometry-zoom-btn noteometry-zoom-percent"
-                onClick={resetZoom}
-                disabled={zoomLocked}
-                title="Reset to 100%"
-              >
-                {Math.round(zoom * 100)}%
-              </button>
-              <button
-                className="noteometry-zoom-btn"
-                onClick={zoomIn}
-                disabled={zoomLocked || zoom >= 4}
-                title="Zoom in"
-              >
-                +
-              </button>
-              <button
-                className={`noteometry-zoom-btn noteometry-zoom-lock ${zoomLocked ? "locked" : ""}`}
-                onClick={toggleZoomLock}
-                title={zoomLocked ? "Unlock zoom" : "Lock zoom (prevents accidental changes)"}
-              >
-                {zoomLocked ? "L" : "U"}
-              </button>
+              {/* Lasso overlay — operates within the viewport only,
+                  so the lasso can't be drawn over the top toolbar */}
+              <LassoOverlay
+                active={lassoActive}
+                containerRef={viewportRef as React.RefObject<HTMLDivElement>}
+                regions={lassoRegions}
+                onComplete={handleLassoComplete}
+                onCancel={clearStack}
+                onClear={clearStack}
+                onProcess={handleProcessStack}
+                onMoveComplete={handleLassoMoveComplete}
+              />
             </div>
           </div>
 
