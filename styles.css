@@ -8,54 +8,70 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v2 — Tektronix workbench + engineering vellum
+   * Noteometry palette v3 — utility hammered military blue
    *
-   * Aesthetic target: you're at an EE lab bench in 1963, the scope is
-   * on, your engineering pad is in front of you, one warm desk lamp.
-   * Phase 4 pt 1 ships the color layer; typography layer (Plex fonts)
-   * is referenced but falls back to system fonts if not installed.
+   * Aesthetic target: WWII-era Tektronix workshop. The app frame is
+   * hammered navy equipment chassis with cream stencil labels and
+   * amber indicator LEDs. The canvas is blueprint paper — deep cyan
+   * with white drafting rules — inset into the chassis like a paper
+   * pad on a steel desk.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Primary accent — brass knob bezel, warm hover highlight */
-  --nm-accent: #b88c4a;
-  --nm-accent-light: rgba(184, 140, 74, 0.14);
-  --nm-accent-hover: #8f6b37;
+  /* Chassis — hammered navy equipment body. Three levels. */
+  --nm-chassis: #2b3340;           /* main chassis surface */
+  --nm-chassis-dark: #1b2028;      /* darker panels / sidebar depth */
+  --nm-chassis-light: #3a4554;     /* lighter highlight / raised surfaces */
+  --nm-chassis-fg: #eae6d5;        /* cream stencil text on chassis */
 
-  /* Phosphor — CRT amber glow for "active" / selected / LED-on states */
+  /* Canvas — blueprint paper */
+  --nm-canvas-bg: #103349;         /* deep blueprint cyan-blue */
+  --nm-canvas-bg-edge: #0c2838;    /* darker blueprint edge for subtle vignette */
+
+  /* Paper — cream panels that sit ON the blueprint canvas.
+   * Text boxes, tables, and image frames — the "draftsman's notebook"
+   * clipped onto the drafting board. Dark navy text on these. */
+  --nm-paper: #f0ead2;
+  --nm-paper-ink: #1a2a4a;         /* fountain pen navy — legible on paper */
+  --nm-paper-border: rgba(26, 42, 74, 0.18);
+
+  /* Accent — brushed aluminum trim. Primary highlight + hover. */
+  --nm-accent: #b8bec5;
+  --nm-accent-light: rgba(184, 190, 197, 0.14);
+  --nm-accent-hover: #d4d9de;
+
+  /* Phosphor — CRT amber glow for "active" / selected / LED-on states.
+   * Retained from the previous palette because amber on navy is one of
+   * the most legible "ON" signals ever invented. */
   --nm-phosphor: #ffb000;
-  --nm-phosphor-light: rgba(255, 176, 0, 0.18);
+  --nm-phosphor-light: rgba(255, 176, 0, 0.22);
 
-  /* Paper — aged engineering vellum, three levels of warmth */
-  --nm-warm-bg: #f1e7cd;         /* main vellum surface */
-  --nm-warm-bg-alt: #e8daae;     /* darker vellum for sidebars & panels */
-  --nm-canvas-bg: #f7efd8;       /* lightest — the drawing area itself */
+  /* Borders — cream-white at low opacity so edges feel like brushed bevels */
+  --nm-warm-border: rgba(234, 230, 213, 0.12);
+  --nm-warm-border-strong: rgba(234, 230, 213, 0.26);
 
-  /* Borders — ink navy at low opacity so they feel drawn, not computed */
-  --nm-warm-border: rgba(26, 42, 74, 0.15);
-  --nm-warm-border-strong: rgba(26, 42, 74, 0.28);
+  /* Legacy names kept as aliases so existing rules keep working.
+   * The old --nm-warm-bg/-alt variables are now dark chassis surfaces. */
+  --nm-warm-bg: var(--nm-chassis);
+  --nm-warm-bg-alt: var(--nm-chassis-dark);
 
-  /* Selection backgrounds — warm cream with brass tint */
-  --nm-section-active: #e0cd92;
+  /* Section selection — brushed steel + amber glow */
+  --nm-section-active: #4a5568;
 
-  /* Text & ink — fountain pen navy, not pure black */
-  --nm-ink: #1a2a4a;
-  --nm-ink-muted: #5c5547;       /* pencil graphite for labels / muted text */
+  /* Text layers */
+  --nm-ink: #eae6d5;               /* main cream stencil text */
+  --nm-ink-muted: #9ba5ae;         /* faded stencil / secondary labels */
 
   /* Semantic states */
-  --nm-danger: #c8382c;          /* signal red — ON/OFF LED, errors */
-  --nm-success: #6b7140;         /* military olive — success / "ready" states */
+  --nm-danger: #e24a3e;            /* signal red LED — errors, destructive */
+  --nm-success: #7ec84a;           /* indicator olive-green — ready / ok */
 
-  /* Chassis — deep charcoal for equipment faces (toolbar lands in Part 3) */
-  --nm-chassis: #2a241e;
-  --nm-chassis-fg: #e3cd95;
-
-  /* Geometry — machined, not extruded. Smaller radii feel like milled plastic. */
+  /* Geometry — machined, not extruded. Small radii feel like milled metal. */
   --nm-radius: 4px;
   --nm-radius-sm: 3px;
 
-  /* Shadows — warm, soft, low. Lit by a single desk lamp, not overhead. */
-  --nm-shadow-soft: 0 1px 4px rgba(26, 42, 74, 0.09), 0 0 1px rgba(26, 42, 74, 0.14);
-  --nm-shadow-toolbar: 0 3px 14px rgba(26, 42, 74, 0.11), 0 0 1px rgba(26, 42, 74, 0.20);
+  /* Shadows — cool, deep. Equipment under workshop lighting. */
+  --nm-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.32), 0 0 1px rgba(0, 0, 0, 0.45);
+  --nm-shadow-toolbar: 0 3px 14px rgba(0, 0, 0, 0.40), 0 0 1px rgba(0, 0, 0, 0.55);
 
   /* Typography — IBM Plex family if installed, graceful system fallback */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
@@ -63,10 +79,13 @@
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
 }
 
-/* Apply ink navy as the default text color on the plugin root so muted
- * variants still land on a warm base instead of black. */
+/* Apply cream stencil as the default text color on the plugin root so every
+ * child element inherits a legible base, and force the Obsidian text-normal
+ * variable for our scope so inherited rules don't bleed through as near-black. */
 .noteometry-container {
   color: var(--nm-ink);
+  --text-normal: var(--nm-ink);
+  --text-muted: var(--nm-ink-muted);
 }
 
 .noteometry-root {
@@ -496,7 +515,8 @@
   width: 100%;
   height: 100%;
   padding: 8px;
-  background: #fff;
+  background: var(--nm-paper);
+  color: var(--nm-paper-ink);
   font-family: var(--nm-font);
   overflow: auto;
   box-sizing: border-box;
@@ -574,7 +594,8 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--nm-paper);
+  color: var(--nm-paper-ink);
   font-family: var(--nm-font);
   box-sizing: border-box;
   overflow: hidden;
@@ -748,7 +769,7 @@
   border: 1px solid var(--nm-warm-border-strong);
   border-radius: var(--nm-radius);
   margin: 0 10px;
-  background: #fff;
+  background: var(--nm-chassis-light);
   box-shadow: var(--nm-shadow-soft);
 }
 
@@ -903,8 +924,8 @@
   width: 34px;
   height: 30px;
   padding: 0;
-  background: #fff;
-  color: var(--text-normal);
+  background: var(--nm-chassis-light);
+  color: var(--nm-ink);
   border: 1px solid var(--nm-warm-border);
   border-radius: 4px;
   cursor: pointer;
@@ -974,7 +995,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #fff;
+  background: var(--nm-chassis-light);
   border: 1px solid var(--nm-warm-border-strong);
   border-radius: var(--nm-radius);
   margin: 0 10px 10px;
@@ -1382,9 +1403,10 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 .noteometry-canvas-object {
-  border: 1px solid var(--nm-warm-border-strong);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius-sm);
-  background: #fff;
+  background: var(--nm-paper);
+  color: var(--nm-paper-ink);
   box-shadow: var(--nm-shadow-soft);
   display: flex;
   flex-direction: column;

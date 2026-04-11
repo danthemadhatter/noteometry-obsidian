@@ -7,13 +7,16 @@ import {
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
 
+// Stencil palette — bright colors legible on the blueprint-cyan canvas.
+// Pre-Phase-4 the defaults were near-black on near-white, which inverts
+// completely on the v3 palette (dark canvas). These are the replacements.
 const INK_COLORS = [
-  { color: "#1e1e1e", label: "Black" },
-  { color: "#e03131", label: "Red" },
-  { color: "#2f9e44", label: "Green" },
-  { color: "#1971c2", label: "Blue" },
-  { color: "#f08c00", label: "Orange" },
-  { color: "#7950f2", label: "Purple" },
+  { color: "#eae6d5", label: "Chalk" },
+  { color: "#ffb000", label: "Amber" },
+  { color: "#ff5555", label: "Signal Red" },
+  { color: "#7ec84a", label: "Phosphor Green" },
+  { color: "#6fc0ff", label: "Sky Blue" },
+  { color: "#d47fff", label: "Magenta" },
 ];
 
 const STROKE_WIDTHS = [
