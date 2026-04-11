@@ -8,92 +8,96 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v4 — hammered military chassis + light
-   * engineering paper
+   * Noteometry palette v5 — nuclear analog faceplate
    *
-   * Mental model: you're at a Navy workshop bench. The equipment frame
-   * is hammered navy steel with cream stencil labels and amber LEDs.
-   * Clipped onto the bench is a light engineering pad with blueprint
-   * rules — pale enough that you can draft on it in a regular black
-   * pencil. Chat bubbles and input fields are cream paper chits on
-   * the dark equipment face (readouts + input strips).
+   * References: Hammarlund SP-600 receiver faceplate, CD V-700 Geiger
+   * counter meter face, Tektronix 545A oscilloscope front panel,
+   * Hallicrafters SX-88 dial plate. Classic 1950s-60s test equipment.
+   *
+   * The pattern: cream tan faceplate with BLACK silkscreen labels,
+   * gunmetal trim between sections, amber LED backlighting, traditional
+   * dark ink. The equipment cabinet around the faceplate might be dark
+   * metal, but the FACE you interact with is warm cream. I was inverting
+   * this for three palette iterations — now it's right.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Chassis — hammered navy equipment body */
-  --nm-chassis: #313a4a;           /* main chassis surface (slightly brighter than v3) */
-  --nm-chassis-dark: #1f2631;      /* deeper panels / sidebar depth */
-  --nm-chassis-light: #45516a;     /* raised highlight surfaces */
-  --nm-chassis-fg: #f4f0e0;        /* cream stencil text — brightened for contrast */
+  /* Faceplate — cream tan, the main interactive surface. Four shades. */
+  --nm-faceplate: #d6c095;         /* main tan faceplate */
+  --nm-faceplate-alt: #c4ad7f;     /* recessed panels, sidebars */
+  --nm-faceplate-light: #e2cfa3;   /* raised highlights, button faces */
+  --nm-faceplate-recessed: #b39f6f; /* inset controls, pressed state */
 
-  /* Canvas — light engineering paper with pale blue tint.
-   * Pale enough for dark ink to read, tinted enough to match the
-   * military palette instead of looking like plain white paper. */
-  --nm-canvas-bg: #e5ecf0;         /* pale blueprint-tinted paper */
-  --nm-canvas-bg-edge: #d0dae3;    /* slightly darker edge */
+  /* Canvas — slightly brighter cream for the drawing surface.
+   * Graph paper clipped onto the equipment face. Blueprint blue grid. */
+  --nm-canvas-bg: #e5d4a5;
+  --nm-canvas-bg-edge: #d1bf8a;
 
-  /* Paper — cream chit/readout panels that sit on the DARK chassis
-   * (chat bubbles, input strips, text-box interiors). Dark ink on these. */
-  --nm-paper: #f4f0e0;             /* cream paper */
-  --nm-paper-ink: #1a2a4a;         /* fountain pen navy — dark text on paper */
-  --nm-paper-muted: #5a5548;       /* muted label text on paper */
-  --nm-paper-border: rgba(26, 42, 74, 0.26);
+  /* Gunmetal — the dark metal trim between cream faceplate panels.
+   * Bezels, dividers, raised edges on equipment seams. */
+  --nm-gunmetal: #3a4050;
+  --nm-gunmetal-light: #5a6072;
+  --nm-gunmetal-dark: #1f232e;
 
-  /* Accent — brushed steel + amber phosphor.
-   * The primary interactive highlight shifts to amber phosphor because
-   * it's the most legible "active" signal on both dark chassis and
-   * pale paper canvases. */
-  --nm-accent: #ffb000;            /* phosphor amber */
-  --nm-accent-light: rgba(255, 176, 0, 0.22);
-  --nm-accent-hover: #ffc94d;
+  /* Stencil ink — dark warm near-black for labels and text on cream */
+  --nm-ink: #1e1a0f;
+  --nm-ink-muted: #5c4f32;         /* faded stencil / secondary labels */
 
-  /* Brushed aluminum — secondary accent for chrome trim on chassis */
-  --nm-steel: #a5b0bc;
-  --nm-steel-light: rgba(165, 176, 188, 0.18);
-  --nm-steel-hover: #c2cad3;
+  /* Accent — brass knob tone, used for hover / secondary highlight */
+  --nm-accent: #a87825;
+  --nm-accent-light: rgba(168, 120, 37, 0.18);
+  --nm-accent-hover: #8a6018;
 
-  /* Phosphor aliases — kept for explicit LED-state uses */
+  /* Phosphor — amber LED glow, primary "active/selected" indicator.
+   * The CRT phosphor / neon indicator / backlit dial warmth that
+   * every piece of mid-century test gear uses to mean "this is live." */
   --nm-phosphor: #ffb000;
-  --nm-phosphor-light: rgba(255, 176, 0, 0.22);
-
-  /* Borders — cream at low opacity on dark chassis, navy on paper */
-  --nm-warm-border: rgba(244, 240, 224, 0.16);
-  --nm-warm-border-strong: rgba(244, 240, 224, 0.32);
-
-  /* Legacy name aliases so existing rules keep working */
-  --nm-warm-bg: var(--nm-chassis);
-  --nm-warm-bg-alt: var(--nm-chassis-dark);
-
-  /* Section selection — raised brushed steel */
-  --nm-section-active: #546281;
-
-  /* Text layers (for chassis surfaces) */
-  --nm-ink: #f4f0e0;               /* bright cream stencil on chassis */
-  --nm-ink-muted: #b8c2cc;         /* faded stencil — brightened for readability */
+  --nm-phosphor-light: rgba(255, 176, 0, 0.26);
 
   /* Semantic states */
-  --nm-danger: #e8574b;            /* signal red LED */
-  --nm-success: #8ed158;           /* indicator olive-green */
+  --nm-danger: #c8382c;            /* signal red — warning light */
+  --nm-success: #6b7140;           /* military olive — ready state */
+
+  /* Borders — gunmetal trim at moderate opacity */
+  --nm-warm-border: rgba(58, 64, 80, 0.24);
+  --nm-warm-border-strong: rgba(58, 64, 80, 0.42);
+
+  /* Section selection — pressed-in recessed faceplate with amber glow */
+  --nm-section-active: var(--nm-faceplate-recessed);
+
+  /* Legacy name aliases so existing rules keep working.
+   * Everything maps onto the new cream/gunmetal scheme. */
+  --nm-warm-bg: var(--nm-faceplate);
+  --nm-warm-bg-alt: var(--nm-faceplate-alt);
+  --nm-chassis: var(--nm-gunmetal);            /* dark metal frames */
+  --nm-chassis-dark: var(--nm-gunmetal-dark);
+  --nm-chassis-light: var(--nm-faceplate-light);
+  --nm-chassis-fg: var(--nm-ink);
+  --nm-paper: var(--nm-faceplate);             /* "paper" IS the faceplate */
+  --nm-paper-ink: var(--nm-ink);
+  --nm-paper-muted: var(--nm-ink-muted);
+  --nm-paper-border: var(--nm-warm-border-strong);
 
   /* Geometry — machined, not extruded */
   --nm-radius: 4px;
   --nm-radius-sm: 3px;
 
-  /* Shadows — cool, deep. Equipment under workshop lighting. */
-  --nm-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.32), 0 0 1px rgba(0, 0, 0, 0.45);
-  --nm-shadow-toolbar: 0 3px 14px rgba(0, 0, 0, 0.40), 0 0 1px rgba(0, 0, 0, 0.55);
+  /* Shadows — warm, moderate. Equipment under workshop lighting. */
+  --nm-shadow-soft: 0 1px 3px rgba(30, 26, 15, 0.22), 0 0 1px rgba(30, 26, 15, 0.30);
+  --nm-shadow-toolbar: 0 2px 10px rgba(30, 26, 15, 0.28), 0 0 1px rgba(30, 26, 15, 0.38);
 
-  /* Typography */
+  /* Typography — IBM Plex family if installed, graceful system fallback */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
 }
 
-/* Force text and background vars inside our scope so Obsidian's own
- * variables don't leak through as near-black on dark surfaces. */
+/* Force stencil-dark as the default text inside our scope. Anything
+ * inheriting --text-normal / --text-muted gets the new warm ink. */
 .noteometry-container {
   color: var(--nm-ink);
   --text-normal: var(--nm-ink);
   --text-muted: var(--nm-ink-muted);
+  --text-faint: var(--nm-ink-muted);
 }
 
 .noteometry-root {
@@ -1080,19 +1084,19 @@
   -webkit-user-select: text;
   cursor: text;
 }
-/* User messages — amber phosphor chip (the "you" label, burnt into the panel) */
+/* User messages — amber backlit indicator (the "transmit" dial glow) */
 .noteometry-chat-bubble.user {
   background: var(--nm-phosphor) !important;
-  color: var(--nm-paper-ink) !important;
+  color: var(--nm-ink) !important;
   border-radius: 4px;
-  border: 1px solid rgba(26, 42, 74, 0.35);
+  border: 1px solid var(--nm-warm-border-strong);
 }
-/* Assistant messages — cream paper chip (the readout strip on the chassis) */
+/* Assistant messages — raised faceplate readout panel with gunmetal trim */
 .noteometry-chat-bubble.assistant {
-  background: var(--nm-paper) !important;
-  color: var(--nm-paper-ink) !important;
+  background: var(--nm-faceplate-light) !important;
+  color: var(--nm-ink) !important;
   border-radius: 4px;
-  border: 1px solid var(--nm-paper-border);
+  border: 1px solid var(--nm-warm-border-strong);
 }
 
 /* Copy button on assistant messages */

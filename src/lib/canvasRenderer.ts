@@ -11,15 +11,15 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 12;
 const GRID_MAJOR = GRID_MINOR * 8; // 96px
 
-// Engineering pad — darker blueprint-blue rules on pale blue-tinted paper.
-// Readable for dark-ink drafting, consistent with the military palette.
-const GRID_MINOR_COLOR = "rgba(50, 90, 140, 0.22)";
-const GRID_MAJOR_COLOR = "rgba(50, 90, 140, 0.48)";
+// Graph paper lines on cream faceplate — slightly desaturated blueprint blue
+// that reads as "drafting grid printed on tan quadrille pad".
+const GRID_MINOR_COLOR = "rgba(58, 64, 80, 0.20)";
+const GRID_MAJOR_COLOR = "rgba(58, 64, 80, 0.42)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 1.0;
 
-// Pale engineering paper — matches --nm-canvas-bg in styles.css
-const GRID_BG_COLOR = "#e5ecf0";
+// Cream canvas — matches --nm-canvas-bg in styles.css
+const GRID_BG_COLOR = "#e5d4a5";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(
