@@ -116,7 +116,9 @@ export default function LassoOverlay({
     const offscreen = document.createElement("canvas");
     offscreen.width = cssSw;
     offscreen.height = cssSh;
-    const ctx = offscreen.getContext("2d");
+    // willReadFrequently: true — this offscreen is a source for drawImage
+    // into the ghost canvas during move drags (one drawImage per pointermove).
+    const ctx = offscreen.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
     ctx.drawImage(inkCanvas, pxSx, pxSy, pxSw, pxSh, 0, 0, cssSw, cssSh);
 

@@ -32,7 +32,12 @@ export function setupCanvas(
   canvas.height = height * dpr;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
-  const ctx = canvas.getContext("2d")!;
+  // willReadFrequently: true — html2canvas + the lasso move ghost capture
+  // repeatedly drawImage() from this canvas. Without this hint the browser
+  // keeps the bitmap GPU-side and each readback round-trips, causing the
+  // visible "tools go dead" lag that shows up as the Canvas2D warning in
+  // the console.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   ctx.scale(dpr, dpr);
   return ctx;
 }

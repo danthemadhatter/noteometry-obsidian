@@ -82,7 +82,10 @@ export async function compositeRegions(
   canvas.width = contentWidth + padding * 2;
   canvas.height = contentHeight + padding * 2;
 
-  const ctx = canvas.getContext("2d");
+  // willReadFrequently hint: toDataURL() below does a full pixel readback
+  // to encode the PNG, and the loaded region images are sourced for
+  // drawImage. Avoids the Canvas2D perf warning.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return null;
 
   // Background
