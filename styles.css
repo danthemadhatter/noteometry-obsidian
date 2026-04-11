@@ -1764,3 +1764,72 @@
   line-height: 1.35;
   white-space: normal;
 }
+
+/* ── Phase 4 Pt 2: zoom controls ─────────────────────── */
+.noteometry-zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius);
+  box-shadow: var(--nm-shadow-toolbar);
+  z-index: 400;
+  font-family: var(--nm-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.noteometry-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--nm-faceplate-light);
+  color: var(--nm-ink);
+  border: 1px solid var(--nm-warm-border);
+  border-radius: var(--nm-radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1;
+  transition: background 100ms, border-color 100ms;
+}
+
+.noteometry-zoom-btn:hover:not(:disabled) {
+  background: var(--nm-faceplate-recessed);
+  border-color: var(--nm-warm-border-strong);
+}
+
+.noteometry-zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.noteometry-zoom-percent {
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+}
+
+.noteometry-zoom-lock {
+  min-width: 28px;
+}
+
+.noteometry-zoom-lock.locked {
+  background: var(--nm-phosphor);
+  color: var(--nm-ink);
+  border-color: var(--nm-warm-border-strong);
+  box-shadow: 0 0 0 1px var(--nm-phosphor-light) inset;
+}
+
+.noteometry-zoom-lock.locked:hover {
+  background: var(--nm-phosphor);
+  filter: brightness(1.08);
+}

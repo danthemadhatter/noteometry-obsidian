@@ -11,6 +11,9 @@ interface Props {
   onObjectsChange: (objects: CanvasObject[]) => void;
   scrollX: number;
   scrollY: number;
+  /** Canvas zoom scale (1.0 = 100%). Applied as a CSS transform on the
+   *  scaled container so DOM overlays scale with the ink canvas. */
+  zoom?: number;
   tool: CanvasTool;
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
@@ -96,8 +99,13 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
 
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
+  zoom = 1,
   tool, selectedObjectId, onSelectObject, plugin,
 }: Props) {
+  // Mirror zoom into a ref so the drag/resize handlers (which close over
+  // stale values) always read the latest scale.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const dragState = useRef<{
     id: string;
     startX: number; startY: number;
@@ -123,17 +131,21 @@ export default function CanvasObjectLayer({
   }, [onSelectObject]);
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
+    // Screen-space delta → world-space delta: divide by zoom.
+    // This makes a 100px screen drag at 2x zoom move the object by
+    // 50 world units (which visually is 100 screen pixels).
+    const z = zoomRef.current;
     if (dragState.current) {
-      const dx = e.clientX - dragState.current.startX;
-      const dy = e.clientY - dragState.current.startY;
+      const dx = (e.clientX - dragState.current.startX) / z;
+      const dy = (e.clientY - dragState.current.startY) / z;
       const id = dragState.current.id;
       onObjectsChange(objects.map(o =>
         o.id === id ? { ...o, x: dragState.current!.objStartX + dx, y: dragState.current!.objStartY + dy } : o
       ));
     }
     if (resizeState.current) {
-      const dx = e.clientX - resizeState.current.startX;
-      const dy = e.clientY - resizeState.current.startY;
+      const dx = (e.clientX - resizeState.current.startX) / z;
+      const dy = (e.clientY - resizeState.current.startY) / z;
       const id = resizeState.current.id;
       onObjectsChange(objects.map(o =>
         o.id === id ? {
@@ -181,6 +193,21 @@ export default function CanvasObjectLayer({
         zIndex: 50,
       }}
     >
+      <div
+        className="noteometry-object-layer-scaled"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
+          // Child overlays position absolutely in world-space coords
+          // (obj.x - scrollX, obj.y - scrollY). This wrapper applies the
+          // zoom scale so everything tracks the ink canvas's ctx.scale.
+          transformOrigin: "0 0",
+          transform: `scale(${zoom})`,
+        }}
+      >
       {objects.map(obj => (
         <div
           key={obj.id}
@@ -250,6 +277,7 @@ export default function CanvasObjectLayer({
           />
         </div>
       ))}
+      </div>
     </div>
   );
 }

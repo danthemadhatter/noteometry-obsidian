@@ -17,6 +17,9 @@ interface Props {
   scrollX: number;
   scrollY: number;
   onViewportChange: (scrollX: number, scrollY: number) => void;
+  /** Current zoom scale (1.0 = 100%). Drawing and pointer math are
+   *  scaled accordingly. Default 1.0 if the caller doesn't pass it. */
+  zoom?: number;
   disabled?: boolean;
   selectedStampId?: string | null;
   onEraseStart?: () => void;
@@ -29,6 +32,7 @@ export default function InkCanvas({
   strokes, onStrokesChange, stamps, onStampsChange,
   activeColor, strokeWidth,
   tool, onToolChange, scrollX, scrollY, onViewportChange,
+  zoom = 1,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
 }: Props) {
@@ -43,6 +47,7 @@ export default function InkCanvas({
   const colorRef = useRef(activeColor);
   const widthRef = useRef(strokeWidth);
   const scrollRef = useRef({ x: scrollX, y: scrollY });
+  const zoomRef = useRef(zoom);
   const selectedStampIdRef = useRef(selectedStampId);
 
   // Active drawing state
@@ -72,6 +77,7 @@ export default function InkCanvas({
   useEffect(() => { colorRef.current = activeColor; }, [activeColor]);
   useEffect(() => { widthRef.current = strokeWidth; }, [strokeWidth]);
   useEffect(() => { scrollRef.current = { x: scrollX, y: scrollY }; }, [scrollX, scrollY]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { selectedStampIdRef.current = selectedStampId; }, [selectedStampId]);
 
   // ── Canvas sizing ──────────────────────────────────
@@ -95,13 +101,24 @@ export default function InkCanvas({
   }, []);
 
   // ── Drawing functions ──────────────────────────────
+  //
+  // Zoom math: the canvas pixel buffer is sized to (w * dpr) x (h * dpr).
+  // We apply ctx.setTransform(dpr*zoom, 0, 0, dpr*zoom, 0, 0) so that
+  // drawing commands in "world space" (minus scroll offset) land at the
+  // right screen pixels after DPR + zoom scaling. The VISIBLE region in
+  // world units shrinks as zoom grows: visibleW = w / zoom.
   const redrawGrid = useCallback(() => {
     const canvas = gridCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawGrid(ctx, scrollRef.current.x, scrollRef.current.y, sizeRef.current.w, sizeRef.current.h);
+    const zoom = zoomRef.current;
+    ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+    // drawGrid iterates from 0..worldW; at zoom=2, visibleW is half the
+    // CSS width, so we pass w/zoom to avoid drawing off-screen ticks.
+    const worldW = sizeRef.current.w / zoom;
+    const worldH = sizeRef.current.h / zoom;
+    drawGrid(ctx, scrollRef.current.x, scrollRef.current.y, worldW, worldH);
   }, []);
 
   const redrawInk = useCallback(() => {
@@ -109,10 +126,14 @@ export default function InkCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     const dpr = window.devicePixelRatio || 1;
+    const zoom = zoomRef.current;
+    // Clear first using an un-scaled transform so we wipe the full buffer.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const { w, h } = sizeRef.current;
     ctx.clearRect(0, 0, w, h);
-    drawAllStrokes(ctx, strokesRef.current, scrollRef.current.x, scrollRef.current.y, w, h);
+    // Now apply DPR × zoom for drawing.
+    ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+    drawAllStrokes(ctx, strokesRef.current, scrollRef.current.x, scrollRef.current.y, w / zoom, h / zoom);
     drawAllStamps(ctx, stampsRef.current, scrollRef.current.x, scrollRef.current.y);
 
     // Draw selection highlight around selected stamp
@@ -166,7 +187,7 @@ export default function InkCanvas({
     }
   }, []);
 
-  useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId]);
+  useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId, zoom]);
 
   // ── Pen/Eraser pointer handlers (NO touch — that's separate) ───
   const handlePointerDown = useCallback((e: PointerEvent) => {
@@ -199,8 +220,10 @@ export default function InkCanvas({
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left + scrollRef.current.x;
-    const y = e.clientY - rect.top + scrollRef.current.y;
+    // Screen coords → world coords: divide by zoom before adding scroll.
+    const z = zoomRef.current;
+    const x = (e.clientX - rect.left) / z + scrollRef.current.x;
+    const y = (e.clientY - rect.top) / z + scrollRef.current.y;
     const pressure = e.pressure > 0 ? e.pressure : 0.5;
 
     if (toolRef.current === "grab") {
@@ -221,7 +244,11 @@ export default function InkCanvas({
 
     if (toolRef.current === "eraser") {
       onEraseStart?.();
-      const tolerance = 10;
+      // Eraser tolerance is specified in screen pixels (visual radius),
+      // converted to world units by dividing by zoom. At 200% zoom a
+      // 10px visual eraser is 5 world units, so world-space hit-testing
+      // still feels consistent on screen.
+      const tolerance = 10 / z;
       const remainingStrokes = strokesRef.current.filter(s => !pointNearStroke(x, y, s, tolerance));
       if (remainingStrokes.length !== strokesRef.current.length) onStrokesChange(remainingStrokes);
       const remainingStamps = stampsRef.current.filter(st => {
@@ -244,8 +271,12 @@ export default function InkCanvas({
     if (e.pointerType === "touch") return;
 
     if (isGrabbingRef.current && grabLastRef.current) {
-      const dx = e.clientX - grabLastRef.current.x;
-      const dy = e.clientY - grabLastRef.current.y;
+      // Screen-space drag delta → world-space scroll delta: divide by zoom.
+      // At 2x zoom, dragging 100 screen px should move scroll by 50 world units
+      // so the content appears to move the full 100 px under the cursor.
+      const z = zoomRef.current;
+      const dx = (e.clientX - grabLastRef.current.x) / z;
+      const dy = (e.clientY - grabLastRef.current.y) / z;
       grabLastRef.current = { x: e.clientX, y: e.clientY };
       const newX = scrollRef.current.x - dx;
       const newY = scrollRef.current.y - dy;
@@ -261,8 +292,9 @@ export default function InkCanvas({
     const canvas = inkCanvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left + scrollRef.current.x;
-    const y = e.clientY - rect.top + scrollRef.current.y;
+    const z = zoomRef.current;
+    const x = (e.clientX - rect.left) / z + scrollRef.current.x;
+    const y = (e.clientY - rect.top) / z + scrollRef.current.y;
     const pressure = e.pressure > 0 ? e.pressure : 0.5;
 
     // Shape preview
@@ -273,7 +305,7 @@ export default function InkCanvas({
     }
 
     if (toolRef.current === "eraser") {
-      const tolerance = 10;
+      const tolerance = 10 / z;
       const remainingStrokes = strokesRef.current.filter(s => !pointNearStroke(x, y, s, tolerance));
       if (remainingStrokes.length !== strokesRef.current.length) onStrokesChange(remainingStrokes);
       const remainingStamps = stampsRef.current.filter(st => {
@@ -414,8 +446,9 @@ export default function InkCanvas({
       if (lastPanRef.current) {
         const touch = touchesRef.current.values().next().value;
         if (touch) {
-          const dx = touch.x - lastPanRef.current.x;
-          const dy = touch.y - lastPanRef.current.y;
+          const z = zoomRef.current;
+          const dx = (touch.x - lastPanRef.current.x) / z;
+          const dy = (touch.y - lastPanRef.current.y) / z;
           lastPanRef.current = { x: touch.x, y: touch.y };
           const newX = scrollRef.current.x - dx;
           const newY = scrollRef.current.y - dy;

@@ -68,6 +68,34 @@ export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Composition-layer state ─── */
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [zoomLocked, setZoomLocked] = useState(false);
+
+  // Zoom controls — bounds and step.
+  const ZOOM_MIN = 0.25;
+  const ZOOM_MAX = 4.0;
+  const ZOOM_STEP = 0.1;
+
+  const clampZoom = useCallback((z: number) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)), []);
+
+  const zoomIn = useCallback(() => {
+    if (zoomLocked) return;
+    setZoom((z) => clampZoom(Math.round((z + ZOOM_STEP) * 100) / 100));
+  }, [zoomLocked, clampZoom]);
+
+  const zoomOut = useCallback(() => {
+    if (zoomLocked) return;
+    setZoom((z) => clampZoom(Math.round((z - ZOOM_STEP) * 100) / 100));
+  }, [zoomLocked, clampZoom]);
+
+  const resetZoom = useCallback(() => {
+    if (zoomLocked) return;
+    setZoom(1);
+  }, [zoomLocked]);
+
+  const toggleZoomLock = useCallback(() => {
+    setZoomLocked((v) => !v);
+  }, []);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -322,26 +350,31 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, [lassoRegions, clearStack, setLassoActive, processCrop]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
-    // Convert lasso polygon from screen coords to scene coords
+    // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
+    // At 2x zoom, a screen bound of 100px maps to 50 world units.
+    const z = zoom;
     const scenePolygon = bounds.points.map((p) => ({
-      x: p.x + scrollX,
-      y: p.y + scrollY,
+      x: p.x / z + scrollX,
+      y: p.y / z + scrollY,
     }));
 
-    // Scene-space bounding box of the lasso (matches handleLassoComplete's object selection)
     const regionBounds = {
-      minX: bounds.minX + scrollX,
-      minY: bounds.minY + scrollY,
-      maxX: bounds.maxX + scrollX,
-      maxY: bounds.maxY + scrollY,
+      minX: bounds.minX / z + scrollX,
+      minY: bounds.minY / z + scrollY,
+      maxX: bounds.maxX / z + scrollX,
+      maxY: bounds.maxY / z + scrollY,
     };
+
+    // Delta is also in screen space (from the move drag overlay).
+    const worldDx = delta.dx / z;
+    const worldDy = delta.dy / z;
 
     pushUndo();
 
     // Move strokes inside lasso
     setStrokes(prev => prev.map(s => {
       if (strokeIntersectsPolygon(s, scenePolygon)) {
-        return { ...s, points: s.points.map(p => ({ ...p, x: p.x + delta.dx, y: p.y + delta.dy })) };
+        return { ...s, points: s.points.map(p => ({ ...p, x: p.x + worldDx, y: p.y + worldDy })) };
       }
       return s;
     }));
@@ -349,27 +382,26 @@ export default function NoteometryApp({ plugin, app }: Props) {
     // Move stamps inside lasso
     setStamps(prev => prev.map(s => {
       if (stampIntersectsPolygon(s, scenePolygon)) {
-        return { ...s, x: s.x + delta.dx, y: s.y + delta.dy };
+        return { ...s, x: s.x + worldDx, y: s.y + worldDy };
       }
       return s;
     }));
 
-    // Move canvas objects (text boxes, tables, images) whose bbox overlaps the lasso bounds.
-    // Uses the same overlap test as handleLassoComplete's OCR selection for consistency.
+    // Move canvas objects whose bbox overlaps the lasso bounds.
     setCanvasObjects(prev => prev.map(obj => {
       const objRight = obj.x + obj.w;
       const objBottom = obj.y + obj.h;
       const overlaps = !(objRight < regionBounds.minX || obj.x > regionBounds.maxX ||
                          objBottom < regionBounds.minY || obj.y > regionBounds.maxY);
       if (overlaps) {
-        return { ...obj, x: obj.x + delta.dx, y: obj.y + delta.dy };
+        return { ...obj, x: obj.x + worldDx, y: obj.y + worldDy };
       }
       return obj;
     }));
 
     setLassoActive(false);
     clearStack();
-  }, [scrollX, scrollY, pushUndo, setLassoActive, clearStack]);
+  }, [scrollX, scrollY, zoom, pushUndo, setLassoActive, clearStack]);
 
   // Chat send, solve from input, and symbol insertion all live in usePipeline now.
 
@@ -475,6 +507,28 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setScrollX(newX);
     setScrollY(newY);
   }, []);
+
+  /* ── Cmd/Ctrl + wheel → zoom (desktop) ─────────────────── */
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (zoomLocked) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      // Scroll up → zoom in; scroll down → zoom out.
+      // Sensitivity: ~1 wheel tick per 0.05 zoom step.
+      setZoom((z) => {
+        const delta = -e.deltaY * 0.005;
+        return clampZoom(Math.round((z + delta) * 100) / 100);
+      });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [zoomLocked, clampZoom]);
 
   /* ── Drag-and-drop math symbols onto canvas ──────────── */
   const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
@@ -644,6 +698,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onToolChange={setTool}
               scrollX={scrollX}
               scrollY={scrollY}
+              zoom={zoom}
               onViewportChange={handleViewportChange}
               disabled={lassoActive}
               selectedStampId={selectedStampId}
@@ -655,6 +710,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onObjectsChange={setCanvasObjects}
               scrollX={scrollX}
               scrollY={scrollY}
+              zoom={zoom}
               tool={tool}
               selectedObjectId={selectedObjectId}
               onSelectObject={setSelectedObjectId}
@@ -672,6 +728,41 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onProcess={handleProcessStack}
               onMoveComplete={handleLassoMoveComplete}
             />
+
+            {/* Zoom controls — floating pill, bottom-right */}
+            <div className="noteometry-zoom-controls">
+              <button
+                className="noteometry-zoom-btn"
+                onClick={zoomOut}
+                disabled={zoomLocked || zoom <= 0.25}
+                title="Zoom out"
+              >
+                −
+              </button>
+              <button
+                className="noteometry-zoom-btn noteometry-zoom-percent"
+                onClick={resetZoom}
+                disabled={zoomLocked}
+                title="Reset to 100%"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                className="noteometry-zoom-btn"
+                onClick={zoomIn}
+                disabled={zoomLocked || zoom >= 4}
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                className={`noteometry-zoom-btn noteometry-zoom-lock ${zoomLocked ? "locked" : ""}`}
+                onClick={toggleZoomLock}
+                title={zoomLocked ? "Unlock zoom" : "Lock zoom (prevents accidental changes)"}
+              >
+                {zoomLocked ? "L" : "U"}
+              </button>
+            </div>
           </div>
 
           {/* ── Right panel ── */}
