@@ -7,20 +7,66 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --nm-accent: #4A90D9;
-  --nm-accent-light: rgba(74, 144, 217, 0.12);
-  --nm-accent-hover: #3A7BC8;
-  --nm-warm-bg: #FAFAF8;
-  --nm-warm-bg-alt: #F5F4F0;
-  --nm-warm-border: rgba(0, 0, 0, 0.08);
-  --nm-warm-border-strong: rgba(0, 0, 0, 0.14);
-  --nm-section-active: #E8E4DC;
-  --nm-danger: #E25555;
-  --nm-radius: 10px;
-  --nm-radius-sm: 6px;
-  --nm-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
-  --nm-shadow-toolbar: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.12);
-  --nm-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  /* ══════════════════════════════════════════════════════════════════
+   * Noteometry palette v2 — Tektronix workbench + engineering vellum
+   *
+   * Aesthetic target: you're at an EE lab bench in 1963, the scope is
+   * on, your engineering pad is in front of you, one warm desk lamp.
+   * Phase 4 pt 1 ships the color layer; typography layer (Plex fonts)
+   * is referenced but falls back to system fonts if not installed.
+   * ══════════════════════════════════════════════════════════════════ */
+
+  /* Primary accent — brass knob bezel, warm hover highlight */
+  --nm-accent: #b88c4a;
+  --nm-accent-light: rgba(184, 140, 74, 0.14);
+  --nm-accent-hover: #8f6b37;
+
+  /* Phosphor — CRT amber glow for "active" / selected / LED-on states */
+  --nm-phosphor: #ffb000;
+  --nm-phosphor-light: rgba(255, 176, 0, 0.18);
+
+  /* Paper — aged engineering vellum, three levels of warmth */
+  --nm-warm-bg: #f1e7cd;         /* main vellum surface */
+  --nm-warm-bg-alt: #e8daae;     /* darker vellum for sidebars & panels */
+  --nm-canvas-bg: #f7efd8;       /* lightest — the drawing area itself */
+
+  /* Borders — ink navy at low opacity so they feel drawn, not computed */
+  --nm-warm-border: rgba(26, 42, 74, 0.15);
+  --nm-warm-border-strong: rgba(26, 42, 74, 0.28);
+
+  /* Selection backgrounds — warm cream with brass tint */
+  --nm-section-active: #e0cd92;
+
+  /* Text & ink — fountain pen navy, not pure black */
+  --nm-ink: #1a2a4a;
+  --nm-ink-muted: #5c5547;       /* pencil graphite for labels / muted text */
+
+  /* Semantic states */
+  --nm-danger: #c8382c;          /* signal red — ON/OFF LED, errors */
+  --nm-success: #6b7140;         /* military olive — success / "ready" states */
+
+  /* Chassis — deep charcoal for equipment faces (toolbar lands in Part 3) */
+  --nm-chassis: #2a241e;
+  --nm-chassis-fg: #e3cd95;
+
+  /* Geometry — machined, not extruded. Smaller radii feel like milled plastic. */
+  --nm-radius: 4px;
+  --nm-radius-sm: 3px;
+
+  /* Shadows — warm, soft, low. Lit by a single desk lamp, not overhead. */
+  --nm-shadow-soft: 0 1px 4px rgba(26, 42, 74, 0.09), 0 0 1px rgba(26, 42, 74, 0.14);
+  --nm-shadow-toolbar: 0 3px 14px rgba(26, 42, 74, 0.11), 0 0 1px rgba(26, 42, 74, 0.20);
+
+  /* Typography — IBM Plex family if installed, graceful system fallback */
+  --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
+  --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+}
+
+/* Apply ink navy as the default text color on the plugin root so muted
+ * variants still land on a warm base instead of black. */
+.noteometry-container {
+  color: var(--nm-ink);
 }
 
 .noteometry-root {
@@ -347,7 +393,7 @@
   min-width: 0;
   min-height: 0;
   /* Grid is drawn on the canvas layer (canvasRenderer.ts) so it scrolls with content */
-  background-color: #fafaf8;
+  background-color: var(--nm-canvas-bg);
 }
 
 /* ── Right panel ──────────────────────────────────────────── */

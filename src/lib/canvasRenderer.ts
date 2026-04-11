@@ -11,10 +11,15 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 12;
 const GRID_MAJOR = GRID_MINOR * 8; // 96px
 
-const GRID_MINOR_COLOR = "rgba(173, 216, 230, 0.35)";
-const GRID_MAJOR_COLOR = "rgba(173, 216, 230, 0.7)";
+// Blueprint grid on vellum — desaturated navy-ish blue at low alpha so the
+// lines read as drafting-pad rule, not as modern UI grid.
+const GRID_MINOR_COLOR = "rgba(100, 135, 175, 0.22)";
+const GRID_MAJOR_COLOR = "rgba(100, 135, 175, 0.48)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 1.0;
+
+// Vellum background — matches --nm-canvas-bg in styles.css
+const GRID_BG_COLOR = "#f7efd8";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(
@@ -42,8 +47,8 @@ export function drawGrid(
 ): void {
   ctx.clearRect(0, 0, width, height);
 
-  // Fill background
-  ctx.fillStyle = "#FAFAF8";
+  // Fill background (vellum)
+  ctx.fillStyle = GRID_BG_COLOR;
   ctx.fillRect(0, 0, width, height);
 
   // Calculate grid offset from scroll position

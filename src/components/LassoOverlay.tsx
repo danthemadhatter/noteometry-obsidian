@@ -233,7 +233,8 @@ export default function LassoOverlay({
       fillAlpha: number,
     ) => {
       if (pts.length > 2) {
-        ctx.fillStyle = `rgba(74, 144, 217, ${fillAlpha})`;
+        // Phosphor amber fill, very low alpha — the "active selection" tint
+        ctx.fillStyle = `rgba(255, 176, 0, ${fillAlpha})`;
         ctx.beginPath();
         ctx.moveTo(pts[0]!.x, pts[0]!.y);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -241,8 +242,11 @@ export default function LassoOverlay({
         ctx.fill();
       }
       if (pts.length >= 2) {
-        ctx.strokeStyle = "#4A90D9";
-        ctx.lineWidth = 2;
+        // Phosphor amber dashed outline — high contrast against vellum,
+        // distinct from the blueprint-blue canvas grid so selections are
+        // unambiguous against the background.
+        ctx.strokeStyle = "#ffb000";
+        ctx.lineWidth = 2.5;
         ctx.setLineDash([6, 4]);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
