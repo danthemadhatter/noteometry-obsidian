@@ -661,11 +661,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 canUndo={canUndo}
                 canRedo={canRedo}
                 onClearCanvas={() => {
-                  if (confirm("Clear all strokes and stamps from this page?")) {
-                    pushUndo();
-                    setStrokes([]);
-                    setStamps([]);
-                  }
+                  // Double confirmation per Dan's explicit request.
+                  // Clearing the whole canvas is destructive and easy
+                  // to trigger by accident; two explicit OKs prevent it.
+                  if (!confirm("Clear all strokes and stamps from this page?")) return;
+                  if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
+                  pushUndo();
+                  setStrokes([]);
+                  setStamps([]);
                 }}
                 onExportImage={() => {
                   const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);

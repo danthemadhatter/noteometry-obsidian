@@ -21,25 +21,29 @@
    * this for three palette iterations — now it's right.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Faceplate — cream tan, the main interactive surface. Four shades. */
-  --nm-faceplate: #d6c095;         /* main tan faceplate */
-  --nm-faceplate-alt: #c4ad7f;     /* recessed panels, sidebars */
-  --nm-faceplate-light: #e2cfa3;   /* raised highlights, button faces */
-  --nm-faceplate-recessed: #b39f6f; /* inset controls, pressed state */
+  /* Faceplate — pale warm off-white.
+   * v6 tones down the v5 tan (#d6c095) which Dan called "atomic blue
+   * with a hint of radiation" when combined with the amber/gray palette.
+   * Now it's a pale, cleaner cream that reads more like a polished
+   * iPad note app than a piece of Cold War test gear. */
+  --nm-faceplate: #ede8d2;         /* pale warm off-white */
+  --nm-faceplate-alt: #dfd9bf;     /* slightly darker for recessed panels */
+  --nm-faceplate-light: #f5f0dc;   /* raised highlights, button faces */
+  --nm-faceplate-recessed: #c8c0a0; /* inset controls, pressed state */
 
-  /* Canvas — slightly brighter cream for the drawing surface.
-   * Graph paper clipped onto the equipment face. Blueprint blue grid. */
-  --nm-canvas-bg: #e5d4a5;
-  --nm-canvas-bg-edge: #d1bf8a;
+  /* Canvas — near-white with a whisper of warmth. Reads clean, holds
+   * dark ink, no longer looks like graph paper (the "EKG" complaint). */
+  --nm-canvas-bg: #f7f4e8;
+  --nm-canvas-bg-edge: #ebe6cf;
 
-  /* Battleship gray — the Tek 545A cabinet. Warm mid blue-gray, the
-   * painted metal body the cream faceplate panels are mounted on.
-   * Shows through as the seam between adjacent cream panels and as
-   * the background behind the whole plugin view. */
-  --nm-cabinet: #6b7a8a;
-  --nm-cabinet-light: #8493a4;     /* highlight / raised bezel edge */
-  --nm-cabinet-dark: #4d5968;      /* shadow / recessed trim */
-  --nm-cabinet-deep: #323c48;      /* deepest inset shadow */
+  /* Cabinet gray — lighter and cooler than v5. Still a Tek 545A
+   * body color, just less saturated so it reads as "soft painted
+   * metal" rather than "battleship steel". Used mainly for the thin
+   * frame bezel + seams between panels. */
+  --nm-cabinet: #8591a0;
+  --nm-cabinet-light: #a3afbd;     /* highlight / raised bezel edge */
+  --nm-cabinet-dark: #6a7684;      /* shadow / recessed trim */
+  --nm-cabinet-deep: #4d5864;      /* deepest inset shadow */
 
   /* Gunmetal — reserved for very dark accents. Primary dark surface
    * is now --nm-cabinet (battleship gray). */
@@ -47,30 +51,34 @@
   --nm-gunmetal-light: #5a6072;
   --nm-gunmetal-dark: #1f232e;
 
-  /* Stencil ink — dark warm near-black for labels and text on cream */
-  --nm-ink: #1e1a0f;
-  --nm-ink-muted: #5c4f32;         /* faded stencil / secondary labels */
+  /* Ink — dark navy, not warm-black. Reads cleanly on the pale
+   * faceplate without feeling "ancient typewriter ribbon". */
+  --nm-ink: #23283a;
+  --nm-ink-muted: #626875;         /* secondary labels */
 
-  /* Accent — brass knob tone, used for hover / secondary highlight */
-  --nm-accent: #a87825;
-  --nm-accent-light: rgba(168, 120, 37, 0.18);
-  --nm-accent-hover: #8a6018;
+  /* Accent — soft warm olive, much less saturated than brass.
+   * v5 used bright brass + amber for hover/active which Dan called
+   * "atomic blue with radiation". Now we use a muted olive for
+   * hover and reserve amber for genuinely active states only. */
+  --nm-accent: #7a7340;
+  --nm-accent-light: rgba(122, 115, 64, 0.14);
+  --nm-accent-hover: #605a30;
 
-  /* Phosphor — amber LED glow, primary "active/selected" indicator.
-   * The CRT phosphor / neon indicator / backlit dial warmth that
-   * every piece of mid-century test gear uses to mean "this is live." */
-  --nm-phosphor: #ffb000;
-  --nm-phosphor-light: rgba(255, 176, 0, 0.26);
+  /* Phosphor — amber kept but used SPARINGLY. Only the currently-
+   * selected tool button gets the phosphor "on" glow; hovers and
+   * secondary affordances use the muted olive accent above. */
+  --nm-phosphor: #e9a825;
+  --nm-phosphor-light: rgba(233, 168, 37, 0.22);
 
   /* Semantic states */
-  --nm-danger: #c8382c;            /* signal red — warning light */
-  --nm-success: #6b7140;           /* military olive — ready state */
+  --nm-danger: #b73e34;            /* signal red */
+  --nm-success: #6b7140;           /* olive */
 
-  /* Borders — battleship-gray trim at moderate opacity. Reads as the
-   * seam where two cream faceplate panels meet, with the gray cabinet
-   * showing through. */
-  --nm-warm-border: rgba(77, 89, 104, 0.35);
-  --nm-warm-border-strong: rgba(77, 89, 104, 0.60);
+  /* Borders — soft cabinet-gray trim at lower opacity. The old v5
+   * 0.35/0.60 alpha was too heavy and read as "equipment seams";
+   * 0.18/0.30 is subtle enough to feel like modern UI hairlines. */
+  --nm-warm-border: rgba(80, 92, 106, 0.18);
+  --nm-warm-border-strong: rgba(80, 92, 106, 0.30);
 
   /* Section selection — pressed-in recessed faceplate with amber glow */
   --nm-section-active: var(--nm-faceplate-recessed);
@@ -92,9 +100,10 @@
   --nm-radius: 4px;
   --nm-radius-sm: 3px;
 
-  /* Shadows — warm, moderate. Equipment under workshop lighting. */
-  --nm-shadow-soft: 0 1px 3px rgba(30, 26, 15, 0.22), 0 0 1px rgba(30, 26, 15, 0.30);
-  --nm-shadow-toolbar: 0 2px 10px rgba(30, 26, 15, 0.28), 0 0 1px rgba(30, 26, 15, 0.38);
+  /* Shadows — softer, less heavy. Was "warm workshop lighting" in v5,
+   * now "clean iPad app elevation". Lower alphas, cooler tones. */
+  --nm-shadow-soft: 0 1px 2px rgba(35, 40, 58, 0.08), 0 0 1px rgba(35, 40, 58, 0.12);
+  --nm-shadow-toolbar: 0 2px 8px rgba(35, 40, 58, 0.10), 0 0 1px rgba(35, 40, 58, 0.16);
 
   /* Typography — IBM Plex family if installed, graceful system fallback */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;

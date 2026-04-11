@@ -8,18 +8,20 @@ import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
 import type { CanvasObject } from "./canvasObjects";
 
 // 1/8 inch at 96 DPI = 12px. Every 8th line is 1 inch (96px).
-const GRID_MINOR = 12;
-const GRID_MAJOR = GRID_MINOR * 8; // 96px
+const GRID_MINOR = 24;
+const GRID_MAJOR = GRID_MINOR * 4; // 96px
 
-// Graph paper lines on cream faceplate — slightly desaturated blueprint blue
-// that reads as "drafting grid printed on tan quadrille pad".
-const GRID_MINOR_COLOR = "rgba(58, 64, 80, 0.20)";
-const GRID_MAJOR_COLOR = "rgba(58, 64, 80, 0.42)";
+// Very subtle grid so the canvas reads as a clean writing surface
+// rather than graph paper. Dan called the previous grid "EKG" — this
+// version is barely visible: a hint of ruling for spatial awareness,
+// not a printed quadrille pad.
+const GRID_MINOR_COLOR = "rgba(80, 92, 106, 0.06)";
+const GRID_MAJOR_COLOR = "rgba(80, 92, 106, 0.12)";
 const GRID_MINOR_WIDTH = 0.5;
-const GRID_MAJOR_WIDTH = 1.0;
+const GRID_MAJOR_WIDTH = 0.75;
 
-// Cream canvas — matches --nm-canvas-bg in styles.css
-const GRID_BG_COLOR = "#e5d4a5";
+// Pale warm canvas — matches --nm-canvas-bg in styles.css
+const GRID_BG_COLOR = "#f7f4e8";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(
