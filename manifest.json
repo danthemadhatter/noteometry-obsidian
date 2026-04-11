@@ -1,7 +1,7 @@
 {
 	"id": "noteometry",
 	"name": "Noteometry",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"minAppVersion": "1.0.0",
 	"description": "Ink-first STEM notebook. Pencil + eraser + Math & Circuit Sniper. Claude AI + LM Studio.",
 	"author": "Dan",
