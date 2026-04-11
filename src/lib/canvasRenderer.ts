@@ -11,11 +11,10 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 24;
 const GRID_MAJOR = GRID_MINOR * 4; // 96px
 
-// Whisper-subtle grid — cool navy-blue at very low alpha, barely
-// visible as a ghost of drafting paper rule. No longer looks like
-// EKG / quadrille.
-const GRID_MINOR_COLOR = "rgba(51, 69, 88, 0.06)";
-const GRID_MAJOR_COLOR = "rgba(51, 69, 88, 0.12)";
+// Whisper-subtle grid — slightly teal-navy to match the atomic-age
+// chassis tone. Still very low alpha so the canvas reads clean.
+const GRID_MINOR_COLOR = "rgba(29, 90, 133, 0.06)";
+const GRID_MAJOR_COLOR = "rgba(29, 90, 133, 0.12)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 0.75;
 

@@ -30,13 +30,17 @@
    * accents — this flips it: BLUE chassis, cream cards on top.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Chassis — industrial blue enamel. DOMINANT surface color.
-   * Used for sidebar, right panel outer, toolbar, frame around
-   * everything. This is what the app "is". */
-  --nm-chassis: #334558;           /* primary industrial blue */
-  --nm-chassis-light: #46596e;     /* raised / highlight surfaces */
-  --nm-chassis-dark: #22303f;      /* recessed / shadow */
-  --nm-chassis-deep: #141c27;      /* deepest inset wells */
+  /* Chassis — "atomic blue vintage electrical": the saturated
+   * mid-navy with a teal undertone used on Weston voltmeter faces,
+   * Eico tube-tester cabinets, Heathkit test gear, and mid-century
+   * Frigidaire/Westinghouse appliance panels. Less "battleship gray
+   * military" than v7, more "optimistic atomic-age science fiction".
+   * The base tone is saturated enough to read distinctly as BLUE
+   * instead of gray-blue. */
+  --nm-chassis: #1d5a85;           /* primary atomic-age teal-navy */
+  --nm-chassis-light: #2a7ab0;     /* raised / highlight (brighter) */
+  --nm-chassis-dark: #14405e;      /* recessed / shadow */
+  --nm-chassis-deep: #0a2b40;      /* deepest inset wells */
   --nm-chassis-fg: #ede8d2;        /* cream stencil text on blue */
 
   /* Faceplate — cream paper inserts that sit ON the blue chassis.
