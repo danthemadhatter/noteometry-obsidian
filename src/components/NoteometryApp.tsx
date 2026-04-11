@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
-import { renderStrokesToImage, renderLassoRegionToImage } from "../lib/canvasRenderer";
+import { renderStrokesToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
@@ -19,6 +19,7 @@ import { useLasso } from "../features/lasso/useLasso";
 import { useObjects } from "../features/objects/useObjects";
 import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
+import { rasterizeRegion } from "../features/lasso/rasterize";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -278,48 +279,36 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const handleReadInkRef = useRef(handleReadInk);
   handleReadInkRef.current = handleReadInk;
 
-  /* ── Lasso complete → high-res crop of EVERYTHING visible ── */
+  /* ── Lasso complete → rasterize the visible region via dumb pipe ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
-    // Convert lasso polygon from screen coords to scene coords
-    const scenePolygon = bounds.points.map((p) => ({
-      x: p.x + scrollX,
-      y: p.y + scrollY,
-    }));
+    const container = canvasAreaRef.current;
+    if (!container) {
+      setLassoActive(false);
+      return;
+    }
 
-    // Scene-space bounding box of the lasso
-    const regionBounds = {
-      minX: bounds.minX + scrollX,
-      minY: bounds.minY + scrollY,
-      maxX: bounds.maxX + scrollX,
-      maxY: bounds.maxY + scrollY,
-    };
-
-    // Filter strokes AND stamps that intersect the lasso polygon
-    const selectedStrokes = strokes.filter((s) => strokeIntersectsPolygon(s, scenePolygon));
-    const selectedStamps = stamps.filter((s) => stampIntersectsPolygon(s, scenePolygon));
-
-    // Filter canvas objects that overlap the lasso bounding box
-    const selectedObjects = canvasObjects.filter((obj) => {
-      const objRight = obj.x + obj.w;
-      const objBottom = obj.y + obj.h;
-      return !(objRight < regionBounds.minX || obj.x > regionBounds.maxX ||
-               objBottom < regionBounds.minY || obj.y > regionBounds.maxY);
+    // Container-relative bounds (the lasso was drawn in screen coords
+    // relative to canvasAreaRef). The rasterizer captures whatever is
+    // visible in the region — ink strokes, stamps, canvas objects,
+    // text box contents, table cells, everything — by treating the DOM
+    // as an opaque pixel source. No filtering, no interpretation,
+    // no model-level reasoning about what's in the region.
+    const dataUrl = await rasterizeRegion(container, {
+      minX: bounds.minX,
+      minY: bounds.minY,
+      maxX: bounds.maxX,
+      maxY: bounds.maxY,
     });
 
-    if (selectedStrokes.length === 0 && selectedStamps.length === 0 && selectedObjects.length === 0) return;
-
-    // Render the full region (strokes + stamps + images/objects) at 3x for OCR
-    const dataUrl = await renderLassoRegionToImage(
-      regionBounds, selectedStrokes, selectedStamps, selectedObjects, 30, 3
-    );
     if (dataUrl) {
       pendingLassoCropRef.current = dataUrl;
-      // Lasso stays visible — user taps OCR to process, or lasso toggle to cancel
+      // Lasso stays visible — user taps OCR in the action bar to process.
     } else {
-      // Nothing captured — dismiss lasso
+      // Capture failed — dismiss lasso and surface the error.
       setLassoActive(false);
+      new Notice("Lasso capture failed — see console", 8000);
     }
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY]);
+  }, [setLassoActive, pendingLassoCropRef]);
 
   /* ── Lasso action bar → OCR or Move ──────────────────── */
   const handleLassoAction = useCallback((action: LassoAction, _bounds: LassoBounds) => {

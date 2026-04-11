@@ -36,6 +36,7 @@
 		"vitest": "^4.1.4"
 	},
 	"dependencies": {
+		"html2canvas": "^1.4.1",
 		"katex": "^0.16.45",
 		"obsidian": "latest",
 		"react": "^18.3.1",
