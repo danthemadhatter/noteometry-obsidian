@@ -1268,12 +1268,13 @@
   align-items: center;
   gap: 2px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 16px;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.15);
+  /* Raised cream faceplate panel — the equipment front panel where
+   * the controls are mounted. Gunmetal border, soft warm shadow. */
+  background: var(--nm-faceplate-light);
+  color: var(--nm-ink);
+  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: var(--nm-radius);
+  box-shadow: var(--nm-shadow-toolbar);
   pointer-events: auto;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1312,7 +1313,7 @@
   flex-shrink: 0;
 }
 .noteometry-toolbar-group + .noteometry-toolbar-group {
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid var(--nm-warm-border);
   margin-left: 2px;
   padding-left: 5px;
 }
@@ -1342,9 +1343,9 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--nm-radius-sm);
   cursor: pointer;
-  color: #3c3c43;
+  color: var(--nm-ink);
   transition: all 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1372,17 +1373,20 @@
   height: 13px !important;
 }
 .noteometry-toolbar-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--nm-accent-light);
 }
 .noteometry-toolbar-btn:active {
   transform: scale(0.92);
 }
+/* Active tool = amber phosphor LED "on" — matches the analog
+ * equipment aesthetic: the currently-selected knob is lit up. */
 .noteometry-toolbar-btn.active {
-  background: var(--nm-accent);
-  color: #fff;
+  background: var(--nm-phosphor);
+  color: var(--nm-ink);
+  box-shadow: inset 0 0 0 1px var(--nm-warm-border-strong);
 }
 .noteometry-toolbar-btn:disabled {
-  opacity: 0.25;
+  opacity: 0.3;
   cursor: default;
 }
 .noteometry-toolbar-btn:disabled:active {
@@ -1766,14 +1770,15 @@
 }
 
 /* ── Phase 4 Pt 2: zoom controls ─────────────────────── */
+/* Top-right so it doesn't compete with the bottom-center canvas toolbar */
 .noteometry-zoom-controls {
   position: absolute;
-  bottom: 16px;
-  right: 16px;
+  top: 12px;
+  right: 12px;
   display: flex;
   gap: 2px;
   padding: 3px;
-  background: var(--nm-faceplate);
+  background: var(--nm-faceplate-light);
   border: 1px solid var(--nm-warm-border-strong);
   border-radius: var(--nm-radius);
   box-shadow: var(--nm-shadow-toolbar);
