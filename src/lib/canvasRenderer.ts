@@ -11,15 +11,15 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 12;
 const GRID_MAJOR = GRID_MINOR * 8; // 96px
 
-// Blueprint paper — white drafting rules on deep cyan. These are the ACTUAL
-// colors of old blueprint reproductions from the ammonia-developed era.
-const GRID_MINOR_COLOR = "rgba(234, 230, 213, 0.16)";
-const GRID_MAJOR_COLOR = "rgba(234, 230, 213, 0.36)";
+// Engineering pad — darker blueprint-blue rules on pale blue-tinted paper.
+// Readable for dark-ink drafting, consistent with the military palette.
+const GRID_MINOR_COLOR = "rgba(50, 90, 140, 0.22)";
+const GRID_MAJOR_COLOR = "rgba(50, 90, 140, 0.48)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 1.0;
 
-// Blueprint cyan background — matches --nm-canvas-bg in styles.css
-const GRID_BG_COLOR = "#103349";
+// Pale engineering paper — matches --nm-canvas-bg in styles.css
+const GRID_BG_COLOR = "#e5ecf0";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(

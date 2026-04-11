@@ -8,64 +8,73 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v3 — utility hammered military blue
+   * Noteometry palette v4 — hammered military chassis + light
+   * engineering paper
    *
-   * Aesthetic target: WWII-era Tektronix workshop. The app frame is
-   * hammered navy equipment chassis with cream stencil labels and
-   * amber indicator LEDs. The canvas is blueprint paper — deep cyan
-   * with white drafting rules — inset into the chassis like a paper
-   * pad on a steel desk.
+   * Mental model: you're at a Navy workshop bench. The equipment frame
+   * is hammered navy steel with cream stencil labels and amber LEDs.
+   * Clipped onto the bench is a light engineering pad with blueprint
+   * rules — pale enough that you can draft on it in a regular black
+   * pencil. Chat bubbles and input fields are cream paper chits on
+   * the dark equipment face (readouts + input strips).
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Chassis — hammered navy equipment body. Three levels. */
-  --nm-chassis: #2b3340;           /* main chassis surface */
-  --nm-chassis-dark: #1b2028;      /* darker panels / sidebar depth */
-  --nm-chassis-light: #3a4554;     /* lighter highlight / raised surfaces */
-  --nm-chassis-fg: #eae6d5;        /* cream stencil text on chassis */
+  /* Chassis — hammered navy equipment body */
+  --nm-chassis: #313a4a;           /* main chassis surface (slightly brighter than v3) */
+  --nm-chassis-dark: #1f2631;      /* deeper panels / sidebar depth */
+  --nm-chassis-light: #45516a;     /* raised highlight surfaces */
+  --nm-chassis-fg: #f4f0e0;        /* cream stencil text — brightened for contrast */
 
-  /* Canvas — blueprint paper */
-  --nm-canvas-bg: #103349;         /* deep blueprint cyan-blue */
-  --nm-canvas-bg-edge: #0c2838;    /* darker blueprint edge for subtle vignette */
+  /* Canvas — light engineering paper with pale blue tint.
+   * Pale enough for dark ink to read, tinted enough to match the
+   * military palette instead of looking like plain white paper. */
+  --nm-canvas-bg: #e5ecf0;         /* pale blueprint-tinted paper */
+  --nm-canvas-bg-edge: #d0dae3;    /* slightly darker edge */
 
-  /* Paper — cream panels that sit ON the blueprint canvas.
-   * Text boxes, tables, and image frames — the "draftsman's notebook"
-   * clipped onto the drafting board. Dark navy text on these. */
-  --nm-paper: #f0ead2;
-  --nm-paper-ink: #1a2a4a;         /* fountain pen navy — legible on paper */
-  --nm-paper-border: rgba(26, 42, 74, 0.18);
+  /* Paper — cream chit/readout panels that sit on the DARK chassis
+   * (chat bubbles, input strips, text-box interiors). Dark ink on these. */
+  --nm-paper: #f4f0e0;             /* cream paper */
+  --nm-paper-ink: #1a2a4a;         /* fountain pen navy — dark text on paper */
+  --nm-paper-muted: #5a5548;       /* muted label text on paper */
+  --nm-paper-border: rgba(26, 42, 74, 0.26);
 
-  /* Accent — brushed aluminum trim. Primary highlight + hover. */
-  --nm-accent: #b8bec5;
-  --nm-accent-light: rgba(184, 190, 197, 0.14);
-  --nm-accent-hover: #d4d9de;
+  /* Accent — brushed steel + amber phosphor.
+   * The primary interactive highlight shifts to amber phosphor because
+   * it's the most legible "active" signal on both dark chassis and
+   * pale paper canvases. */
+  --nm-accent: #ffb000;            /* phosphor amber */
+  --nm-accent-light: rgba(255, 176, 0, 0.22);
+  --nm-accent-hover: #ffc94d;
 
-  /* Phosphor — CRT amber glow for "active" / selected / LED-on states.
-   * Retained from the previous palette because amber on navy is one of
-   * the most legible "ON" signals ever invented. */
+  /* Brushed aluminum — secondary accent for chrome trim on chassis */
+  --nm-steel: #a5b0bc;
+  --nm-steel-light: rgba(165, 176, 188, 0.18);
+  --nm-steel-hover: #c2cad3;
+
+  /* Phosphor aliases — kept for explicit LED-state uses */
   --nm-phosphor: #ffb000;
   --nm-phosphor-light: rgba(255, 176, 0, 0.22);
 
-  /* Borders — cream-white at low opacity so edges feel like brushed bevels */
-  --nm-warm-border: rgba(234, 230, 213, 0.12);
-  --nm-warm-border-strong: rgba(234, 230, 213, 0.26);
+  /* Borders — cream at low opacity on dark chassis, navy on paper */
+  --nm-warm-border: rgba(244, 240, 224, 0.16);
+  --nm-warm-border-strong: rgba(244, 240, 224, 0.32);
 
-  /* Legacy names kept as aliases so existing rules keep working.
-   * The old --nm-warm-bg/-alt variables are now dark chassis surfaces. */
+  /* Legacy name aliases so existing rules keep working */
   --nm-warm-bg: var(--nm-chassis);
   --nm-warm-bg-alt: var(--nm-chassis-dark);
 
-  /* Section selection — brushed steel + amber glow */
-  --nm-section-active: #4a5568;
+  /* Section selection — raised brushed steel */
+  --nm-section-active: #546281;
 
-  /* Text layers */
-  --nm-ink: #eae6d5;               /* main cream stencil text */
-  --nm-ink-muted: #9ba5ae;         /* faded stencil / secondary labels */
+  /* Text layers (for chassis surfaces) */
+  --nm-ink: #f4f0e0;               /* bright cream stencil on chassis */
+  --nm-ink-muted: #b8c2cc;         /* faded stencil — brightened for readability */
 
   /* Semantic states */
-  --nm-danger: #e24a3e;            /* signal red LED — errors, destructive */
-  --nm-success: #7ec84a;           /* indicator olive-green — ready / ok */
+  --nm-danger: #e8574b;            /* signal red LED */
+  --nm-success: #8ed158;           /* indicator olive-green */
 
-  /* Geometry — machined, not extruded. Small radii feel like milled metal. */
+  /* Geometry — machined, not extruded */
   --nm-radius: 4px;
   --nm-radius-sm: 3px;
 
@@ -73,15 +82,14 @@
   --nm-shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.32), 0 0 1px rgba(0, 0, 0, 0.45);
   --nm-shadow-toolbar: 0 3px 14px rgba(0, 0, 0, 0.40), 0 0 1px rgba(0, 0, 0, 0.55);
 
-  /* Typography — IBM Plex family if installed, graceful system fallback */
+  /* Typography */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
 }
 
-/* Apply cream stencil as the default text color on the plugin root so every
- * child element inherits a legible base, and force the Obsidian text-normal
- * variable for our scope so inherited rules don't bleed through as near-black. */
+/* Force text and background vars inside our scope so Obsidian's own
+ * variables don't leak through as near-black on dark surfaces. */
 .noteometry-container {
   color: var(--nm-ink);
   --text-normal: var(--nm-ink);
@@ -826,19 +834,23 @@
 .noteometry-panel-textarea {
   flex: 1;
   width: 100%;
-  padding: 4px 14px;
-  font-family: var(--font-monospace);
+  padding: 8px 14px;
+  font-family: var(--nm-font-mono);
   font-size: 13px;
   line-height: 1.6;
-  background: transparent;
-  color: var(--text-normal);
-  border: none;
+  background: var(--nm-paper);
+  color: var(--nm-paper-ink);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: var(--nm-radius-sm);
   resize: none;
   box-sizing: border-box;
   min-height: 40px;
+  margin: 6px 8px;
 }
 .noteometry-panel-textarea:focus {
   outline: none;
+  border-color: var(--nm-phosphor);
+  box-shadow: 0 0 0 2px var(--nm-phosphor-light);
 }
 
 .noteometry-panel-raw {
@@ -1068,16 +1080,19 @@
   -webkit-user-select: text;
   cursor: text;
 }
+/* User messages — amber phosphor chip (the "you" label, burnt into the panel) */
 .noteometry-chat-bubble.user {
-  background: var(--nm-accent) !important;
-  color: #fff !important;
-  border-radius: 18px 18px 4px 18px;
+  background: var(--nm-phosphor) !important;
+  color: var(--nm-paper-ink) !important;
+  border-radius: 4px;
+  border: 1px solid rgba(26, 42, 74, 0.35);
 }
+/* Assistant messages — cream paper chip (the readout strip on the chassis) */
 .noteometry-chat-bubble.assistant {
-  background: var(--nm-warm-bg-alt) !important;
-  color: var(--text-normal) !important;
-  border-radius: 18px 18px 18px 4px;
-  border: 1px solid var(--nm-warm-border);
+  background: var(--nm-paper) !important;
+  color: var(--nm-paper-ink) !important;
+  border-radius: 4px;
+  border: 1px solid var(--nm-paper-border);
 }
 
 /* Copy button on assistant messages */
@@ -1165,10 +1180,10 @@
   flex: 1;
   padding: 8px 14px;
   font-size: 13px;
-  background: var(--nm-warm-bg-alt);
-  color: var(--text-normal);
-  border: 1px solid var(--nm-warm-border);
-  border-radius: 20px;
+  background: var(--nm-paper);
+  color: var(--nm-paper-ink);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: 4px;
   resize: none;
   line-height: 1.4;
   font-family: var(--nm-font);
@@ -1176,10 +1191,10 @@
 }
 .noteometry-chat-textarea:focus {
   outline: none;
-  border-color: var(--nm-accent);
-  box-shadow: 0 0 0 2px var(--nm-accent-light);
+  border-color: var(--nm-phosphor);
+  box-shadow: 0 0 0 2px var(--nm-phosphor-light);
 }
-.noteometry-chat-textarea::placeholder { color: var(--text-faint); }
+.noteometry-chat-textarea::placeholder { color: var(--nm-paper-muted); }
 
 .noteometry-chat-send-btn {
   display: flex;

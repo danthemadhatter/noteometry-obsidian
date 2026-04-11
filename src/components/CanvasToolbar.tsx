@@ -7,16 +7,16 @@ import {
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
 
-// Stencil palette — bright colors legible on the blueprint-cyan canvas.
-// Pre-Phase-4 the defaults were near-black on near-white, which inverts
-// completely on the v3 palette (dark canvas). These are the replacements.
+// Traditional ink palette — dark colors that read on the pale engineering
+// paper canvas. Default is fountain pen navy (reads as black, feels like
+// fountain pen on vellum rather than harsh true black).
 const INK_COLORS = [
-  { color: "#eae6d5", label: "Chalk" },
-  { color: "#ffb000", label: "Amber" },
-  { color: "#ff5555", label: "Signal Red" },
-  { color: "#7ec84a", label: "Phosphor Green" },
-  { color: "#6fc0ff", label: "Sky Blue" },
-  { color: "#d47fff", label: "Magenta" },
+  { color: "#1a2a4a", label: "Ink" },
+  { color: "#c8382c", label: "Signal Red" },
+  { color: "#3a7a2e", label: "Engineer Green" },
+  { color: "#1f4b8e", label: "Drafting Blue" },
+  { color: "#b5651d", label: "Rust Orange" },
+  { color: "#5d3b8e", label: "Purple" },
 ];
 
 const STROKE_WIDTHS = [

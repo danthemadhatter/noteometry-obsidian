@@ -52,9 +52,9 @@ export function useInk(): UseInkReturn {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [stamps, setStamps] = useState<Stamp[]>([]);
   const [tool, setToolState] = useState<CanvasTool>("select");
-  // Cream stencil — the default "chalk" color on the blueprint canvas.
-  // Pre-Phase-4 this was near-black which is invisible on dark cyan.
-  const [activeColor, setActiveColor] = useState("#eae6d5");
+  // Fountain pen navy — reads as "black enough" on the pale canvas, less
+  // harsh than pure #000, consistent with the military palette's ink tone.
+  const [activeColor, setActiveColor] = useState("#1a2a4a");
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
   const [pendingSymbol, setPendingSymbol] = useState<string | null>(null);
