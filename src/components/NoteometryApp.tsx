@@ -1,20 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
-import type { ChatMessage, Attachment } from "../types";
-import type { Stroke, Stamp } from "../lib/inkEngine";
-import type { CanvasObject } from "../lib/canvasObjects";
-import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox } from "../lib/inkEngine";
+import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage, renderLassoRegionToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject } from "../lib/canvasObjects";
-import { newStampId } from "../lib/inkEngine";
-import { readInk, chat, solve } from "../lib/ai";
-import {
-  savePage, loadPage, listSections, listPages,
-  createSection, createPage, migrateLegacy, migrateJsonToMd, migrateDotAttachments,
-  saveImageToVault, loadImageFromVault, migrateBase64Images,
-  CanvasData,
-} from "../lib/persistence";
+import { savePage, saveImageToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasToolbar from "./CanvasToolbar";
 import CanvasObjectLayer from "./CanvasObjectLayer";
@@ -24,6 +14,11 @@ import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds, LassoAction } from "./LassoOverlay";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback } from "../lib/tableStore";
+import { useInk } from "../features/ink/useInk";
+import { useLasso } from "../features/lasso/useLasso";
+import { useObjects } from "../features/objects/useObjects";
+import { usePipeline } from "../features/pipeline/usePipeline";
+import { usePages } from "../features/pages/usePages";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -34,30 +29,51 @@ interface Props {
 export let flushSave: (() => Promise<void>) | null = null;
 
 export default function NoteometryApp({ plugin, app }: Props) {
-  /* ── Canvas state ────────────────────────────────────── */
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [stamps, setStamps] = useState<Stamp[]>([]);
-  const [canvasObjects, setCanvasObjects] = useState<CanvasObject[]>([]);
+  /* ── Ink feature: strokes, stamps, tool, color, width, undo/redo ─── */
+  const {
+    strokes, stamps, tool, activeColor, strokeWidth,
+    selectedStampId, pendingSymbol, canUndo, canRedo,
+    setStrokes, setStamps, setTool, setActiveColor, setStrokeWidth,
+    setSelectedStampId, setPendingSymbol,
+    handleStrokesChange, handleStampsChange,
+    pushUndo, handleUndo, handleRedo, hydrate: hydrateInk,
+    onEraseStart, onEraseEnd,
+  } = useInk();
+
+  /* ── Lasso feature: active state + pending OCR crop ─── */
+  const {
+    lassoActive, setLassoActive, pendingCropRef: pendingLassoCropRef,
+  } = useLasso();
+
+  /* ── Objects feature: canvas objects + selection ─── */
+  const {
+    canvasObjects, selectedObjectId,
+    setCanvasObjects, setSelectedObjectId,
+    hydrate: hydrateObjects,
+  } = useObjects();
+
+  /* ── Pipeline feature: panel input + chat + READ INK + solve ─── */
+  const {
+    inputCode, chatMessages, isReading, chatLoading,
+    setInputCode, setChatMessages,
+    sendToChat, processCrop, handleSolveInput, handleInsertSymbol,
+    hydrate: hydratePipeline,
+  } = usePipeline(plugin);
+
+  /* ── Composition-layer state ─── */
   const [scrollX, setScrollX] = useState(0);
   const [scrollY, setScrollY] = useState(0);
-  const [tool, setTool] = useState<CanvasTool>("select");
-  const [activeColor, setActiveColor] = useState("#1e1e1e");
-  const [strokeWidth, setStrokeWidth] = useState(3);
-  const [lassoActive, setLassoActive] = useState(false);
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
-  const [pendingSymbol, setPendingSymbol] = useState<string | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Swipe blocking is handled in NoteometryView.ts at the view boundary
 
-  // Clear selection when switching away from select tool
+  // Clear canvas object selection when switching away from select tool.
+  // (Stamp selection is cleared inside useInk.)
   useEffect(() => {
     if (tool !== "select") {
       setSelectedObjectId(null);
-      setSelectedStampId(null);
     }
   }, [tool]);
 
@@ -121,43 +137,17 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedStampId(null);
   }, [tool, stamps, scrollX, scrollY, pendingSymbol, activeColor]);
 
-  /* ── Undo/Redo (snapshots of strokes + stamps) ────────── */
-  interface UndoSnapshot { strokes: Stroke[]; stamps: Stamp[] }
-  const undoStackRef = useRef<UndoSnapshot[]>([]);
-  const redoStackRef = useRef<UndoSnapshot[]>([]);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-
-  const pushUndo = useCallback(() => {
-    undoStackRef.current.push({ strokes, stamps });
-    redoStackRef.current = [];
-    setCanUndo(true);
-    setCanRedo(false);
-  }, [strokes, stamps]);
-
-  const handleUndo = useCallback(() => {
-    if (undoStackRef.current.length === 0) return;
-    const prev = undoStackRef.current.pop()!;
-    redoStackRef.current.push({ strokes, stamps });
-    setStrokes(prev.strokes);
-    setStamps(prev.stamps);
-    setSelectedStampId(null);
+  // Wrapped undo/redo that also clears cross-feature selection (canvas objects).
+  // Stamp selection is cleared inside useInk.
+  const handleUndoWrapped = useCallback(() => {
+    handleUndo();
     setSelectedObjectId(null);
-    setCanUndo(undoStackRef.current.length > 0);
-    setCanRedo(true);
-  }, [strokes, stamps]);
+  }, [handleUndo]);
 
-  const handleRedo = useCallback(() => {
-    if (redoStackRef.current.length === 0) return;
-    const next = redoStackRef.current.pop()!;
-    undoStackRef.current.push({ strokes, stamps });
-    setStrokes(next.strokes);
-    setStamps(next.stamps);
-    setSelectedStampId(null);
+  const handleRedoWrapped = useCallback(() => {
+    handleRedo();
     setSelectedObjectId(null);
-    setCanRedo(redoStackRef.current.length > 0);
-    setCanUndo(true);
-  }, [strokes, stamps]);
+  }, [handleRedo]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -167,39 +157,62 @@ export default function NoteometryApp({ plugin, app }: Props) {
         const editable = (e.target as HTMLElement)?.isContentEditable;
         if (tag === "INPUT" || tag === "TEXTAREA" || editable) return;
         e.preventDefault();
-        if (e.shiftKey) handleRedo();
-        else handleUndo();
+        if (e.shiftKey) handleRedoWrapped();
+        else handleUndoWrapped();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleUndo, handleRedo]);
-
-  /* ── Stroke changes (with undo tracking) ─────────────── */
-  const erasingRef = useRef(false);
-  const handleStrokesChange = useCallback((newStrokes: Stroke[]) => {
-    if (!erasingRef.current) pushUndo();
-    setStrokes(newStrokes);
-  }, [pushUndo]);
+  }, [handleUndoWrapped, handleRedoWrapped]);
 
   /* ── Panel state ──────────────────────────────────────── */
-  const [inputCode, setInputCode] = useState("");
-  const [isReading, setIsReading] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
-  /* ── Chat state ───────────────────────────────────────── */
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
-
-  /* ── Section / Page state ─────────────────────────────── */
-  const [currentSection, setCurrentSection] = useState("");
-  const [currentPage, setCurrentPage] = useState("");
-  const sectionRef = useRef("");
-  const pageRef = useRef("");
-
-  /* ── Persistence ──────────────────────────────────────── */
-  const [ready, setReady] = useState(false);
+  /* ── Persistence coordination ─────────────────────────── */
   const saveTimer = useRef<number>(0);
+  const loadingPageRef = useRef(false);
+
+  // Indirection ref: lets flushPendingSave call the latest saveNow without
+  // creating a circular dependency with usePages.
+  const saveNowRef = useRef<() => Promise<void>>(async () => {});
+
+  const flushPendingSave = useCallback(async () => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = 0;
+    }
+    await saveNowRef.current();
+  }, []);
+
+  const onPageLoaded = useCallback(async (data: CanvasData) => {
+    loadingPageRef.current = true;
+    hydratePipeline(data.panelInput ?? "", data.chatMessages ?? []);
+    hydrateInk(data.strokes ?? [], data.stamps ?? []);
+    hydrateObjects(data.canvasObjects ?? []);
+    loadAllTableData(data.tableData ?? {});
+    loadAllTextBoxData(data.textBoxData ?? {});
+    setScrollX(data.viewport?.scrollX ?? 0);
+    setScrollY(data.viewport?.scrollY ?? 0);
+    // Clear loading flag after React processes the state updates
+    requestAnimationFrame(() => { loadingPageRef.current = false; });
+  }, [hydratePipeline, hydrateInk, hydrateObjects]);
+
+  const onEmptyState = useCallback(() => {
+    loadingPageRef.current = true;
+    hydratePipeline("", []);
+    hydrateInk([], []);
+    hydrateObjects([]);
+    setScrollX(0);
+    setScrollY(0);
+    requestAnimationFrame(() => { loadingPageRef.current = false; });
+  }, [hydratePipeline, hydrateInk, hydrateObjects]);
+
+  /* ── Pages feature: section/page state + load lifecycle ── */
+  const {
+    currentSection, currentPage, ready,
+    sectionRef, pageRef,
+    selectPage: handleSelect,
+  } = usePages({ plugin, onPageLoaded, onEmptyState, flushPendingSave });
 
   const saveNow = useCallback(async () => {
     const sec = sectionRef.current;
@@ -219,7 +232,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
       lastSaved: new Date().toISOString(),
     };
     await savePage(plugin, sec, pg, data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin]);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, sectionRef, pageRef]);
+
+  // Keep the indirection ref up to date so flushPendingSave sees the latest saveNow.
+  useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
   const doSave = useCallback(() => {
     if (!plugin.settings.autoSave) return;
@@ -228,9 +244,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
     saveTimer.current = window.setTimeout(async () => {
       await saveNow();
     }, plugin.settings.autoSaveDelay);
-  }, [saveNow, plugin]);
+  }, [saveNow, plugin, sectionRef, pageRef]);
 
-  const loadingPageRef = useRef(false);
   useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
@@ -246,137 +261,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => { flushSave = null; };
   }, [saveNow]);
 
-  /* ── Section/page selection ──────────────────────────── */
-  const handleSelect = useCallback(async (section: string, page: string) => {
-    // Clear pending debounced save to prevent it firing for the wrong page
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = 0;
-    }
-    await saveNow();
+  /* ── READ INK → OCR → auto-solve (composition coordinator) ── */
 
-    if (section && !page) {
-      const pages = await listPages(plugin, section);
-      page = pages[0] ?? "";
-    }
-
-    sectionRef.current = section;
-    pageRef.current = page;
-    setCurrentSection(section);
-    setCurrentPage(page);
-
-    loadingPageRef.current = true;
-    if (section && page) {
-      const data = await loadPage(plugin, section, page);
-      setInputCode(data.panelInput ?? "");
-      setChatMessages(data.chatMessages ?? []);
-      setStrokes(data.strokes ?? []);
-      setStamps(data.stamps ?? []);
-      // Migrate base64 images to vault files
-      const objs = data.canvasObjects ?? [];
-      const imgResult = await migrateBase64Images(plugin, section, objs);
-      setCanvasObjects(imgResult.objects);
-      setScrollX(data.viewport?.scrollX ?? 0);
-      setScrollY(data.viewport?.scrollY ?? 0);
-      loadAllTableData(data.tableData ?? {});
-      loadAllTextBoxData(data.textBoxData ?? {});
-      undoStackRef.current = [];
-      redoStackRef.current = [];
-      setCanUndo(false);
-      setCanRedo(false);
-    } else {
-      setInputCode("");
-      setChatMessages([]);
-      setStrokes([]);
-      setStamps([]);
-      setCanvasObjects([]);
-      setScrollX(0);
-      setScrollY(0);
-    }
-    // Clear loading flag after React processes the state updates
-    requestAnimationFrame(() => { loadingPageRef.current = false; });
-  }, [plugin, saveNow]);
-
-  /* ── Initial load ────────────────────────────────────── */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await migrateJsonToMd(plugin);
-      await migrateDotAttachments(plugin);
-      const migrated = await migrateLegacy(plugin);
-      const secs = await listSections(plugin);
-      if (cancelled) return;
-
-      let sec = "";
-      let pg = "";
-
-      if (migrated) {
-        sec = migrated.section;
-        pg = migrated.page;
-      } else if (secs.length > 0) {
-        sec = secs[0]!;
-        const pages = await listPages(plugin, sec);
-        pg = pages[0] ?? "";
-      } else {
-        sec = "My Course";
-        pg = "Week 1";
-        await createSection(plugin, sec);
-        for (let i = 1; i <= 16; i++) {
-          await createPage(plugin, sec, `Week ${i}`);
-        }
-      }
-
-      if (cancelled) return;
-      sectionRef.current = sec;
-      pageRef.current = pg;
-      setCurrentSection(sec);
-      setCurrentPage(pg);
-
-      if (sec && pg) {
-        const data = await loadPage(plugin, sec, pg);
-        if (!cancelled) {
-          setInputCode(data.panelInput ?? "");
-          setChatMessages(data.chatMessages ?? []);
-          setStrokes(data.strokes ?? []);
-          setStamps(data.stamps ?? []);
-          // Migrate base64 images to vault files
-          const objs = data.canvasObjects ?? [];
-          const imgResult = await migrateBase64Images(plugin, sec, objs);
-          setCanvasObjects(imgResult.objects);
-          setScrollX(data.viewport?.scrollX ?? 0);
-          setScrollY(data.viewport?.scrollY ?? 0);
-          loadAllTableData(data.tableData ?? {});
-          loadAllTextBoxData(data.textBoxData ?? {});
-        }
-      }
-
-      if (!cancelled) setReady(true);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  /* ── Send to chat helper ─────────────────────────────── */
-  const sendToChat = async (userText: string, atts: Attachment[] = []) => {
-    const userMsg: ChatMessage = { role: "user", text: userText };
-    const newHistory = [...chatMessages, userMsg];
-    setChatMessages(newHistory);
-    setChatLoading(true);
-    try {
-      const res = await chat(newHistory, atts, plugin.settings);
-      setChatMessages((prev) => [...prev, {
-        role: "assistant",
-        text: res.ok ? res.text : (res.error ?? "No response"),
-      }]);
-    } catch {
-      setChatMessages((prev) => [...prev, { role: "assistant", text: "AI request failed." }]);
-    }
-    setChatLoading(false);
-  };
-
-  /* ── READ INK → OCR → auto-solve ────────────────────── */
-  const pendingLassoCropRef = useRef<string | null>(null);
-
-  const handleReadInk = async () => {
+  const handleReadInk = useCallback(async () => {
     const lassoCrop = pendingLassoCropRef.current;
     if (!lassoCrop) {
       setLassoActive(true);
@@ -384,36 +271,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
     pendingLassoCropRef.current = null;
     setLassoActive(false);
-
-    setIsReading(true);
-    try {
-      const res = await readInk(lassoCrop, plugin.settings);
-      if (res.ok && res.text.trim()) {
-        setInputCode(res.text);
-        setIsReading(false);
-        // Also send the original image as an attachment so the AI can see
-        // diagrams, figures, and context that text extraction might miss
-        const imgAttachment = {
-          name: "lasso-capture.png",
-          mimeType: "image/png",
-          data: lassoCrop,
-        };
-        await sendToChat(`Solve this:\n${res.text}`, [imgAttachment]);
-        return;
-      } else {
-        setChatMessages((prev) => [...prev, {
-          role: "assistant",
-          text: res.error ?? "READ INK couldn't extract anything from the selection.",
-        }]);
-      }
-    } catch {
-      setChatMessages((prev) => [...prev, {
-        role: "assistant",
-        text: "Vision API failed.",
-      }]);
-    }
-    setIsReading(false);
-  };
+    await processCrop(lassoCrop);
+  }, [pendingLassoCropRef, setLassoActive, processCrop]);
 
   // Keep a ref to handleReadInk so handleLassoComplete can call the latest version
   const handleReadInkRef = useRef(handleReadInk);
@@ -520,32 +379,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pendingLassoCropRef.current = null;
   }, [scrollX, scrollY, pushUndo]);
 
-  /* ── Chat ────────────────────────────────────────────── */
-  const handleSendChat = async (text: string, attachments: Attachment[]) => {
-    await sendToChat(text, attachments);
-  };
-
-  /* ── Solve from Input box ────────────────────────────── */
-  const handleSolveInput = async () => {
-    if (!inputCode.trim()) return;
-    setChatMessages(prev => [...prev, { role: "user", text: inputCode }]);
-    setChatLoading(true);
-    try {
-      const res = await solve(inputCode, plugin.settings);
-      setChatMessages(prev => [...prev, {
-        role: "assistant",
-        text: res.ok ? res.text : (res.error ?? "Solve failed."),
-      }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: "assistant", text: "Solver error." }]);
-    }
-    setChatLoading(false);
-  };
-
-  /* ── Symbol insertion ────────────────────────────────── */
-  const handleInsertSymbol = (sym: string) => {
-    setInputCode((prev) => prev + sym);
-  };
+  // Chat send, solve from input, and symbol insertion all live in usePipeline now.
 
   /* ── Insert canvas objects ───────────────────────────── */
   const handleInsertTextBox = useCallback(() => {
@@ -774,8 +608,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onInsertTextBox={handleInsertTextBox}
               onInsertTable={handleInsertTable}
               onInsertImage={handleInsertImage}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
+              onUndo={handleUndoWrapped}
+              onRedo={handleRedoWrapped}
               canUndo={canUndo}
               canRedo={canRedo}
               onReadInk={handleReadInk}
@@ -814,9 +648,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
               strokes={strokes}
               onStrokesChange={handleStrokesChange}
               stamps={stamps}
-              onStampsChange={(newStamps: Stamp[]) => { if (!erasingRef.current) pushUndo(); setStamps(newStamps); }}
-              onEraseStart={() => { erasingRef.current = true; pushUndo(); }}
-              onEraseEnd={() => { erasingRef.current = false; }}
+              onStampsChange={handleStampsChange}
+              onEraseStart={onEraseStart}
+              onEraseEnd={onEraseEnd}
               activeColor={activeColor}
               strokeWidth={strokeWidth}
               tool={tool}
@@ -889,7 +723,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 <div style={{ height: chatHeight, flexShrink: 0 }}>
                   <ChatPanel
                     messages={chatMessages}
-                    onSend={handleSendChat}
+                    onSend={sendToChat}
                     onClear={() => setChatMessages([])}
                     loading={chatLoading}
                   />
