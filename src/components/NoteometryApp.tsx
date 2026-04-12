@@ -3,8 +3,8 @@ import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject } from "../lib/canvasObjects";
-import { savePage, saveImageToVault, CanvasData } from "../lib/persistence";
+import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
+import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasToolbar from "./CanvasToolbar";
 import CanvasObjectLayer from "./CanvasObjectLayer";
@@ -45,9 +45,31 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Lasso stack feature: multi-region selection ─── */
   const {
-    lassoActive, lassoMode, setLassoActive, regions: lassoRegions,
+    lassoActive, lassoMode, setLassoActive, setLassoMode, regions: lassoRegions,
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
+
+  /* ── Double-click / double-tap tool cycle ──────────────
+   * Used by both Apple Pencil double-tap (iPad) and mouse double-click
+   * (Mac). Cycles: pen → eraser → rect-lasso → pen. Lasso is included
+   * because Dan explicitly wanted a keyboard-free way to jump between
+   * the three core canvas modes without digging in the toolbar. */
+  const handleCycleTool = useCallback(() => {
+    if (lassoActive) {
+      // Currently in a lasso mode → return to pen
+      setLassoActive(false);
+      setTool("pen");
+    } else if (tool === "eraser") {
+      // Eraser → rect lasso (start in rect mode, which is more useful
+      // than freehand for the typical "crop a dropped image" flow)
+      setTool("pen");
+      setLassoMode("rect");
+      setLassoActive(true);
+    } else {
+      // pen / grab / select / shapes → eraser
+      setTool("eraser");
+    }
+  }, [lassoActive, tool, setLassoActive, setLassoMode]);
 
   /* ── Objects feature: canvas objects + selection ─── */
   const {
@@ -102,6 +124,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, []);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Swipe blocking is handled in NoteometryView.ts at the view boundary
@@ -151,7 +174,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     if (pendingSymbol) {
       setStamps(prev => [...prev, {
         id: newStampId(), x: clickX, y: clickY,
-        text: pendingSymbol, fontSize: 28, color: activeColor,
+        text: pendingSymbol, fontSize: 96, color: activeColor,
       }]);
       setPendingSymbol(null);
       return;
@@ -451,6 +474,33 @@ export default function NoteometryApp({ plugin, app }: Props) {
     imageInputRef.current?.click();
   }, []);
 
+  const handleInsertPdf = useCallback(() => {
+    pdfInputRef.current?.click();
+  }, []);
+
+  const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    try {
+      const bytes = await file.arrayBuffer();
+      const obj = createPdfObject(scrollX + 80, scrollY + 80, "");
+      const sec = sectionRef.current;
+      if (!sec) {
+        new Notice("Can't insert PDF — no active section. Create or open a page first.", 6000);
+        return;
+      }
+      const vaultPath = await savePdfToVault(plugin, sec, obj.id, bytes);
+      obj.fileRef = vaultPath;
+      setCanvasObjects((prev) => [...prev, obj]);
+      setTool("select");
+      setSelectedObjectId(obj.id);
+    } catch (err) {
+      console.error("[Noteometry] PDF insert failed:", err);
+      new Notice("PDF insert failed — see console", 8000);
+    }
+  }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
+
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -579,7 +629,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       setStamps(prev => [...prev, {
         id: newStampId(), x, y,
         text: item.stamp ?? item.display,
-        fontSize: 28,
+        fontSize: 96,
         color: activeColor,
       }]);
     } catch { /* ignore */ }
@@ -661,6 +711,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onChange={handleImageUpload}
               className="noteometry-hidden"
             />
+            {/* Hidden PDF input */}
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handlePdfUpload}
+              className="noteometry-hidden"
+            />
 
             {/* ── Top bar: tools on the left, zoom controls on the right ── */}
             <div className="noteometry-canvas-topbar">
@@ -683,6 +741,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onInsertTextBox={handleInsertTextBox}
                 onInsertTable={handleInsertTable}
                 onInsertImage={handleInsertImage}
+                onInsertPdf={handleInsertPdf}
                 onUndo={handleUndoWrapped}
                 onRedo={handleRedoWrapped}
                 canUndo={canUndo}
@@ -708,8 +767,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
               />
 
               <div className="noteometry-zoom-controls">
-                {/* ZOOM OUT removed per user feedback — use Cmd/Ctrl + scroll
-                    down, or click the percent and zoom back in. */}
+                <button
+                  className="noteometry-zoom-btn"
+                  onClick={zoomOut}
+                  disabled={zoomLocked || zoom <= 0.5}
+                  title="Zoom out (Cmd/Ctrl + scroll also works)"
+                  aria-label="Zoom out"
+                >
+                  ZOOM −
+                </button>
                 <button
                   className="noteometry-zoom-btn noteometry-zoom-percent"
                   onClick={resetZoom}
@@ -769,6 +835,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 zoom={zoom}
                 zoomLocked={zoomLocked}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
+                onCycleTool={handleCycleTool}
                 onViewportChange={handleViewportChange}
                 disabled={lassoActive}
                 selectedStampId={selectedStampId}
@@ -829,7 +896,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     const y = (screenY - rect.top) / zoom + scrollY;
                     setStamps(prev => [...prev, {
                       id: newStampId(), x, y,
-                      text: display, fontSize: 28, color: activeColor,
+                      text: display, fontSize: 96, color: activeColor,
                     }]);
                   }}
                   onSolve={handleSolveInput}

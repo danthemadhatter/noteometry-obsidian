@@ -118,12 +118,27 @@ export interface ImageElementV3 {
   fileRef: string;
 }
 
+export interface PdfElementV3 {
+  type: "pdf";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Vault-relative path to the PDF file (binary, stored in attachments). */
+  fileRef: string;
+  /** Current page (1-based). Restored on reload so the user lands on
+   * whichever page they were studying. */
+  page: number;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
   | TextboxElementV3
   | TableElementV3
-  | ImageElementV3;
+  | ImageElementV3
+  | PdfElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -196,6 +211,14 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         fileRef: obj.dataURL,
+      });
+    } else if (obj.type === "pdf") {
+      elements.push({
+        type: "pdf",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        fileRef: obj.fileRef,
+        page: obj.page,
       });
     }
   }
@@ -271,6 +294,15 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           type: "image",
           x: el.x, y: el.y, w: el.w, h: el.h,
           dataURL: el.fileRef,
+        });
+        break;
+      case "pdf":
+        canvasObjects.push({
+          id: el.id,
+          type: "pdf",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          fileRef: el.fileRef,
+          page: el.page ?? 1,
         });
         break;
     }

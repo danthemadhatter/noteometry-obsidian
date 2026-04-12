@@ -5,6 +5,7 @@ import type NoteometryPlugin from "../main";
 import { loadImageFromVault } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
+import PdfViewer from "./PdfViewer";
 
 interface Props {
   objects: CanvasObject[];
@@ -221,7 +222,10 @@ export default function CanvasObjectLayer({
             onPointerDown={(e) => handleDragStart(e, obj)}
           >
             <span className="noteometry-object-drag-label">
-              {obj.type === "textbox" ? "Text" : obj.type === "table" ? "Table" : "Image"}
+              {obj.type === "textbox" ? "Text"
+                : obj.type === "table" ? "Table"
+                : obj.type === "pdf" ? "PDF"
+                : "Image"}
             </span>
             <button
               className="noteometry-object-delete"
@@ -256,6 +260,18 @@ export default function CanvasObjectLayer({
             {obj.type === "table" && <TableEditor tableId={obj.id} />}
             {obj.type === "image" && (
               <VaultImage src={obj.dataURL} plugin={plugin} />
+            )}
+            {obj.type === "pdf" && (
+              <PdfViewer
+                fileRef={obj.fileRef}
+                page={obj.page}
+                plugin={plugin}
+                onPageChange={(newPage) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "pdf" ? { ...o, page: newPage } : o
+                  ));
+                }}
+              />
             )}
           </div>
 

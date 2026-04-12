@@ -33,3 +33,17 @@ export const IconRotate = () => <svg {...s}><path d="M21 12a9 9 0 1 1-9-9c2.52 0
 export const IconCopy = () => <svg {...s}><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>;
 export const IconCheck = () => <svg {...s}><path d="M20 6 9 17l-5-5"/></svg>;
 export const IconRefresh = () => <svg {...s}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>;
+// Combined rect+circle = "shapes" group. Used as the fallback icon on the
+// shape picker so the button never looks like a minus sign (which was the
+// problem Dan repeatedly flagged with the old IconLine fallback).
+export const IconShapes = () => <svg {...s}><rect x="3" y="3" width="10" height="10" rx="1"/><circle cx="16" cy="15" r="5"/></svg>;
+// Dashed square + anchor dot = rectangular lasso, visually distinct from
+// both the freehand IconLasso and the solid-rect shape-drawing IconRect.
+export const IconLassoRect = () => <svg {...s}><rect x="3" y="3" width="14" height="14" rx="1" strokeDasharray="3 2"/><circle cx="19" cy="19" r="2"/></svg>;
+// Zoom-out magnifier. Re-added to the toolbar after Dan asked for zoom
+// out back; my earlier removal conflated it with an unrelated "minus" icon.
+export const IconZoomOut = () => <svg {...s}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>;
+// PDF file icon — a page outline with a "P" inside. Used on the "Insert PDF"
+// toolbar button so users can drop textbook pages / lecture slides / lab
+// manuals onto the canvas and lasso-clip pieces into the chat.
+export const IconPdf = () => <svg {...s}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h1.5a1.5 1.5 0 0 1 0 3H9v-3z" fill="currentColor" stroke="none"/><path d="M9 13v5"/></svg>;

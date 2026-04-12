@@ -140,6 +140,7 @@
  * surface we flip the color defaults AND re-scope --text-normal/muted/faint
  * so descendant elements that reach for those vars resolve to dark navy. */
 .noteometry-canvas-topbar,
+.noteometry-canvas-toolbar,
 .noteometry-table-editor,
 .noteometry-richtext,
 .noteometry-panel-box,
@@ -148,12 +149,46 @@
 .noteometry-chat-bubble.assistant,
 .noteometry-canvas-object,
 .noteometry-zoom-btn,
+.noteometry-zoom-controls,
 .noteometry-mathpal,
 .noteometry-mathpal-btn {
   color: var(--nm-paper-ink);
   --text-normal: var(--nm-paper-ink);
   --text-muted: var(--nm-ink-muted);
   --text-faint: rgba(26, 35, 53, 0.52);
+}
+
+/* Blue-surface text scope — explicit cream on all dark chassis surfaces so
+ * nothing inside falls back to an inherited color. Sidebar items (files
+ * and folders) were the most visible offenders — they used var(--text-normal)
+ * which theoretically resolves to cream at container level, but adding an
+ * explicit rule at the item level removes any cascade ambiguity. */
+.noteometry-sidebar-open,
+.noteometry-sidebar-closed,
+.noteometry-sidebar-hdr,
+.noteometry-sidebar-title,
+.noteometry-sidebar-item,
+.noteometry-sidebar-section-item,
+.noteometry-sidebar-page-item,
+.noteometry-sidebar-add-page,
+.noteometry-sidebar-add,
+.noteometry-chat,
+.noteometry-chat-header,
+.noteometry-chat-title,
+.noteometry-chat-messages,
+.noteometry-chat-empty,
+.noteometry-chat-input-row,
+.noteometry-preset-btn,
+.noteometry-preset-menu {
+  color: var(--nm-chassis-fg);
+}
+
+/* Belt-and-suspenders: force every inline SVG inside the plugin to use
+ * currentColor for strokes. Without this, a stray theme can turn icons
+ * white against a cream background and they disappear. */
+.noteometry-container svg {
+  stroke: currentColor !important;
+  fill: none;
 }
 
 .noteometry-root {
@@ -1558,6 +1593,87 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ── PDF viewer (canvas object type) ─────────────────── */
+.noteometry-pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  color: var(--nm-paper-ink);
+  overflow: hidden;
+}
+
+.noteometry-pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--nm-faceplate-recessed);
+  border-bottom: 1px solid var(--nm-paper-border);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.noteometry-pdf-nav {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--nm-paper-ink);
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: var(--nm-radius-sm);
+  min-width: 32px;
+}
+.noteometry-pdf-nav:hover:not(:disabled) {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+.noteometry-pdf-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.noteometry-pdf-page {
+  font-variant-numeric: tabular-nums;
+  color: var(--nm-paper-ink);
+  min-width: 60px;
+  text-align: center;
+}
+
+.noteometry-pdf-canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #e8e4d0;
+  padding: 4px;
+}
+
+.noteometry-pdf-canvas {
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  max-width: 100%;
+}
+
+.noteometry-pdf-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--nm-danger);
+  text-align: center;
+  background: repeating-linear-gradient(45deg, #fff0ec, #fff0ec 8px, #f5e0d9 8px, #f5e0d9 16px);
 }
 
 .noteometry-object-drag-handle {

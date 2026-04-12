@@ -8,8 +8,9 @@ import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
 import type { CanvasObject } from "./canvasObjects";
 
 // 1/8 inch at 96 DPI = 12px. Every 8th line is 1 inch (96px).
-const GRID_MINOR = 24;
-const GRID_MAJOR = GRID_MINOR * 4; // 96px
+// Dan wants 1/8" minor grid to match engineering graph paper.
+const GRID_MINOR = 12;
+const GRID_MAJOR = GRID_MINOR * 8; // 96px = 1 inch
 
 // Whisper-subtle grid — slightly teal-navy to match the atomic-age
 // chassis tone. Still very low alpha so the canvas reads clean.

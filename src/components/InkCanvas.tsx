@@ -24,13 +24,17 @@ interface Props {
   zoomLocked?: boolean;
   /** Called when the user pinches to zoom. Parent should clamp + setZoom. */
   onZoomChange?: (zoom: number) => void;
+  /** Called when the user double-taps/double-clicks on empty canvas.
+   * Parent decides the next tool state (typically cycles pen → eraser →
+   * lasso → pen). Works on pen (Apple Pencil) AND mouse — the Mac path
+   * was previously missing, which left Dan without a keyboard-free tool
+   * switcher. */
+  onCycleTool?: () => void;
   disabled?: boolean;
   selectedStampId?: string | null;
   onEraseStart?: () => void;
   onEraseEnd?: () => void;
 }
-
-const TOOL_CYCLE: CanvasTool[] = ["pen", "eraser", "grab"];
 
 export default function InkCanvas({
   strokes, onStrokesChange, stamps, onStampsChange,
@@ -39,6 +43,7 @@ export default function InkCanvas({
   zoom = 1,
   zoomLocked = false,
   onZoomChange,
+  onCycleTool,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
 }: Props) {
@@ -68,9 +73,14 @@ export default function InkCanvas({
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const shapeEndRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Apple Pencil double-tap detection
-  const lastPenTapTimeRef = useRef(0);
-  const lastPenTapPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Double-tap / double-click detection — fires for BOTH Apple Pencil
+  // (iPad, pen pointer type) and mouse (Mac, desktop). Parent handles the
+  // cycle via onCycleTool. One shared timer so rapid clicks/taps cross
+  // pointer types cleanly.
+  const lastTapTimeRef = useRef(0);
+  const lastTapPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onCycleToolRef = useRef(onCycleTool);
 
   // Touch pan state (shared between touch handler and main)
   const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -97,6 +107,7 @@ export default function InkCanvas({
   useEffect(() => { selectedStampIdRef.current = selectedStampId; }, [selectedStampId]);
   useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
   useEffect(() => { zoomLockedRef.current = zoomLocked; }, [zoomLocked]);
+  useEffect(() => { onCycleToolRef.current = onCycleTool; }, [onCycleTool]);
 
   // ── Canvas sizing ──────────────────────────────────
   const sizeRef = useRef({ w: 0, h: 0 });
@@ -211,27 +222,26 @@ export default function InkCanvas({
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return; // handled by touch pan effect
 
-    // Apple Pencil double-tap detection
-    if (e.pointerType === "pen") {
+    // Double-tap / double-click detection for pen AND mouse. Fires
+    // onCycleTool in the parent, which drives pen → eraser → rect-lasso
+    // → pen. Works on Mac where there's no Apple Pencil double-tap.
+    if (e.pointerType === "pen" || e.pointerType === "mouse") {
       const now = performance.now();
-      const prev = lastPenTapPosRef.current;
-      const elapsed = now - lastPenTapTimeRef.current;
-      if (elapsed < 300 && prev) {
+      const prev = lastTapPosRef.current;
+      const elapsed = now - lastTapTimeRef.current;
+      if (elapsed < 350 && prev) {
         const dist = Math.hypot(e.clientX - prev.x, e.clientY - prev.y);
-        if (dist < 10) {
-          // Double-tap detected — cycle tool
-          lastPenTapTimeRef.current = 0;
-          lastPenTapPosRef.current = null;
+        if (dist < 12) {
+          lastTapTimeRef.current = 0;
+          lastTapPosRef.current = null;
           e.preventDefault();
           e.stopPropagation();
-          const idx = TOOL_CYCLE.indexOf(toolRef.current);
-          const next = TOOL_CYCLE[(idx + 1) % TOOL_CYCLE.length]!;
-          onToolChange?.(next);
+          onCycleToolRef.current?.();
           return;
         }
       }
-      lastPenTapTimeRef.current = now;
-      lastPenTapPosRef.current = { x: e.clientX, y: e.clientY };
+      lastTapTimeRef.current = now;
+      lastTapPosRef.current = { x: e.clientX, y: e.clientY };
     }
 
     const canvas = inkCanvasRef.current;

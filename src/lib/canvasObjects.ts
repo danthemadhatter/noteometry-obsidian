@@ -24,7 +24,18 @@ export interface ImageObject extends CanvasObjectBase {
   dataURL: string;
 }
 
-export type CanvasObject = TextBoxObject | TableObject | ImageObject;
+export interface PdfObject extends CanvasObjectBase {
+  type: "pdf";
+  /** Vault-relative path to the PDF file. Stored in the attachments dir
+   * next to images. Never a base64 data URL — PDFs are far too big for
+   * that to make sense. */
+  fileRef: string;
+  /** Current page being rendered (1-based). Saved with the object so the
+   * user returns to the same page after reload. */
+  page: number;
+}
+
+export type CanvasObject = TextBoxObject | TableObject | ImageObject | PdfObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -44,4 +55,12 @@ export function createImageObject(
   w: number = 300, h: number = 200
 ): ImageObject {
   return { id: newObjectId(), type: "image", x, y, w, h, dataURL };
+}
+
+export function createPdfObject(
+  x: number, y: number,
+  fileRef: string,
+  w: number = 560, h: number = 720
+): PdfObject {
+  return { id: newObjectId(), type: "pdf", x, y, w, h, fileRef, page: 1 };
 }

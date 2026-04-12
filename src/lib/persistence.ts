@@ -311,6 +311,36 @@ export async function loadImageFromVault(
   return `data:image/png;base64,${b64}`;
 }
 
+/* ── PDF vault sync ─────────────────────────────────
+ * PDFs live next to images in the section's attachments folder. We
+ * store raw binary, not base64, because PDFs are typically too big
+ * to serialize as data URLs. Loading returns an ArrayBuffer for
+ * pdfjs-dist to consume directly. */
+
+export async function savePdfToVault(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  pdfId: string,
+  bytes: ArrayBuffer
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
+  if (!(await adapter.exists(attachDir))) {
+    await adapter.mkdir(attachDir);
+  }
+  const vaultPath = `${attachDir}/${pdfId}.pdf`;
+  await adapter.writeBinary(vaultPath, bytes);
+  return vaultPath;
+}
+
+export async function loadPdfFromVault(
+  plugin: NoteometryPlugin,
+  vaultPath: string
+): Promise<ArrayBuffer> {
+  const adapter = plugin.app.vault.adapter;
+  return await adapter.readBinary(vaultPath);
+}
+
 export async function migrateBase64Images(
   plugin: NoteometryPlugin,
   sectionName: string,

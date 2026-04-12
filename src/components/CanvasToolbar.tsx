@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
-  IconSelect, IconPen, IconEraser, IconHand, IconLasso,
-  IconType, IconTable, IconImage, IconUndo, IconRedo,
-  IconLine, IconArrow, IconRect, IconCircle,
+  IconSelect, IconPen, IconEraser, IconHand, IconLasso, IconLassoRect,
+  IconType, IconTable, IconImage, IconPdf, IconUndo, IconRedo,
+  IconLine, IconArrow, IconRect, IconCircle, IconShapes,
   IconDownload, IconTrash, IconSliders,
 } from "./Icons";
 import type { CanvasTool } from "./InkCanvas";
@@ -50,6 +50,7 @@ interface Props {
   onInsertTextBox: () => void;
   onInsertTable: () => void;
   onInsertImage: () => void;
+  onInsertPdf: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -78,7 +79,7 @@ export default function CanvasToolbar({
   lassoActive, lassoMode, onLassoToggle,
   activeColor, onColorChange,
   strokeWidth, onStrokeWidthChange,
-  onInsertTextBox, onInsertTable, onInsertImage,
+  onInsertTextBox, onInsertTable, onInsertImage, onInsertPdf,
   onUndo, onRedo, canUndo, canRedo,
   onClearCanvas, onExportImage,
 }: Props) {
@@ -86,8 +87,11 @@ export default function CanvasToolbar({
   const toggle = (p: typeof popup) => setPopup(popup === p ? "" : p);
   const isShape = ["line", "arrow", "rect", "circle"].includes(tool);
 
-  // Get current shape icon for the button
-  const ShapeIcon = SHAPE_TOOLS.find(s => s.tool === tool)?.icon ?? IconLine;
+  // Shape-picker button icon. Always render IconShapes (square + circle)
+  // when no shape tool is active — using IconLine as the fallback made
+  // the button look like a minus sign, which Dan kept asking me to
+  // remove (it was never a real minus, it was the line-tool preview).
+  const ShapeIcon = SHAPE_TOOLS.find(s => s.tool === tool)?.icon ?? IconShapes;
 
   return (
     <div className="noteometry-canvas-toolbar">
@@ -147,7 +151,7 @@ export default function CanvasToolbar({
           onClick={() => onLassoToggle("rect")}
           title="Rectangle lasso (drag a box — great for cropping dropped images)"
         >
-          <IconRect />
+          <IconLassoRect />
         </Btn>
       </div>
 
@@ -198,6 +202,9 @@ export default function CanvasToolbar({
         </Btn>
         <Btn onClick={onInsertImage} title="Image">
           <IconImage />
+        </Btn>
+        <Btn onClick={onInsertPdf} title="PDF — drop a textbook page / lecture slide / lab manual onto the canvas to lasso-clip pieces out">
+          <IconPdf />
         </Btn>
       </div>
 
