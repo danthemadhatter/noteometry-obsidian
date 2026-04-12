@@ -8,101 +8,71 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v5 — nuclear analog faceplate
+   * Noteometry palette v8 — clean, professional, works with black text
    *
-   * References: Hammarlund SP-600 receiver faceplate, CD V-700 Geiger
-   * counter meter face, Tektronix 545A oscilloscope front panel,
-   * Hallicrafters SX-88 dial plate. Classic 1950s-60s test equipment.
-   *
-   * The pattern: cream tan faceplate with BLACK silkscreen labels,
-   * gunmetal trim between sections, amber LED backlighting, traditional
-   * dark ink. The equipment cabinet around the faceplate might be dark
-   * metal, but the FACE you interact with is warm cream. I was inverting
-   * this for three palette iterations — now it's right.
+   * Direction: masculine and fun. Warm white/paper surfaces, dark
+   * charcoal-slate chassis, steel blue accent. All text is black.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* ══════════════════════════════════════════════════════════════════
-   * v7 — 1950s industrial BLUE dominant. Structural chassis is
-   * painted navy-blue industrial enamel (IBM System/360 cabinet,
-   * Siemens machine enclosure, Navy shipboard equipment). Cream
-   * "paper" inserts provide the reading surfaces on top of the blue.
-   * Previous iterations had cream as the dominant surface with blue
-   * accents — this flips it: BLUE chassis, cream cards on top.
-   * ══════════════════════════════════════════════════════════════════ */
+  /* Primary surface — warm white/paper (not cream, cleaner) */
+  --nm-canvas-bg: #f5f3ee;
+  --nm-faceplate: #eae7df;
+  --nm-faceplate-light: #f0ede5;
+  --nm-faceplate-alt: #e2dfd6;
+  --nm-faceplate-recessed: #d8d4ca;
 
-  /* Chassis — "atomic blue vintage electrical": the saturated
-   * mid-navy with a teal undertone used on Weston voltmeter faces,
-   * Eico tube-tester cabinets, Heathkit test gear, and mid-century
-   * Frigidaire/Westinghouse appliance panels. Less "battleship gray
-   * military" than v7, more "optimistic atomic-age science fiction".
-   * The base tone is saturated enough to read distinctly as BLUE
-   * instead of gray-blue. */
-  --nm-chassis: #1d5a85;           /* primary atomic-age teal-navy */
-  --nm-chassis-light: #2a7ab0;     /* raised / highlight (brighter) */
-  --nm-chassis-dark: #14405e;      /* recessed / shadow */
-  --nm-chassis-deep: #0a2b40;      /* deepest inset wells */
-  --nm-chassis-fg: #ede8d2;        /* cream stencil text on blue */
+  /* Chassis — dark charcoal-slate, not blue */
+  --nm-chassis: #2c3038;
+  --nm-chassis-light: #3a3f4a;
+  --nm-chassis-dark: #22262d;
+  --nm-chassis-deep: #181b20;
+  --nm-chassis-fg: #e8e5dd;        /* kept for backwards compat */
 
-  /* Faceplate — cream paper inserts that sit ON the blue chassis.
-   * Used for: canvas drawing surface, chat bubbles, text boxes,
-   * LaTeX input areas. Everything readable lives on cream paper. */
-  --nm-faceplate: #ede8d2;
-  --nm-faceplate-alt: #dfd9bf;
-  --nm-faceplate-light: #f5f0dc;
-  --nm-faceplate-recessed: #c8c0a0;
+  /* Text — always dark */
+  --nm-ink: #1a1d24;
+  --nm-ink-muted: #5a5d66;
+  --nm-paper-ink: var(--nm-ink);
 
-  /* Canvas — the drawing paper clipped to the bench. Near-white so
-   * dark ink reads clean. */
-  --nm-canvas-bg: #f7f4e8;
-  --nm-canvas-bg-edge: #ebe6cf;
+  /* Accent — steel blue (professional, not "pride") */
+  --nm-accent: #4a7c9b;
+  --nm-accent-light: rgba(74, 124, 155, 0.12);
+  --nm-accent-hover: #5a8fae;
 
-  /* Cabinet aliases — keep for v5.1-v6 rules that referenced them. */
+  /* Active/selected — warm amber (kept, works well as indicator) */
+  --nm-phosphor: #e8a838;
+  --nm-phosphor-light: rgba(232, 168, 56, 0.2);
+
+  /* Semantic */
+  --nm-danger: #c44a3c;
+  --nm-success: #5a8a42;
+
+  /* Borders — dark hairlines on light surfaces */
+  --nm-paper-border: rgba(26, 29, 36, 0.18);
+  --nm-warm-border: rgba(26, 29, 36, 0.10);
+  --nm-warm-border-strong: rgba(26, 29, 36, 0.22);
+
+  /* Canvas edge (used by some bg gradients) */
+  --nm-canvas-bg-edge: #ebe8e0;
+
+  /* Cabinet aliases — backwards compat with older rules */
   --nm-cabinet: var(--nm-chassis);
   --nm-cabinet-light: var(--nm-chassis-light);
   --nm-cabinet-dark: var(--nm-chassis-dark);
   --nm-cabinet-deep: var(--nm-chassis-deep);
 
-  /* Gunmetal — reserved for very dark borders on cream surfaces */
-  --nm-gunmetal: #2a3543;
-  --nm-gunmetal-light: #46596e;
-  --nm-gunmetal-dark: #141c27;
-
-  /* Ink — dark navy for text ON CREAM faceplate surfaces */
-  --nm-ink: #1a2335;
-  --nm-ink-muted: #525a6e;
-
-  /* Accent — warm brass knob tone for hover highlights on blue chassis */
-  --nm-accent: #b89258;
-  --nm-accent-light: rgba(184, 146, 88, 0.18);
-  --nm-accent-hover: #d4ae74;
-
-  /* Phosphor — amber LED for active/selected indicators. On the
-   * industrial blue chassis this reads exactly like a lit control
-   * on real 1950s equipment. */
-  --nm-phosphor: #ffb91a;
-  --nm-phosphor-light: rgba(255, 185, 26, 0.28);
-
-  /* Semantic states */
-  --nm-danger: #d64838;            /* signal red LED */
-  --nm-success: #7fa63d;           /* olive/green ready */
-
-  /* Borders — cream at low alpha for subtle hairlines on blue chassis */
-  --nm-warm-border: rgba(237, 232, 210, 0.18);
-  --nm-warm-border-strong: rgba(237, 232, 210, 0.32);
+  /* Gunmetal — reserved for very dark borders */
+  --nm-gunmetal: #2a3038;
+  --nm-gunmetal-light: #4a5060;
+  --nm-gunmetal-dark: #14181e;
 
   /* Section selection */
   --nm-section-active: var(--nm-chassis-light);
 
-  /* Legacy aliases — v7 flips the primary surface from cream to blue.
-   * Rules that reference --nm-warm-bg / --nm-warm-bg-alt now render
-   * as blue chassis. Rules that reference --nm-paper render as cream.
-   * Components that need "dark text on cream" use --nm-paper-ink. */
-  --nm-warm-bg: var(--nm-chassis);              /* primary = blue */
-  --nm-warm-bg-alt: var(--nm-chassis-dark);     /* darker nested = darker blue */
-  --nm-paper: var(--nm-faceplate);              /* cream paper inserts */
-  --nm-paper-ink: var(--nm-ink);                /* dark navy on cream */
+  /* Legacy aliases — kept for rules that still reference them */
+  --nm-warm-bg: var(--nm-chassis);              /* primary = dark */
+  --nm-warm-bg-alt: var(--nm-chassis-dark);     /* darker nested */
+  --nm-paper: var(--nm-faceplate);              /* paper inserts */
   --nm-paper-muted: var(--nm-ink-muted);
-  --nm-paper-border: rgba(26, 35, 53, 0.24);    /* navy hairlines on cream */
 
   /* Geometry — machined, not extruded */
   --nm-radius: 4px;
@@ -468,6 +438,15 @@
   flex-direction: column;
 }
 
+.noteometry-sidebar-add-course {
+  background: var(--nm-accent-light);
+  border: 1px solid var(--nm-accent);
+  border-radius: var(--nm-radius-sm);
+  margin: 6px 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+}
+
 .noteometry-sidebar-add:hover {
   background: var(--nm-accent-light);
 }
@@ -551,24 +530,29 @@
   background: transparent;
 }
 
-/* ── Canvas top bar (Phase 4 pt 2 polish) ──────────────────
-   Holds the CanvasToolbar on the left and the zoom controls on
-   the right. Static flex row, not floating. Replaces the old
-   position: absolute toolbar at the bottom of the canvas area. */
+/* ── Canvas top bar ──────────────────
+   Now ONLY holds the zoom controls (tools moved to vertical strip). */
 .noteometry-canvas-topbar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 4px 10px;
   background: var(--nm-faceplate-light);
-  border-bottom: 2px solid var(--nm-cabinet-dark);
+  border-bottom: 1px solid var(--nm-paper-border);
   box-shadow: var(--nm-shadow-soft);
-  /* The toolbar is a horizontal scroll container if it overflows
-   * on narrow windows; zoom controls stay visible on the right. */
   min-height: 0;
   overflow: visible;
+}
+
+/* ── Canvas body: vertical toolbar + viewport side by side ── */
+.noteometry-canvas-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* The drawing surface below the top bar. This is what InkCanvas,
@@ -926,7 +910,7 @@
 }
 .noteometry-color-dot.active {
   border-color: var(--nm-accent);
-  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.3);
+  box-shadow: 0 0 0 2px rgba(74, 124, 155, 0.3);
 }
 
 .noteometry-panel-box {
@@ -1395,23 +1379,22 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 .noteometry-canvas-toolbar {
-  /* Static flex child inside .noteometry-canvas-topbar.
-   * Previously this was position: absolute bottom: 12px; now it sits
-   * inline at the top of the canvas area, embedded in the frame. */
-  flex: 1 1 auto;
-  min-width: 0;
+  /* Vertical strip to the left of the canvas viewport */
+  flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 0;
-  background: transparent;
+  width: 48px;
+  padding: 6px 4px;
+  gap: 4px;
+  background: var(--nm-faceplate);
   color: var(--nm-ink);
-  border: none;
+  border-right: 1px solid var(--nm-paper-border);
   border-radius: 0;
   box-shadow: none;
   pointer-events: auto;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -1441,15 +1424,17 @@
 
 .noteometry-toolbar-group {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 0 3px;
+  padding: 3px 0;
   flex-shrink: 0;
+  width: 100%;
 }
 .noteometry-toolbar-group + .noteometry-toolbar-group {
-  border-left: 1px solid var(--nm-warm-border);
-  margin-left: 2px;
-  padding-left: 5px;
+  border-top: 1px solid var(--nm-warm-border);
+  margin-top: 2px;
+  padding-top: 5px;
 }
 
 .noteometry-toolbar-readink {
@@ -1532,14 +1517,12 @@
 }
 
 /* Toolbar popups (shapes, width, insert, more) */
-/* Toolbar moved to the top bar in Phase 4 — popup opens DOWNWARD now,
- * not upward. The old bottom: 48px was a relic from when the toolbar
- * sat at the bottom of the canvas area. */
+/* Toolbar is vertical strip — popup opens to the RIGHT of the button */
 .noteometry-toolbar-popup {
   position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(100% + 4px);
+  top: 0;
+  transform: none;
   display: flex;
   gap: 2px;
   padding: 6px;
@@ -1850,7 +1833,7 @@
 
 .noteometry-object-selected {
   border: 2px solid var(--nm-accent) !important;
-  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.2), var(--nm-shadow-soft) !important;
+  box-shadow: 0 0 0 3px rgba(74, 124, 155, 0.2), var(--nm-shadow-soft) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1924,11 +1907,10 @@
    * Previous values (36px buttons, 14px color dots) were designed for
    * mouse precision — on an iPad with a finger they're unhittable. */
 
-  /* Toolbar: still centered bottom, but compact */
+  /* Toolbar: vertical strip, finger-friendly on touch */
   .noteometry-canvas-toolbar {
-    bottom: 8px;
-    padding: 4px 6px;
-    border-radius: 14px;
+    width: 56px;
+    padding: 4px;
   }
   .noteometry-toolbar-btn {
     width: 44px;
@@ -1941,7 +1923,7 @@
     min-height: 28px !important;
     max-width: 28px !important;
     max-height: 28px !important;
-    margin: 0 3px;
+    margin: 3px 0;
   }
 
   /* Lasso action bar — was desktop density, now finger-friendly */

@@ -47,3 +47,4 @@ export const IconZoomOut = () => <svg {...s}><circle cx="11" cy="11" r="7"/><lin
 // toolbar button so users can drop textbook pages / lecture slides / lab
 // manuals onto the canvas and lasso-clip pieces into the chat.
 export const IconPdf = () => <svg {...s}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h1.5a1.5 1.5 0 0 1 0 3H9v-3z" fill="currentColor" stroke="none"/><path d="M9 13v5"/></svg>;
+export const IconBook = () => <svg {...s}><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Notice } from "obsidian";
 import {
   IconPlus, IconTrash, IconFolder, IconFile,
-  IconChevDown, IconChevRight, IconMenu, IconX, IconPen,
+  IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook,
 } from "./Icons";
 import type NoteometryPlugin from "../main";
 import {
@@ -240,6 +240,18 @@ const handleDeletePage = async (section: string, name: string) => {
           <span className="noteometry-sidebar-title">Notebooks</span>
         </div>
 
+        {/* ── New Course button — above section list per plan ── */}
+        {addingCourse
+          ? inlineInput(handleAddCourse)
+          : (
+            <button
+              className="noteometry-sidebar-add noteometry-sidebar-add-course"
+              onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName("APUS"); }}
+            >
+              <IconBook /> New Course
+            </button>
+          )}
+
         <div className="noteometry-sidebar-list">
           {sections.map((s) => {
             const isExpanded = expandedSection === s;
@@ -323,23 +335,13 @@ const handleDeletePage = async (section: string, name: string) => {
 
         {addingSection
           ? inlineInput(handleAddSection)
-          : addingCourse
-          ? inlineInput(handleAddCourse)
           : (
-            <div className="noteometry-sidebar-add-buttons">
-              <button
-                className="noteometry-sidebar-add"
-                onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
-              >
-                <IconPlus /> New section
-              </button>
-              <button
-                className="noteometry-sidebar-add"
-                onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
-              >
-                <IconPlus /> New course
-              </button>
-            </div>
+            <button
+              className="noteometry-sidebar-add"
+              onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+            >
+              <IconPlus /> New section
+            </button>
           )}
       </div>
     </>

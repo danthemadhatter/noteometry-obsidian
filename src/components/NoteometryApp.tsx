@@ -827,52 +827,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               className="noteometry-hidden"
             />
 
-            {/* ── Top bar: tools on the left, zoom controls on the right ── */}
+            {/* ── Top bar: zoom controls only (tools moved to vertical strip) ── */}
             <div className="noteometry-canvas-topbar">
-              <CanvasToolbar
-                tool={tool}
-                onToolChange={(t) => { setTool(t); setLassoActive(false); }}
-                lassoActive={lassoActive}
-                lassoMode={lassoMode}
-                onLassoToggle={(requestedMode) => {
-                  // Entering lasso mode swaps the active tool out of any
-                  // drawing mode so pen strokes don't leak through — same
-                  // behavior the old single-button toggle had.
-                  if (!lassoActive) setTool("pen");
-                  toggleLasso(requestedMode);
-                }}
-                activeColor={activeColor}
-                onColorChange={setActiveColor}
-                strokeWidth={strokeWidth}
-                onStrokeWidthChange={setStrokeWidth}
-                onInsertTextBox={handleInsertTextBox}
-                onInsertTable={handleInsertTable}
-                onInsertImage={handleInsertImage}
-                onInsertPdf={handleInsertPdf}
-                onUndo={handleUndoWrapped}
-                onRedo={handleRedoWrapped}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onClearCanvas={() => {
-                  // Double confirmation per Dan's explicit request.
-                  // Clearing the whole canvas is destructive and easy
-                  // to trigger by accident; two explicit OKs prevent it.
-                  if (!confirm("Clear all strokes and stamps from this page?")) return;
-                  if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
-                  pushUndo();
-                  setStrokes([]);
-                  setStamps([]);
-                }}
-                onExportImage={() => {
-                  const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
-                  if (!dataUrl) return;
-                  const link = document.createElement("a");
-                  link.download = `${currentPage || "canvas"}.png`;
-                  link.href = dataUrl;
-                  link.click();
-                }}
-              />
-
               <div className="noteometry-zoom-controls">
                 <button
                   className="noteometry-zoom-btn"
@@ -911,8 +867,49 @@ export default function NoteometryApp({ plugin, app }: Props) {
               </div>
             </div>
 
-            {/* ── Viewport: the actual drawing surface ── */}
-            <div ref={viewportRef} className="noteometry-canvas-viewport">
+            {/* ── Canvas body: vertical toolbar + viewport ── */}
+            <div className="noteometry-canvas-body">
+              {/* ── Vertical tool strip (left of viewport) ── */}
+              <CanvasToolbar
+                tool={tool}
+                onToolChange={(t) => { setTool(t); setLassoActive(false); }}
+                lassoActive={lassoActive}
+                lassoMode={lassoMode}
+                onLassoToggle={(requestedMode) => {
+                  if (!lassoActive) setTool("pen");
+                  toggleLasso(requestedMode);
+                }}
+                activeColor={activeColor}
+                onColorChange={setActiveColor}
+                strokeWidth={strokeWidth}
+                onStrokeWidthChange={setStrokeWidth}
+                onInsertTextBox={handleInsertTextBox}
+                onInsertTable={handleInsertTable}
+                onInsertImage={handleInsertImage}
+                onInsertPdf={handleInsertPdf}
+                onUndo={handleUndoWrapped}
+                onRedo={handleRedoWrapped}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onClearCanvas={() => {
+                  if (!confirm("Clear all strokes and stamps from this page?")) return;
+                  if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
+                  pushUndo();
+                  setStrokes([]);
+                  setStamps([]);
+                }}
+                onExportImage={() => {
+                  const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
+                  if (!dataUrl) return;
+                  const link = document.createElement("a");
+                  link.download = `${currentPage || "canvas"}.png`;
+                  link.href = dataUrl;
+                  link.click();
+                }}
+              />
+
+              {/* ── Viewport: the actual drawing surface ── */}
+              <div ref={viewportRef} className="noteometry-canvas-viewport">
               {!panelOpen && (
                 <div className="noteometry-canvas-actions">
                   <button
@@ -975,6 +972,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onMoveComplete={handleLassoMoveComplete}
               />
             </div>
+            </div>{/* end noteometry-canvas-body */}
           </div>
 
           {/* ── Right panel ── */}

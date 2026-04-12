@@ -149,26 +149,6 @@ const TABS: TabDef[] = [
     ],
   },
   {
-    id: "stats", label: "P(X)",
-    items: [
-      { latex: "P()", display: "P( )", title: "Probability" },
-      { latex: "E[]", display: "E[ ]", title: "Expected value" },
-      { latex: "\\text{Var}()", display: "Var( )", title: "Variance" },
-      { latex: "\\sigma^2", display: "σ²", title: "Variance" },
-      { latex: "\\bar{x}", display: "x̄", title: "Sample mean" },
-      { latex: "\\hat{p}", display: "p̂", title: "Estimate" },
-      { latex: "\\mu", display: "μ", title: "Population mean" },
-      { latex: "\\sigma", display: "σ", title: "Std deviation" },
-      { latex: "\\binom{n}{k}", display: "ⁿCₖ", title: "Binomial coefficient" },
-      { latex: "n!", display: "n!", title: "Factorial" },
-      { latex: "\\sim ", display: "∼", title: "Distributed as" },
-      { latex: "\\mathcal{N}(\\mu, \\sigma^2)", display: "N(μ,σ²)", title: "Normal dist" },
-      { latex: "\\chi^2", display: "χ²", title: "Chi-squared" },
-      { latex: "H_0", display: "H₀", title: "Null hypothesis" },
-      { latex: "H_a", display: "Hₐ", title: "Alt hypothesis" },
-    ],
-  },
-  {
     id: "ee", label: "⚡",
     items: [
       { latex: "V", display: "V", title: "Voltage" },
@@ -251,72 +231,6 @@ const TABS: TabDef[] = [
       { latex: "\\text{f}", display: "f", title: "femto (10⁻¹⁵)" },
     ],
   },
-  {
-    // One-click EE formula templates. Click inserts the full LaTeX into
-    // the panel Input; the Preview renders it via KaTeX immediately.
-    // Drag-to-canvas stamps the plain text form as a canvas label.
-    id: "formulas", label: "∫V",
-    items: [
-      // ── DC fundamentals ──
-      { latex: "V = IR", display: "V=IR", stamp: "V=IR", title: "Ohm's law" },
-      { latex: "P = VI", display: "P=VI", stamp: "P=VI", title: "Power = V×I" },
-      { latex: "P = I^{2}R", display: "P=I²R", stamp: "P=I²R", title: "Power dissipated in R" },
-      { latex: "P = \\frac{V^{2}}{R}", display: "P=V²/R", stamp: "P=V²/R", title: "Power from V across R" },
-      // ── Kirchhoff ──
-      { latex: "\\sum V = 0", display: "ΣV=0", stamp: "ΣV=0", title: "KVL" },
-      { latex: "\\sum I = 0", display: "ΣI=0", stamp: "ΣI=0", title: "KCL" },
-      // ── AC impedance ──
-      { latex: "Z = R + jX", display: "Z=R+jX", stamp: "Z=R+jX", title: "Impedance" },
-      { latex: "Z_{C} = \\frac{1}{j\\omega C}", display: "Zc=1/jωC", title: "Capacitor impedance" },
-      { latex: "Z_{L} = j\\omega L", display: "Zl=jωL", title: "Inductor impedance" },
-      { latex: "\\omega = 2\\pi f", display: "ω=2πf", stamp: "ω=2πf", title: "Angular frequency" },
-      // ── Resonance and time constants ──
-      { latex: "\\omega_{0} = \\frac{1}{\\sqrt{LC}}", display: "ω₀=1/√LC", title: "Resonance" },
-      { latex: "\\tau = RC", display: "τ=RC", stamp: "τ=RC", title: "RC time constant" },
-      { latex: "\\tau = \\frac{L}{R}", display: "τ=L/R", stamp: "τ=L/R", title: "RL time constant" },
-      { latex: "Q = \\omega_{0} RC", display: "Q=ω₀RC", title: "Quality factor (RC)" },
-      // ── Capacitor / inductor defining equations ──
-      { latex: "i_{C} = C \\frac{dv}{dt}", display: "i=Cdv/dt", title: "Capacitor i–v" },
-      { latex: "v_{L} = L \\frac{di}{dt}", display: "v=Ldi/dt", title: "Inductor v–i" },
-      { latex: "W_{C} = \\tfrac{1}{2}CV^{2}", display: "½CV²", title: "Capacitor energy" },
-      { latex: "W_{L} = \\tfrac{1}{2}LI^{2}", display: "½LI²", title: "Inductor energy" },
-      // ── AC power ──
-      { latex: "S = P + jQ", display: "S=P+jQ", stamp: "S=P+jQ", title: "Complex power" },
-      { latex: "P = V_{rms} I_{rms} \\cos\\phi", display: "P=VI cosφ", title: "Real power" },
-      { latex: "\\text{pf} = \\cos\\phi", display: "pf=cosφ", title: "Power factor" },
-      // ── Transfer functions and filters ──
-      { latex: "H(s) = \\frac{Y(s)}{X(s)}", display: "H=Y/X", title: "Transfer function" },
-      { latex: "H(j\\omega) = \\frac{1}{1 + j\\omega RC}", display: "LPF", title: "First-order low-pass" },
-      { latex: "H(j\\omega) = \\frac{j\\omega RC}{1 + j\\omega RC}", display: "HPF", title: "First-order high-pass" },
-      // ── Amplifier gains ──
-      { latex: "A_{v} = -g_{m} R_{L}", display: "Av=-gmRL", title: "Common-emitter / CS gain" },
-      { latex: "A_{v} = 1 + \\frac{R_{f}}{R_{1}}", display: "non-inv", title: "Non-inverting op-amp" },
-      { latex: "A_{v} = -\\frac{R_{f}}{R_{1}}", display: "inverting", title: "Inverting op-amp" },
-      // ── Time-domain signals ──
-      { latex: "v(t) = V_{m}\\cos(\\omega t + \\phi)", display: "Vmcos", title: "Sinusoid" },
-      { latex: "V_{rms} = \\frac{V_{m}}{\\sqrt{2}}", display: "Vm/√2", title: "RMS of sinusoid" },
-      // ── Divider rules ──
-      { latex: "V_{out} = V_{in}\\frac{R_{2}}{R_{1}+R_{2}}", display: "÷V", title: "Voltage divider" },
-      { latex: "I_{1} = I\\frac{R_{2}}{R_{1}+R_{2}}", display: "÷I", title: "Current divider" },
-      // ── Maxwell (compact forms) ──
-      { latex: "\\nabla \\cdot \\vec{E} = \\frac{\\rho}{\\epsilon_{0}}", display: "∇·E=ρ/ε", title: "Gauss's law" },
-      { latex: "\\nabla \\times \\vec{E} = -\\frac{\\partial \\vec{B}}{\\partial t}", display: "∇×E", title: "Faraday's law" },
-      { latex: "\\nabla \\cdot \\vec{B} = 0", display: "∇·B=0", title: "No monopoles" },
-      { latex: "\\nabla \\times \\vec{B} = \\mu_{0}\\vec{J} + \\mu_{0}\\epsilon_{0}\\frac{\\partial \\vec{E}}{\\partial t}", display: "∇×B", title: "Ampère-Maxwell" },
-    ],
-  },
-  {
-    id: "logic", label: "∀∃",
-    items: [
-      { latex: "\\forall ", display: "∀" }, { latex: "\\exists ", display: "∃" },
-      { latex: "\\neg ", display: "¬" }, { latex: "\\land ", display: "∧" },
-      { latex: "\\lor ", display: "∨" }, { latex: "\\oplus ", display: "⊕", title: "XOR" },
-      { latex: "\\Rightarrow ", display: "⇒" }, { latex: "\\Leftrightarrow ", display: "⇔" },
-      { latex: "\\top ", display: "⊤", title: "True" }, { latex: "\\bot ", display: "⊥", title: "False" },
-      { latex: "\\emptyset ", display: "∅" }, { latex: "\\cup ", display: "∪" },
-      { latex: "\\cap ", display: "∩" }, { latex: "\\setminus ", display: "∖" },
-    ],
-  },
 ];
 
 // Export tabs for use in floating palette
@@ -372,7 +286,7 @@ export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Prop
         ghost.style.cssText =
           "position:fixed;z-index:99999;pointer-events:none;" +
           "font-size:24px;padding:6px 10px;" +
-          "background:rgba(74,144,217,0.15);border:2px solid #4A90D9;" +
+          "background:rgba(74,124,155,0.15);border:2px solid #4a7c9b;" +
           "border-radius:10px;transform:translate(-50%,-110%);";
         document.body.appendChild(ghost);
         state.ghost = ghost;

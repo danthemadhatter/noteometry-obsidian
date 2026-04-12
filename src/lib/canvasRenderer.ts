@@ -12,15 +12,14 @@ import type { CanvasObject } from "./canvasObjects";
 const GRID_MINOR = 12;
 const GRID_MAJOR = GRID_MINOR * 8; // 96px = 1 inch
 
-// Whisper-subtle grid — slightly teal-navy to match the atomic-age
-// chassis tone. Still very low alpha so the canvas reads clean.
-const GRID_MINOR_COLOR = "rgba(29, 90, 133, 0.06)";
-const GRID_MAJOR_COLOR = "rgba(29, 90, 133, 0.12)";
+// Whisper-subtle grid — steel blue tint to match the v8 accent.
+const GRID_MINOR_COLOR = "rgba(74, 124, 155, 0.08)";
+const GRID_MAJOR_COLOR = "rgba(74, 124, 155, 0.18)";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 0.75;
 
-// Canvas cream — matches --nm-canvas-bg in styles.css
-const GRID_BG_COLOR = "#f7f4e8";
+// Canvas bg — matches --nm-canvas-bg in styles.css
+const GRID_BG_COLOR = "#f5f3ee";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(
