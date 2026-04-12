@@ -106,9 +106,6 @@ export default function CanvasToolbar({
         <Btn active={tool === "grab" && !lassoActive} onClick={() => onToolChange("grab")} title="Pan">
           <IconHand />
         </Btn>
-        <Btn active={tool === "select" && !lassoActive} onClick={() => onToolChange("select")} title="Select">
-          <IconSelect />
-        </Btn>
       </div>
 
       {/* ── Shapes (popup) ── */}

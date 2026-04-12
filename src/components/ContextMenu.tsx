@@ -78,8 +78,9 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
             key={i}
             className={`noteometry-ctx-item ${item.disabled ? "disabled" : ""} ${item.danger ? "danger" : ""}`}
             disabled={item.disabled}
-            onClick={() => {
+            onPointerUp={(e) => {
               if (item.disabled) return;
+              e.stopPropagation();
               item.onClick?.();
               onClose();
             }}

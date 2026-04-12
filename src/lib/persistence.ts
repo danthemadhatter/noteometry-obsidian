@@ -30,6 +30,26 @@ function rootDir(plugin: NoteometryPlugin): string {
   return plugin.settings.vaultFolder || "Noteometry";
 }
 
+/** Natural sort comparator — "Week 2" before "Week 10". */
+function naturalCompare(a: string, b: string): number {
+  const ax = a.split(/(\d+)/);
+  const bx = b.split(/(\d+)/);
+  const len = Math.min(ax.length, bx.length);
+  for (let i = 0; i < len; i++) {
+    const aPart = ax[i]!;
+    const bPart = bx[i]!;
+    // If both parts are numeric, compare numerically
+    if (/^\d+$/.test(aPart) && /^\d+$/.test(bPart)) {
+      const diff = parseInt(aPart, 10) - parseInt(bPart, 10);
+      if (diff !== 0) return diff;
+    } else {
+      const cmp = aPart.localeCompare(bPart, undefined, { sensitivity: "base" });
+      if (cmp !== 0) return cmp;
+    }
+  }
+  return ax.length - bx.length;
+}
+
 function sectionPath(plugin: NoteometryPlugin, section: string): string {
   return `${rootDir(plugin)}/${section}`;
 }
@@ -51,7 +71,7 @@ export async function listSections(plugin: NoteometryPlugin): Promise<string[]> 
     return listing.folders
       .map((f) => f.split("/").pop() ?? "")
       .filter((n) => n.length > 0)
-      .sort();
+      .sort(naturalCompare);
   } catch {
     return [];
   }
@@ -91,7 +111,7 @@ export async function listPages(plugin: NoteometryPlugin, section: string): Prom
         const name = f.split("/").pop() ?? "";
         return name.replace(/\.md$/, "");
       })
-      .sort();
+      .sort(naturalCompare);
   } catch {
     return [];
   }

@@ -119,20 +119,20 @@
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
 }
 
-/* v7: primary chassis is blue, so default text is cream stencil.
- * Components that render on cream faceplate inserts (chat bubbles,
- * text boxes, canvas) override locally with --nm-paper-ink.
+/* Dan's rule (2026-04-11): "ALL of the text should be black." No
+ * exceptions, no cream-on-blue, no context-dependent scoping. Every
+ * piece of text in the UI is dark navy. Period.
  *
- * IMPORTANT: --text-muted and --text-faint must be CREAM-derived at
- * the container level, because most labels that reach for these vars
- * (panel headers, chat titles, sidebar items) live on the BLUE chassis.
- * Setting them to --nm-ink-muted made them invisible on blue. Cream
- * surfaces re-scope these vars locally (see cream-surface rule below). */
+ * This replaces the dual-zone cream/dark scoping system that was
+ * causing repeated contrast bugs. On blue chassis surfaces the text
+ * is now dark-on-blue instead of cream-on-blue — lower contrast in
+ * those areas, but Dan explicitly prioritized universal readability
+ * over the 1950s aesthetic cream stencil look. */
 .noteometry-container {
-  color: var(--nm-chassis-fg);
-  --text-normal: var(--nm-chassis-fg);
-  --text-muted: rgba(237, 232, 210, 0.72);
-  --text-faint: rgba(237, 232, 210, 0.5);
+  color: var(--nm-paper-ink);
+  --text-normal: var(--nm-paper-ink);
+  --text-muted: var(--nm-ink-muted);
+  --text-faint: rgba(26, 35, 53, 0.6);
 }
 
 /* Cream-surface text scope — Dan's rule: "font for everything needs to
@@ -158,20 +158,10 @@
   --text-faint: rgba(26, 35, 53, 0.52);
 }
 
-/* Blue-surface text scope — explicit cream on all dark chassis surfaces so
- * nothing inside falls back to an inherited color. Sidebar items (files
- * and folders) were the most visible offenders — they used var(--text-normal)
- * which theoretically resolves to cream at container level, but adding an
- * explicit rule at the item level removes any cascade ambiguity. */
-.noteometry-sidebar-open,
-.noteometry-sidebar-closed,
-.noteometry-sidebar-hdr,
-.noteometry-sidebar-title,
-.noteometry-sidebar-item,
-.noteometry-sidebar-section-item,
-.noteometry-sidebar-page-item,
-.noteometry-sidebar-add-page,
-.noteometry-sidebar-add,
+/* Blue-surface text scope — explicit cream on dark chassis surfaces.
+ * Sidebar is now cream-based (--nm-faceplate-alt) and uses dark ink
+ * text, so sidebar selectors are removed from this rule. Only the chat
+ * panel (which sits on the blue chassis) needs cream text. */
 .noteometry-chat,
 .noteometry-chat-header,
 .noteometry-chat-title,
@@ -181,6 +171,19 @@
 .noteometry-preset-btn,
 .noteometry-preset-menu {
   color: var(--nm-chassis-fg);
+}
+
+/* Sidebar text — dark ink on cream background for readability. */
+.noteometry-sidebar-open,
+.noteometry-sidebar-closed,
+.noteometry-sidebar-hdr,
+.noteometry-sidebar-title,
+.noteometry-sidebar-item,
+.noteometry-sidebar-section-item,
+.noteometry-sidebar-page-item,
+.noteometry-sidebar-add-page,
+.noteometry-sidebar-add {
+  color: var(--nm-paper-ink);
 }
 
 /* Belt-and-suspenders: force every inline SVG inside the plugin to use
@@ -259,16 +262,16 @@
   display: flex;
   align-items: flex-start;
   padding-top: 8px;
-  background: var(--nm-warm-bg-alt);
-  border-right: 1px solid var(--nm-warm-border);
+  background: var(--nm-faceplate-alt);
+  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-open {
   width: 260px;
   display: flex;
   flex-direction: column;
-  background: var(--nm-warm-bg-alt);
-  border-right: 1px solid var(--nm-warm-border-strong);
+  background: var(--nm-faceplate-alt);
+  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-backdrop {
@@ -317,7 +320,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 12px 10px;
-  border-bottom: 1px solid var(--nm-warm-border);
+  border-bottom: 1px solid var(--nm-paper-border);
   flex-shrink: 0;
 }
 
@@ -329,7 +332,7 @@
 }
 
 .noteometry-sidebar-section {
-  border-bottom: 1px solid var(--nm-warm-border);
+  border-bottom: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-pages {
@@ -373,10 +376,10 @@
 }
 
 .noteometry-sidebar-item.active {
-  background: var(--nm-section-active);
+  background: var(--nm-accent-light);
   border-left-color: var(--nm-accent);
   font-weight: 600;
-  color: var(--text-normal);
+  color: var(--nm-paper-ink);
 }
 
 .noteometry-sidebar-item-name {
@@ -454,10 +457,15 @@
   color: var(--nm-accent);
   background: none;
   border: none;
-  border-top: 1px solid var(--nm-warm-border);
+  border-top: 1px solid var(--nm-paper-border);
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.12s;
+}
+
+.noteometry-sidebar-add-buttons {
+  display: flex;
+  flex-direction: column;
 }
 
 .noteometry-sidebar-add:hover {
@@ -475,8 +483,8 @@
   font-size: 13px;
   border: 1.5px solid var(--nm-accent);
   border-radius: var(--nm-radius-sm);
-  background: var(--nm-warm-bg);
-  color: var(--text-normal);
+  background: var(--nm-faceplate-light);
+  color: var(--nm-paper-ink);
   box-sizing: border-box;
 }
 
@@ -602,6 +610,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  background: var(--nm-faceplate);
 }
 
 /* ── Resize handles ───────────────────────────────────────── */
@@ -686,7 +695,7 @@
 }
 
 .noteometry-table td {
-  border: 1px solid var(--nm-warm-border-strong);
+  border: 1px solid var(--nm-paper-border);
   padding: 0;
 }
 
@@ -732,8 +741,8 @@
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--nm-warm-bg-alt);
-  border: 1px solid var(--nm-warm-border);
+  background: var(--nm-faceplate-alt);
+  border: 1px solid var(--nm-paper-border);
   border-radius: 4px;
   cursor: pointer;
   color: var(--text-muted);
@@ -1523,21 +1532,24 @@
 }
 
 /* Toolbar popups (shapes, width, insert, more) */
+/* Toolbar moved to the top bar in Phase 4 — popup opens DOWNWARD now,
+ * not upward. The old bottom: 48px was a relic from when the toolbar
+ * sat at the bottom of the canvas area. */
 .noteometry-toolbar-popup {
   position: absolute;
-  bottom: 48px;
+  top: calc(100% + 4px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 2px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  background: var(--nm-faceplate);
+  color: var(--nm-paper-ink);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
   white-space: nowrap;
+  z-index: 200;
 }
 
 /* Stroke width picker popup */
@@ -1676,17 +1688,22 @@
   background: repeating-linear-gradient(45deg, #fff0ec, #fff0ec 8px, #f5e0d9 8px, #f5e0d9 16px);
 }
 
+/* Compact drag handle — shrunk from a full header row to a minimal
+ * strip. Dan flagged "wasted space because of blocky design" with the
+ * old header that said "TEXT" and had a big X taking a whole row. Now
+ * the label and delete button sit in a thin 20px strip. */
 .noteometry-object-drag-handle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 8px;
-  background: var(--nm-warm-bg-alt);
-  border-bottom: 1px solid var(--nm-warm-border);
+  padding: 1px 6px;
+  background: var(--nm-faceplate-recessed);
+  border-bottom: 1px solid var(--nm-paper-border);
   cursor: grab;
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 9px;
+  color: var(--nm-paper-ink);
   user-select: none;
+  min-height: 18px;
 }
 .noteometry-object-drag-handle:active { cursor: grabbing; }
 
@@ -1783,21 +1800,34 @@
   background: var(--nm-paper-border);
 }
 
+/* Delete button + drag handle are ALWAYS clickable regardless of the
+ * current tool mode. Without this, when the parent canvas-object div
+ * has pointer-events:none (non-select mode), the delete button and
+ * drag handle become dead — Dan reported "X's do nothing". */
+.noteometry-object-drag-handle,
+.noteometry-object-delete {
+  pointer-events: auto !important;
+}
+
 .noteometry-object-delete {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: 18px;
-  padding: 6px 8px;
+  color: var(--nm-paper-ink);
+  font-size: 14px;
+  padding: 2px 6px;
   line-height: 1;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 20px;
+  min-height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  opacity: 0.5;
+}
+.noteometry-object-drag-handle:hover .noteometry-object-delete {
+  opacity: 1;
 }
 .noteometry-object-delete:hover { color: var(--nm-danger); }
 .noteometry-object-delete:active { color: var(--nm-danger); transform: scale(0.9); }
@@ -2205,18 +2235,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
-  height: 30px;
-  padding: 0 10px;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
   background: var(--nm-faceplate);
-  color: var(--nm-ink);
-  border: 1px solid var(--nm-warm-border-strong);
+  color: var(--nm-paper-ink);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius-sm);
   cursor: pointer;
   font-family: inherit;
-  font-size: inherit;
-  font-weight: inherit;
-  letter-spacing: inherit;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   transition: background 100ms, border-color 100ms;
@@ -2233,12 +2262,14 @@
 }
 
 .noteometry-zoom-percent {
-  min-width: 52px;
+  min-width: 36px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .noteometry-zoom-lock {
-  min-width: 28px;
+  min-width: 24px;
+  font-size: 14px;
 }
 
 .noteometry-zoom-lock.locked {

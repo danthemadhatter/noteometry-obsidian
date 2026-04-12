@@ -878,10 +878,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   className="noteometry-zoom-btn"
                   onClick={zoomOut}
                   disabled={zoomLocked || zoom <= 0.5}
-                  title="Zoom out (Cmd/Ctrl + scroll also works)"
+                  title="Zoom out"
                   aria-label="Zoom out"
                 >
-                  ZOOM −
+                  −
                 </button>
                 <button
                   className="noteometry-zoom-btn noteometry-zoom-percent"
@@ -895,18 +895,18 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   className="noteometry-zoom-btn"
                   onClick={zoomIn}
                   disabled={zoomLocked || zoom >= 4}
-                  title="Zoom in (Cmd/Ctrl + scroll also works)"
+                  title="Zoom in"
                   aria-label="Zoom in"
                 >
-                  ZOOM +
+                  +
                 </button>
                 <button
                   className={`noteometry-zoom-btn noteometry-zoom-lock ${zoomLocked ? "locked" : ""}`}
                   onClick={toggleZoomLock}
-                  title={zoomLocked ? "Unlock zoom (currently LOCKED)" : "Lock zoom (prevents accidental changes)"}
+                  title={zoomLocked ? "Unlock zoom" : "Lock zoom"}
                   aria-label={zoomLocked ? "Unlock zoom" : "Lock zoom"}
                 >
-                  {zoomLocked ? "LOCK" : "UNLK"}
+                  {zoomLocked ? "🔒" : "🔓"}
                 </button>
               </div>
             </div>

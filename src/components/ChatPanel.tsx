@@ -222,16 +222,6 @@ export default function ChatPanel({
                     {copiedIdx === i ? <IconCheck /> : <IconCopy />}
                     {copiedIdx === i ? "Copied!" : "Copy for Word"}
                   </button>
-                  {onDropToCanvas && (
-                    <button
-                      className="noteometry-chat-copy-btn"
-                      onClick={() => onDropToCanvas(toMathMLForClipboard(m.text))}
-                      title="Drop this response onto the canvas as an editable text box"
-                    >
-                      <IconType />
-                      Drop onto canvas
-                    </button>
-                  )}
                 </div>
               )}
             </div>

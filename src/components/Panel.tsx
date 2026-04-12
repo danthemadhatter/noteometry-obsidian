@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
+import { IconChevRight } from "./Icons";
 import KaTeXRenderer from "./KaTeXRenderer";
 import MathPalette from "./MathPalette";
 
@@ -78,11 +79,11 @@ export default function Panel({
         <div className="noteometry-panel-box-hdr">
           <span>Preview</span>
           <button
-            className="noteometry-panel-action"
+            className="noteometry-panel-action noteometry-panel-hide"
             onClick={onClosePanel}
-            title="Close panel"
+            title="Hide panel"
           >
-            ✕
+            <IconChevRight />
           </button>
         </div>
         <div className="noteometry-panel-box-content">

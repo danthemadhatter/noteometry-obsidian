@@ -2,15 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import type NoteometryPlugin from "../main";
 import { loadPdfFromVault } from "../lib/persistence";
 
-// Legacy build runs without a Web Worker, which is what we need inside
-// Obsidian's sandboxed renderer — a standalone worker URL won't resolve
-// reliably across desktop/mobile. Main-thread rendering is slower but
-// works everywhere.
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-
-// Explicitly disable worker so pdfjs uses a fake/inline one on the main
-// thread. Without this, getDocument() tries to spawn a worker from a URL
-// that doesn't exist inside Obsidian's bundle and fails silently.
+// pdfjs-dist v2.x — the last version that supports disableWorker: true
+// in getDocument(). v3+ requires an explicit worker URL which doesn't
+// reliably resolve inside Obsidian's Electron/mobile sandbox. v2 runs
+// everything on the main thread when disableWorker is set, which is
+// slower for huge PDFs but works on every platform without any worker
+// bundling gymnastics.
+// @ts-expect-error — pdfjs-dist@2 ships untyped CJS; TS can't resolve the module but esbuild bundles it fine.
+import * as pdfjsLib from "pdfjs-dist/build/pdf";
 (pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
 
 interface Props {
@@ -63,7 +62,7 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
         }
         const loadingTask = (pdfjsLib as unknown as {
           getDocument: (opts: unknown) => { promise: Promise<unknown> };
-        }).getDocument({ data });
+        }).getDocument({ data, disableWorker: true });
         const doc = await loadingTask.promise;
         if (cancelled) return;
         const pageCount = (doc as { numPages: number }).numPages;
