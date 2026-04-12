@@ -128,19 +128,14 @@
   --text-faint: rgba(26, 35, 53, 0.52);
 }
 
-/* Blue-surface text scope — explicit cream on dark chassis surfaces.
- * Sidebar is now cream-based (--nm-faceplate-alt) and uses dark ink
- * text, so sidebar selectors are removed from this rule. Only the chat
- * panel (which sits on the blue chassis) needs cream text. */
+/* Chat text — dark ink on cream/paper background. */
 .noteometry-chat,
 .noteometry-chat-header,
 .noteometry-chat-title,
 .noteometry-chat-messages,
 .noteometry-chat-empty,
-.noteometry-chat-input-row,
-.noteometry-preset-btn,
-.noteometry-preset-menu {
-  color: var(--nm-chassis-fg);
+.noteometry-chat-input-row {
+  color: var(--nm-ink);
 }
 
 /* Sidebar text — dark ink on cream background for readability. */
@@ -228,16 +223,16 @@
 }
 
 .noteometry-sidebar-closed {
-  width: 44px;
+  width: 36px;
   display: flex;
   align-items: flex-start;
-  padding-top: 8px;
+  padding-top: 6px;
   background: var(--nm-faceplate-alt);
   border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-open {
-  width: 260px;
+  width: 180px;
   display: flex;
   flex-direction: column;
   background: var(--nm-faceplate-alt);
@@ -332,8 +327,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   cursor: pointer;
   color: var(--text-normal);
   border-left: 3px solid transparent;
@@ -1150,7 +1145,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--nm-chassis-light);
+  background: var(--nm-faceplate);
   border: 1px solid var(--nm-warm-border-strong);
   border-radius: var(--nm-radius);
   margin: 0 10px 10px;
@@ -1671,52 +1666,39 @@
   background: repeating-linear-gradient(45deg, #fff0ec, #fff0ec 8px, #f5e0d9 8px, #f5e0d9 16px);
 }
 
-/* Compact drag handle — shrunk from a full header row to a minimal
- * strip. Dan flagged "wasted space because of blocky design" with the
- * old header that said "TEXT" and had a big X taking a whole row. Now
- * the label and delete button sit in a thin 20px strip. */
-.noteometry-object-drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1px 6px;
-  background: var(--nm-faceplate-recessed);
-  border-bottom: 1px solid var(--nm-paper-border);
+/* Title bar — flush editable text input that doubles as drag handle.
+ * No background/border until hover or focus for a minimal look. */
+.noteometry-object-title-bar {
   cursor: grab;
-  font-size: 9px;
-  color: var(--nm-paper-ink);
   user-select: none;
-  min-height: 18px;
+  padding: 0;
 }
-.noteometry-object-drag-handle:active { cursor: grabbing; }
+.noteometry-object-title-bar:active { cursor: grabbing; }
 
-.noteometry-object-drag-label {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: text;
-  user-select: none;
-  padding: 2px 4px;
-  border-radius: 3px;
-}
-.noteometry-object-drag-label:hover {
-  background: rgba(184, 146, 88, 0.12);
-}
-
-/* Inline rename input that replaces the drag label on double-click */
-.noteometry-object-name-input {
+.noteometry-object-title-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--nm-faceplate-light);
+  letter-spacing: 0.3px;
   color: var(--nm-paper-ink);
-  border: 1px solid var(--nm-accent);
-  border-radius: 3px;
-  padding: 2px 4px;
-  min-width: 80px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 3px 6px;
   outline: none;
+  cursor: inherit;
+}
+.noteometry-object-title-input:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--nm-paper-border);
+}
+.noteometry-object-title-input:focus {
+  background: var(--nm-faceplate-light);
+  border-color: var(--nm-accent);
+  cursor: text;
 }
 
 /* ── Right-click context menu ─────────────────────────── */
@@ -1783,37 +1765,12 @@
   background: var(--nm-paper-border);
 }
 
-/* Delete button + drag handle are ALWAYS clickable regardless of the
- * current tool mode. Without this, when the parent canvas-object div
- * has pointer-events:none (non-select mode), the delete button and
- * drag handle become dead — Dan reported "X's do nothing". */
-.noteometry-object-drag-handle,
-.noteometry-object-delete {
+/* Title bar is ALWAYS clickable regardless of the current tool mode.
+ * Without this, when the parent canvas-object div has
+ * pointer-events:none (non-select mode), the title bar becomes dead. */
+.noteometry-object-title-bar {
   pointer-events: auto !important;
 }
-
-.noteometry-object-delete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--nm-paper-ink);
-  font-size: 14px;
-  padding: 2px 6px;
-  line-height: 1;
-  min-width: 20px;
-  min-height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  opacity: 0.5;
-}
-.noteometry-object-drag-handle:hover .noteometry-object-delete {
-  opacity: 1;
-}
-.noteometry-object-delete:hover { color: var(--nm-danger); }
-.noteometry-object-delete:active { color: var(--nm-danger); transform: scale(0.9); }
 
 .noteometry-object-content {
   flex: 1;

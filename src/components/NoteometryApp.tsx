@@ -81,11 +81,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     hydrate: hydrateObjects,
   } = useObjects();
 
-  /* ── Pipeline feature: panel input + chat + READ INK + solve + presets ─── */
+  /* ── Pipeline feature: panel input + chat + READ INK + solve ─── */
   const {
     inputCode, chatMessages, isReading, chatLoading,
-    presets, activePreset,
-    setInputCode, setChatMessages, setActivePresetId,
+    setInputCode, setChatMessages,
     sendToChat, stopChat, processCrop, handleSolveInput, handleInsertSymbol,
     hydrate: hydratePipeline,
   } = usePipeline(plugin);
@@ -1020,9 +1019,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     onStop={stopChat}
                     onClear={() => setChatMessages([])}
                     loading={chatLoading}
-                    presets={presets}
-                    activePresetId={activePreset.id}
-                    onPresetChange={setActivePresetId}
                     onDropToCanvas={handleDropChatToCanvas}
                   />
                 </div>

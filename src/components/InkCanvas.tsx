@@ -221,6 +221,7 @@ export default function InkCanvas({
   // ── Pen/Eraser pointer handlers (NO touch — that's separate) ───
   const handlePointerDown = useCallback((e: PointerEvent) => {
     if (e.pointerType === "touch") return; // handled by touch pan effect
+    if (e.button === 2) return; // right-click — let onContextMenu handle it
 
     // Double-tap / double-click detection for pen AND mouse. Fires
     // onCycleTool in the parent, which drives pen → eraser → rect-lasso

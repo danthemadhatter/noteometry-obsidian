@@ -8,16 +8,13 @@ import {
 import type { CanvasTool } from "./InkCanvas";
 import type { LassoMode } from "../features/lasso/useLassoStack";
 
-// Traditional ink palette — dark colors that read on the pale engineering
-// paper canvas. Default is fountain pen navy (reads as black, feels like
-// fountain pen on vellum rather than harsh true black).
 const INK_COLORS = [
-  { color: "#1a2a4a", label: "Ink" },
-  { color: "#c8382c", label: "Signal Red" },
-  { color: "#3a7a2e", label: "Engineer Green" },
-  { color: "#1f4b8e", label: "Drafting Blue" },
-  { color: "#b5651d", label: "Rust Orange" },
-  { color: "#5d3b8e", label: "Purple" },
+  { color: "#202124", label: "Black" },      // Google dark
+  { color: "#d93025", label: "Red" },         // Google red
+  { color: "#1a73e8", label: "Blue" },        // Google blue
+  { color: "#188038", label: "Green" },       // Google green
+  { color: "#e8710a", label: "Orange" },      // Google orange
+  { color: "#9334e6", label: "Purple" },      // Google purple
 ];
 
 const STROKE_WIDTHS = [

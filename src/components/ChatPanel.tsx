@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck, IconType } from "./Icons";
+import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
 import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
-import type { PromptPreset } from "../features/pipeline/presets";
 
 interface Props {
   messages: ChatMessage[];
@@ -11,9 +10,6 @@ interface Props {
   /** Optional: stop an in-flight chat request (streaming). */
   onStop?: () => void;
   loading: boolean;
-  presets: PromptPreset[];
-  activePresetId: string;
-  onPresetChange: (id: string) => void;
   /** Called when the user clicks "Drop onto canvas" on an assistant message.
    * Receives the pre-rendered HTML (LaTeX → MathML) ready to drop into a
    * contenteditable text box on the canvas. */
@@ -71,31 +67,14 @@ function toMathMLForClipboard(text: string): string {
 
 export default function ChatPanel({
   messages, onSend, onClear, onStop, loading,
-  presets, activePresetId, onPresetChange,
   onDropToCanvas,
 }: Props) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const presetMenuRef = useRef<HTMLDivElement>(null);
-
-  const activePreset = presets.find((p) => p.id === activePresetId) ?? presets[0]!;
-
-  // Close the preset menu when clicking outside
-  useEffect(() => {
-    if (!presetMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (!presetMenuRef.current?.contains(e.target as Node)) {
-        setPresetMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [presetMenuOpen]);
 
   const copyAsMathML = useCallback(async (text: string, idx: number) => {
     const mathml = toMathMLForClipboard(text);
@@ -156,40 +135,9 @@ export default function ChatPanel({
 
   return (
     <div className="noteometry-chat">
-      {/* Header with preset selector */}
+      {/* Header — just the chat title + New button */}
       <div className="noteometry-chat-header">
-        <div className="noteometry-preset-selector" ref={presetMenuRef}>
-          <button
-            className="noteometry-preset-btn"
-            onClick={() => setPresetMenuOpen((v) => !v)}
-            title={activePreset.description}
-          >
-            <span className="noteometry-preset-badge">{activePreset.badge}</span>
-            <span className="noteometry-preset-label">{activePreset.label}</span>
-            <span className="noteometry-preset-caret">▾</span>
-          </button>
-          {presetMenuOpen && (
-            <div className="noteometry-preset-menu">
-              {presets.map((p) => (
-                <button
-                  key={p.id}
-                  className={`noteometry-preset-menu-item ${p.id === activePresetId ? "active" : ""}`}
-                  onClick={() => {
-                    onPresetChange(p.id);
-                    setPresetMenuOpen(false);
-                  }}
-                  title={p.description}
-                >
-                  <span className="noteometry-preset-badge">{p.badge}</span>
-                  <span className="noteometry-preset-menu-label">
-                    <span className="noteometry-preset-menu-name">{p.label}</span>
-                    <span className="noteometry-preset-menu-desc">{p.description}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <span className="noteometry-chat-title">Chat</span>
         {messages.length > 0 && (
           <button className="noteometry-chat-clear" onClick={onClear} title="New conversation">
             <IconRotate />

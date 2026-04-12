@@ -8,14 +8,18 @@ import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
 
-/** Inline editable label that lives in the drag handle of every canvas
- * object. Click to rename, Enter to commit, Escape to revert. */
-function EditableObjectName({
+/** Editable title input at the top of every canvas object. Click to
+ * edit, Enter/blur to commit, Escape to revert. The input also doubles
+ * as the drag handle — onPointerDown on the wrapper starts the drag
+ * unless the input is focused for editing. */
+function EditableObjectTitle({
   value,
   onChange,
+  onDragStart,
 }: {
   value: string;
   onChange: (next: string) => void;
+  onDragStart: (e: React.PointerEvent) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -37,40 +41,36 @@ function EditableObjectName({
     if (trimmed && trimmed !== value) onChange(trimmed);
     setEditing(false);
   };
-  const revert = () => {
-    setDraft(value);
-    setEditing(false);
-  };
 
-  if (editing) {
-    return (
+  return (
+    <div
+      className="noteometry-object-title-bar"
+      onPointerDown={(e) => {
+        if (!editing) onDragStart(e);
+      }}
+    >
       <input
         ref={inputRef}
-        className="noteometry-object-name-input"
-        value={draft}
+        className="noteometry-object-title-input"
+        value={editing ? draft : value}
+        readOnly={!editing}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
+          if (!editing) return;
           e.stopPropagation();
           if (e.key === "Enter") { e.preventDefault(); commit(); }
-          if (e.key === "Escape") { e.preventDefault(); revert(); }
+          if (e.key === "Escape") { e.preventDefault(); setDraft(value); setEditing(false); }
         }}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!editing) setEditing(true);
+        }}
+        onPointerDown={(e) => {
+          if (editing) e.stopPropagation();
+        }}
       />
-    );
-  }
-  return (
-    <span
-      className="noteometry-object-drag-label"
-      onDoubleClick={(e) => {
-        e.stopPropagation();
-        setEditing(true);
-      }}
-      title="Double-click to rename"
-    >
-      {value}
-    </span>
+    </div>
   );
 }
 
@@ -283,33 +283,16 @@ export default function CanvasObjectLayer({
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
-          {/* Drag handle */}
-          <div
-            className="noteometry-object-drag-handle"
-            onPointerDown={(e) => handleDragStart(e, obj)}
-          >
-            <EditableObjectName
-              value={defaultObjectName(obj)}
-              onChange={(next) => {
-                onObjectsChange(objects.map(o =>
-                  o.id === obj.id ? { ...o, name: next } : o
-                ));
-              }}
-            />
-            <button
-              className="noteometry-object-delete"
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                const label = obj.type === "textbox" ? "text box" : obj.type === "table" ? "table" : "image";
-                if (confirm(`Delete this ${label}?`)) {
-                  onObjectsChange(objects.filter(o => o.id !== obj.id));
-                  if (selectedObjectId === obj.id) onSelectObject(null);
-                }
-              }}
-              title="Delete"
-            >&times;</button>
-          </div>
+          {/* Title bar — editable name that doubles as drag handle */}
+          <EditableObjectTitle
+            value={defaultObjectName(obj)}
+            onChange={(next) => {
+              onObjectsChange(objects.map(o =>
+                o.id === obj.id ? { ...o, name: next } : o
+              ));
+            }}
+            onDragStart={(e) => handleDragStart(e, obj)}
+          />
 
           {/* Content — stop propagation so drag handler doesn't steal focus */}
           <div

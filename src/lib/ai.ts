@@ -230,34 +230,32 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are a strict handwriting transcriber. Your job is LITERAL TRANSCRIPTION — not interpretation.
+const VISION_SYSTEM = `You are a visual content analyzer for a note-taking canvas.
 
-ORIENTATION:
-- The image is always right-side-up, standard notebook orientation. Never rotate or reinterpret orientation.
+ANALYZE the image and produce the most useful textual representation:
 
-TRANSCRIPTION RULES:
-1. Transcribe EXACTLY what is written. Do NOT interpret, substitute, correct, or infer.
-2. A handwritten mark that looks like a digit IS that digit. 3 is 3 — not ∞, not ε, not ξ.
-3. When a symbol is ambiguous between a numeral and a math/Greek symbol, ALWAYS choose the numeral.
-4. Content is handwritten math, equations, circuit diagrams, or English text. Isolated marks are digits or letters, not decorative or abstract symbols.
-5. Do NOT hallucinate subscripts, superscripts, bounds, or terms that are not clearly written.
-6. If something is truly illegible, write [?] — do not guess wildly.
+1. If it contains handwritten or printed MATH: output LaTeX wrapped in $$...$$ delimiters. Use proper LaTeX commands (\\int, \\sum, \\sqrt, etc.). Capture EVERY term, coefficient, variable.
 
-OUTPUT FORMAT:
-- Math expressions: output LaTeX wrapped in $$...$$ delimiters. Every math symbol MUST use a LaTeX command (integral=\\int, sum=\\sum, sqrt=\\sqrt, etc.).
-- Plain text: output the text only, no delimiters.
-- Circuit diagrams: output component values and node labels only.
-- Multiple expressions: each on its own line wrapped in $$...$$.
-- If there are no integral bounds written, output \\int (indefinite), NOT \\int_a^b.
-- Capture the ENTIRE expression — every term, coefficient, variable, and operator.
-- NO commentary, NO explanation, NO prose. Just the transcription.`;
+2. If it contains a CIRCUIT DIAGRAM: list components with values, describe the topology, identify nodes.
+
+3. If it contains PRINTED TEXT (from a textbook, slide, document): transcribe the text verbatim.
+
+4. If it contains an IMAGE, PHOTO, or DIAGRAM: describe what you see in 1-2 sentences.
+
+5. If it contains MIXED content: handle each part according to its type.
+
+RULES:
+- Be literal. Transcribe what you SEE, don't interpret or solve.
+- For math: 3 is 3, not \\infty. When ambiguous between numeral and symbol, choose the numeral.
+- If truly illegible, write [?].
+- NO commentary beyond the transcription/description itself.`;
 
 export async function readInk(
   base64Png: string,
   settings: NoteometrySettings
 ): Promise<AIResult> {
   const data = base64Png.replace(/^data:image\/\w+;base64,/, "");
-  const prompt = "Convert to LaTeX. Output only the expression(s), no explanation.";
+  const prompt = "Analyze this image. Output only the transcription or description, no explanation.";
 
   if (settings.aiProvider === "lmstudio") {
     return callLMStudio(settings, settings.lmStudioVisionModel, VISION_SYSTEM, [

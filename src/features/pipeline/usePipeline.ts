@@ -115,9 +115,9 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
   }, []);
 
   /**
-   * Process a base64 PNG crop (from lasso OCR) through the vision model,
-   * populate the panel input with the extracted LaTeX, and auto-send to chat
-   * with the original image attached so the model has visual context.
+   * Process a base64 PNG crop (from lasso OCR) through the vision model
+   * and populate the panel input with the extracted text. Does NOT
+   * auto-send to chat -- the user can hit Solve or type a question.
    */
   const processCrop = useCallback(async (dataURL: string): Promise<boolean> => {
     setIsReading(true);
@@ -126,12 +126,6 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
       if (res.ok && res.text.trim()) {
         setInputCode(res.text);
         setIsReading(false);
-        const imgAttachment: Attachment = {
-          name: "lasso-capture.png",
-          mimeType: "image/png",
-          data: dataURL,
-        };
-        await sendToChat(`Solve this:\n${res.text}`, [imgAttachment]);
         return true;
       }
       setChatMessages((prev) => [...prev, {
@@ -146,7 +140,7 @@ export function usePipeline(plugin: NoteometryPlugin): UsePipelineReturn {
     }
     setIsReading(false);
     return false;
-  }, [plugin, sendToChat]);
+  }, [plugin]);
 
   const handleSolveInput = useCallback(async () => {
     const current = inputCodeRef.current;
