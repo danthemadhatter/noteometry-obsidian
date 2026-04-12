@@ -31,6 +31,11 @@ export interface PromptPreset {
  * that's the most common EE-student use case and matches the prior
  * Noteometry behavior before presets existed.
  */
+/**
+ * v1.2 prompt presets — the selector strip shows these 5.
+ * "Solve" (DLP v12) is the default. "Plain Chat" provides a no-frills
+ * conversational mode, triggered automatically by the /? shortcut.
+ */
 export const DEFAULT_PRESETS: PromptPreset[] = [
   {
     id: "solve",
@@ -147,6 +152,13 @@ Answer
 
 ## Reminder
 Follow the structure above EXACTLY. Do not add headings. Do not add explanations outside the six sections. Do not use bullets. Do not use display-math \\$\\$...\\$\\$. Do not center equations. Do not skip sections. Do not chain items in Given/Equations/Where onto one line. Do not put anything after the boxed answers.`,
+  },
+  {
+    id: "plainChat",
+    label: "Plain Chat",
+    badge: "💬",
+    description: "Conversational assistant — no math formatting unless asked",
+    system: `You are a helpful assistant. Answer questions naturally and conversationally. Do not force mathematical formatting unless the user explicitly asks for it.`,
   },
   {
     id: "explain",

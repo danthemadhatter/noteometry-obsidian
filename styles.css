@@ -8,81 +8,90 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v8 — clean, professional, works with black text
-   *
-   * Direction: masculine and fun. Warm white/paper surfaces, dark
-   * charcoal-slate chassis, steel blue accent. All text is black.
+   * Noteometry v1.2 — Document-style color scheme
+   * White canvas, light gray chrome, clean and professional.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Primary surface — warm white/paper (not cream, cleaner) */
-  --nm-canvas-bg: #f5f3ee;
-  --nm-faceplate: #eae7df;
-  --nm-faceplate-light: #f0ede5;
-  --nm-faceplate-alt: #e2dfd6;
-  --nm-faceplate-recessed: #d8d4ca;
+  /* Canvas surface */
+  --nm-canvas-bg: #FFFFFF;
+  --nm-grid-color: #E8E8E8;
+  --nm-grid-major-color: #D0D0D0;
 
-  /* Chassis — dark charcoal-slate, not blue */
-  --nm-chassis: #2c3038;
-  --nm-chassis-light: #3a3f4a;
-  --nm-chassis-dark: #22262d;
-  --nm-chassis-deep: #181b20;
-  --nm-chassis-fg: #e8e5dd;        /* kept for backwards compat */
+  /* UI Chrome — light gray surfaces */
+  --nm-faceplate: #F5F5F5;
+  --nm-faceplate-light: #FAFAFA;
+  --nm-faceplate-alt: #F0F0F0;
+  --nm-faceplate-recessed: #E8E8E8;
 
-  /* Text — always dark */
-  --nm-ink: #1a1d24;
-  --nm-ink-muted: #5a5d66;
-  --nm-paper-ink: var(--nm-ink);
+  /* Sidebar and panels */
+  --nm-sidebar-bg: #F5F5F5;
 
-  /* Accent — steel blue (professional, not "pride") */
-  --nm-accent: #4a7c9b;
-  --nm-accent-light: rgba(74, 124, 155, 0.12);
-  --nm-accent-hover: #5a8fae;
+  /* Chassis — kept as aliases for backward compatibility */
+  --nm-chassis: #F5F5F5;
+  --nm-chassis-light: #FAFAFA;
+  --nm-chassis-dark: #E8E8E8;
+  --nm-chassis-deep: #E0E0E0;
+  --nm-chassis-fg: #1A1A2E;
 
-  /* Active/selected — warm amber (kept, works well as indicator) */
-  --nm-phosphor: #e8a838;
-  --nm-phosphor-light: rgba(232, 168, 56, 0.2);
+  /* Text — always dark navy */
+  --nm-ink: #1A1A2E;
+  --nm-ink-muted: #6B7280;
+  --nm-paper-ink: #1A1A2E;
+
+  /* Accent — steel blue */
+  --nm-accent: #4A90D9;
+  --nm-accent-light: rgba(74, 144, 217, 0.12);
+  --nm-accent-hover: #5A9DE6;
+
+  /* Active/selected — amber */
+  --nm-phosphor: #F5A623;
+  --nm-phosphor-light: rgba(245, 166, 35, 0.2);
 
   /* Semantic */
-  --nm-danger: #c44a3c;
-  --nm-success: #5a8a42;
+  --nm-danger: #DC2626;
+  --nm-success: #16A34A;
 
-  /* Borders — dark hairlines on light surfaces */
-  --nm-paper-border: rgba(26, 29, 36, 0.18);
-  --nm-warm-border: rgba(26, 29, 36, 0.10);
-  --nm-warm-border-strong: rgba(26, 29, 36, 0.22);
+  /* Borders — subtle on light surfaces */
+  --nm-paper-border: #E0E0E0;
+  --nm-warm-border: rgba(0, 0, 0, 0.08);
+  --nm-warm-border-strong: rgba(0, 0, 0, 0.15);
 
-  /* Canvas edge (used by some bg gradients) */
-  --nm-canvas-bg-edge: #ebe8e0;
+  /* Drop-in chrome */
+  --nm-dropin-border: #E0E0E0;
+  --nm-dropin-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 
-  /* Cabinet aliases — backwards compat with older rules */
+  /* Canvas edge */
+  --nm-canvas-bg-edge: #F5F5F5;
+
+  /* Cabinet aliases — backward compat */
   --nm-cabinet: var(--nm-chassis);
   --nm-cabinet-light: var(--nm-chassis-light);
   --nm-cabinet-dark: var(--nm-chassis-dark);
   --nm-cabinet-deep: var(--nm-chassis-deep);
 
-  /* Gunmetal — reserved for very dark borders */
-  --nm-gunmetal: #2a3038;
-  --nm-gunmetal-light: #4a5060;
-  --nm-gunmetal-dark: #14181e;
+  /* Gunmetal — now lighter */
+  --nm-gunmetal: #D0D0D0;
+  --nm-gunmetal-light: #E0E0E0;
+  --nm-gunmetal-dark: #C0C0C0;
 
   /* Section selection */
-  --nm-section-active: var(--nm-chassis-light);
+  --nm-section-active: var(--nm-accent-light);
 
-  /* Legacy aliases — kept for rules that still reference them */
-  --nm-warm-bg: var(--nm-chassis);              /* primary = dark */
-  --nm-warm-bg-alt: var(--nm-chassis-dark);     /* darker nested */
-  --nm-paper: var(--nm-faceplate);              /* paper inserts */
+  /* Legacy aliases */
+  --nm-warm-bg: var(--nm-faceplate);
+  --nm-warm-bg-alt: var(--nm-faceplate-alt);
+  --nm-paper: var(--nm-faceplate);
   --nm-paper-muted: var(--nm-ink-muted);
 
-  /* Geometry — rounded, premium iPad app feel */
+  /* Geometry */
   --nm-radius: 6px;
   --nm-radius-sm: 4px;
 
-  /* Shadows — soft, subtle elevation. Premium tablet app aesthetic. */
-  --nm-shadow-soft: 0 1px 3px rgba(35, 40, 58, 0.06), 0 0 1px rgba(35, 40, 58, 0.08);
-  --nm-shadow-toolbar: 0 2px 10px rgba(35, 40, 58, 0.08), 0 0 1px rgba(35, 40, 58, 0.10);
+  /* Shadows — soft elevation */
+  --nm-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
+  --nm-shadow-toolbar: 0 2px 10px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.10);
 
-  /* Typography — IBM Plex family if installed, graceful system fallback */
+  /* Typography */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
@@ -1942,3 +1951,367 @@
 
 /* Zoom controls removed from topbar — zoom now in right-click menu.
  * Ctrl+wheel and pinch-zoom still work in InkCanvas. */
+
+/* ── P2-8: Stamp sub/superscript toggle pill ─────────────────────── */
+.nm-stamp-script-toggle {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: var(--nm-radius-sm, 4px);
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.nm-script-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--nm-radius-sm, 3px);
+  background: transparent;
+  color: var(--nm-ink);
+  font-family: "Times New Roman", "STIX Two Math", serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+
+.nm-script-btn:hover {
+  background: var(--nm-accent-light);
+}
+
+.nm-script-btn.nm-script-active {
+  background: var(--nm-accent);
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v1.2 Component Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── P0-1: Zoom Widget ─────────────────────────────────────────── */
+.nm-zoom-widget {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: 20px;
+  box-shadow: var(--nm-dropin-shadow);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.nm-zoom-btn, .nm-zoom-pct {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--nm-font);
+  color: var(--nm-ink);
+  padding: 6px 10px;
+  line-height: 1;
+  transition: background 0.12s;
+}
+.nm-zoom-btn:hover, .nm-zoom-pct:hover {
+  background: var(--nm-accent-light);
+}
+.nm-zoom-pct {
+  font-weight: 600;
+  min-width: 48px;
+  text-align: center;
+  border-left: 1px solid var(--nm-dropin-border);
+  border-right: 1px solid var(--nm-dropin-border);
+}
+
+/* ── P0-3: Color/Thickness Sub-Panel ───────────────────────────── */
+.nm-pen-panel {
+  position: fixed;
+  z-index: 1200;
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  min-width: 200px;
+}
+.nm-pen-panel-section {
+  margin-bottom: 10px;
+}
+.nm-pen-panel-section:last-child {
+  margin-bottom: 0;
+}
+.nm-pen-panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nm-ink-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.nm-pen-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nm-pen-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+  padding: 0;
+}
+.nm-pen-color-swatch:hover {
+  transform: scale(1.1);
+}
+.nm-pen-color-swatch.active {
+  border-color: var(--nm-accent);
+  box-shadow: 0 0 0 2px var(--nm-accent-light);
+}
+.nm-pen-widths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nm-pen-width-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm);
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--nm-ink);
+  transition: background 0.12s;
+}
+.nm-pen-width-btn:hover {
+  background: var(--nm-faceplate-alt);
+}
+.nm-pen-width-btn.active {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+  color: var(--nm-accent);
+}
+.nm-pen-width-preview {
+  width: 40px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+}
+.nm-pen-width-line {
+  width: 100%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* ── P1-6: Prompt Preset Strip ─────────────────────────────────── */
+.nm-preset-strip {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--nm-dropin-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.nm-preset-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: var(--nm-ink);
+  font-size: 11px;
+  font-family: var(--nm-font);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.nm-preset-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+}
+.nm-preset-btn.nm-preset-active {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+  border-color: var(--nm-accent);
+}
+.nm-slash-toast {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--nm-accent);
+  text-align: center;
+  background: var(--nm-accent-light);
+  border-bottom: 1px solid var(--nm-accent);
+}
+
+/* ── P1-7: Floating AI Panel ───────────────────────────────────── */
+.nm-floating-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nm-floating-panel.nm-fp-docked {
+  border-radius: 0;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.06);
+}
+.nm-floating-panel.nm-fp-minimized {
+  overflow: hidden;
+}
+.nm-fp-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--nm-faceplate);
+  border-bottom: 1px solid var(--nm-dropin-border);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+}
+.nm-fp-titlebar:active {
+  cursor: grabbing;
+}
+.nm-fp-drag-icon {
+  font-size: 10px;
+  color: var(--nm-ink-muted);
+  letter-spacing: -1px;
+}
+.nm-fp-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nm-ink);
+  flex: 1;
+}
+.nm-fp-titlebar-actions {
+  display: flex;
+  gap: 4px;
+}
+.nm-fp-dock-btn, .nm-fp-min-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--nm-ink-muted);
+  padding: 2px 4px;
+  border-radius: var(--nm-radius-sm);
+  transition: all 0.12s;
+}
+.nm-fp-dock-btn:hover, .nm-fp-min-btn:hover {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+.nm-fp-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+.nm-fp-resize-left {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: ew-resize;
+  z-index: 10;
+}
+.nm-fp-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.nm-fp-show-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 500;
+  padding: 4px 12px;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  background: #FFFFFF;
+  color: var(--nm-ink);
+  font-size: 12px;
+  font-family: var(--nm-font);
+  cursor: pointer;
+  box-shadow: var(--nm-dropin-shadow);
+  transition: all 0.12s;
+}
+.nm-fp-show-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+}
+
+/* ── P2-8: Stamp Script Toggle ─────────────────────────────────── */
+.nm-stamp-script-toggle {
+  display: flex;
+  gap: 1px;
+  background: var(--nm-dropin-border);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: var(--nm-dropin-shadow);
+}
+.nm-script-btn {
+  border: none;
+  background: #FFFFFF;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: serif;
+  color: var(--nm-ink);
+  padding: 3px 8px;
+  min-width: 26px;
+  text-align: center;
+  transition: all 0.12s;
+}
+.nm-script-btn:hover {
+  background: var(--nm-faceplate);
+}
+.nm-script-btn.nm-script-active {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+}
+
+/* ── PDF Re-link button ────────────────────────────────────────── */
+.noteometry-pdf-relink {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--nm-accent);
+  border-radius: var(--nm-radius-sm);
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.noteometry-pdf-relink:hover {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+}
+
+/* ── Sidebar Course button ─────────────────────────────────────── */
+.noteometry-sidebar-add-course {
+  border-bottom: 1px solid var(--nm-paper-border);
+}

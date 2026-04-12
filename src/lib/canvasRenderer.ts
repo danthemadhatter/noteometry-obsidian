@@ -7,19 +7,18 @@
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
 import type { CanvasObject } from "./canvasObjects";
 
-// 1/8 inch at 96 DPI = 12px. Every 8th line is 1 inch (96px).
-// Dan wants 1/8" minor grid to match engineering graph paper.
-const GRID_MINOR = 12;
-const GRID_MAJOR = GRID_MINOR * 8; // 96px = 1 inch
+// Grid spacing: 20px at 100% zoom per v1.2 spec.
+const GRID_MINOR = 20;
+const GRID_MAJOR = GRID_MINOR * 5; // 100px = every 5 cells
 
-// Whisper-subtle grid — steel blue tint to match the v8 accent.
-const GRID_MINOR_COLOR = "rgba(74, 124, 155, 0.08)";
-const GRID_MAJOR_COLOR = "rgba(74, 124, 155, 0.18)";
+// v1.2 document-style palette: light gray grid on white.
+const GRID_MINOR_COLOR = "#E8E8E8";
+const GRID_MAJOR_COLOR = "#D0D0D0";
 const GRID_MINOR_WIDTH = 0.5;
 const GRID_MAJOR_WIDTH = 0.75;
 
-// Canvas bg — matches --nm-canvas-bg in styles.css
-const GRID_BG_COLOR = "#f5f3ee";
+// Canvas bg — matches --nm-canvas-bg in styles.css (v1.2: pure white)
+const GRID_BG_COLOR = "#FFFFFF";
 
 /** Set up canvas for Retina (call once on mount and resize) */
 export function setupCanvas(
@@ -42,19 +41,23 @@ export function setupCanvas(
   return ctx;
 }
 
-/** Draw 1/8-inch graph paper grid */
+/** Draw graph paper grid. When showGrid is false, draws only the
+ *  white background (no grid lines). */
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
   scrollX: number,
   scrollY: number,
   width: number,
-  height: number
+  height: number,
+  showGrid: boolean = true
 ): void {
   ctx.clearRect(0, 0, width, height);
 
-  // Fill background (vellum)
+  // Fill background (pure white per v1.2 document scheme)
   ctx.fillStyle = GRID_BG_COLOR;
   ctx.fillRect(0, 0, width, height);
+
+  if (!showGrid) return;
 
   // Calculate grid offset from scroll position
   const startX = -(scrollX % GRID_MINOR);
@@ -80,7 +83,7 @@ export function drawGrid(
   }
   ctx.stroke();
 
-  // Draw major lines (every 1 inch)
+  // Draw major lines (every 5 cells)
   ctx.strokeStyle = GRID_MAJOR_COLOR;
   ctx.lineWidth = GRID_MAJOR_WIDTH;
   ctx.beginPath();
@@ -193,17 +196,25 @@ export function drawAllStrokes(
   }
 }
 
-/** Draw a stamp (dropped math symbol) on canvas */
+/** Draw a stamp (dropped math symbol) on canvas.
+ *  P2-8: Handles sub/superscript via reduced font size and vertical offset. */
 function drawStamp(
   ctx: CanvasRenderingContext2D,
   stamp: Stamp,
   scrollX: number,
   scrollY: number
 ): void {
-  ctx.font = `${stamp.fontSize}px "Times New Roman", "STIX Two Math", serif`;
+  const mode = stamp.scriptMode || 'norm';
+  const fontSize = mode === 'norm' ? stamp.fontSize : stamp.fontSize * 0.65;
+  // Vertical offset: subscript shifts down, superscript shifts up
+  let dy = 0;
+  if (mode === 'sub') dy = stamp.fontSize * 0.35;
+  if (mode === 'super') dy = -stamp.fontSize * 0.4;
+
+  ctx.font = `${fontSize}px "Times New Roman", "STIX Two Math", serif`;
   ctx.fillStyle = stamp.color;
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(stamp.text, stamp.x - scrollX, stamp.y - scrollY);
+  ctx.fillText(stamp.text, stamp.x - scrollX, stamp.y - scrollY + dy);
 }
 
 /** Draw all stamps */

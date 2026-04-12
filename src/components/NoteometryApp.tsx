@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { App, Notice } from "obsidian";
+import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
-// CanvasToolbar removed — all tools now live in the right-click context menu
 import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
@@ -25,23 +24,13 @@ import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
+import ZoomWidget from "./ZoomWidget";
+import ColorThicknessPanel, { PEN_COLORS, PEN_WIDTHS } from "./ColorThicknessPanel";
 
 /* ── Color and width presets for context-menu cycling ───────────── */
-const INK_COLORS = [
-  { color: "#202124", label: "Black" },
-  { color: "#d93025", label: "Red" },
-  { color: "#1a73e8", label: "Blue" },
-  { color: "#188038", label: "Green" },
-  { color: "#e8710a", label: "Orange" },
-  { color: "#9334e6", label: "Purple" },
-];
+const INK_COLORS = PEN_COLORS;
 
-const STROKE_WIDTHS = [
-  { width: 1.5, label: "Fine" },
-  { width: 3, label: "Medium" },
-  { width: 5, label: "Thick" },
-  { width: 8, label: "Marker" },
-];
+const STROKE_WIDTHS = PEN_WIDTHS;
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -101,7 +90,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Pipeline feature: panel input + chat + READ INK + solve ─── */
   const {
     inputCode, chatMessages, isReading, chatLoading,
-    setInputCode, setChatMessages,
+    presets, activePreset,
+    setInputCode, setChatMessages, setActivePresetId,
     sendToChat, stopChat, processCrop, handleSolveInput, handleInsertSymbol,
     hydrate: hydratePipeline,
   } = usePipeline(plugin);
@@ -111,6 +101,16 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [scrollY, setScrollY] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [zoomLocked, setZoomLocked] = useState(false);
+  const [showGrid, setShowGrid] = useState(plugin.settings.showGrid);
+  const [colorPanel, setColorPanel] = useState<{ x: number; y: number } | null>(null);
+
+  /* ── Floating panel state (P1-7) ─── */
+  const [fpDocked, setFpDocked] = useState(plugin.settings.floatingPanelDocked);
+  const [fpMinimized, setFpMinimized] = useState(plugin.settings.floatingPanelMinimized);
+  const [fpPos, setFpPos] = useState({ x: plugin.settings.floatingPanelX, y: plugin.settings.floatingPanelY });
+  const [fpSize, setFpSize] = useState({ w: plugin.settings.floatingPanelWidth, h: plugin.settings.floatingPanelHeight });
+  const fpDragRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(null);
+  const fpResizeRef = useRef<{ startX: number; startW: number } | null>(null);
   // viewportRef = the drawing surface inside the canvas area.
   // Lasso, rasterization, and zoom wheel events all key off this.
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -136,6 +136,23 @@ export default function NoteometryApp({ plugin, app }: Props) {
     if (zoomLocked) return;
     setZoom(1);
   }, [zoomLocked]);
+
+  // Persist showGrid
+  useEffect(() => {
+    plugin.settings.showGrid = showGrid;
+    plugin.saveSettings();
+  }, [showGrid]);
+
+  // Persist floating panel state
+  useEffect(() => {
+    plugin.settings.floatingPanelDocked = fpDocked;
+    plugin.settings.floatingPanelMinimized = fpMinimized;
+    plugin.settings.floatingPanelX = fpPos.x;
+    plugin.settings.floatingPanelY = fpPos.y;
+    plugin.settings.floatingPanelWidth = fpSize.w;
+    plugin.settings.floatingPanelHeight = fpSize.h;
+    plugin.saveSettings();
+  }, [fpDocked, fpMinimized, fpPos, fpSize]);
 
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -604,19 +621,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
       // Resolve current color/width labels for display
       const colorEntry = INK_COLORS.find((c) => c.color === activeColor) ?? INK_COLORS[0]!;
-      const widthEntry = STROKE_WIDTHS.find((w) => w.width === strokeWidth) ?? STROKE_WIDTHS[1]!;
-
-      // Helper: cycle to next entry in an array
-      const nextColor = () => {
-        const idx = INK_COLORS.findIndex((c) => c.color === activeColor);
-        const next = INK_COLORS[(idx + 1) % INK_COLORS.length]!;
-        setActiveColor(next.color);
-      };
-      const nextWidth = () => {
-        const idx = STROKE_WIDTHS.findIndex((w) => w.width === strokeWidth);
-        const next = STROKE_WIDTHS[(idx + 1) % STROKE_WIDTHS.length]!;
-        setStrokeWidth(next.width);
-      };
+      const widthEntry = STROKE_WIDTHS.find((w) => w.width === strokeWidth) ?? STROKE_WIDTHS[0]!;
 
       // ── Drawing ──
       items.push(
@@ -624,8 +629,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Select (Pointer)", shortcut: tool === "select" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("select"); setLassoActive(false); }},
         { label: "Pen", shortcut: tool === "pen" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("pen"); setLassoActive(false); }},
         { label: "Eraser", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
-        { label: `Color: \u25CF ${colorEntry.label}`, onClick: nextColor },
-        { label: `Width: \u2500\u2500 ${widthEntry.label}`, onClick: nextWidth },
+        { label: `Color & Width: \u25CF ${colorEntry.label} / ${widthEntry.label}`, onClick: () => {
+          // Open the color/thickness sub-panel at the click position
+          setColorPanel({ x: e.clientX, y: e.clientY });
+        }},
         { label: "", separator: true },
       );
 
@@ -659,10 +666,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Undo", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
         { label: "Redo", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
         { label: "", separator: true },
-        { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
-        { label: "Zoom Out", onClick: zoomOut },
-        { label: "Reset Zoom (100%)", onClick: resetZoom },
         { label: "Lock Zoom", shortcut: zoomLocked ? "\u2713" : "", onClick: () => setZoomLocked((v) => !v) },
+        { label: showGrid ? "Hide Grid" : "Show Grid", onClick: () => setShowGrid((v) => !v) },
         { label: "", separator: true },
         { label: "Export PNG", onClick: () => {
           const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
@@ -685,7 +690,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
   }, [
     zoom, zoomLocked, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, tool, activeColor, strokeWidth,
-    lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage,
+    lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage, showGrid,
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
@@ -825,49 +830,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     } catch { /* ignore */ }
   }, [scrollX, scrollY, activeColor, pushUndo]);
 
-  /* ── Right panel resize ──────────────────────────────── */
-  const [panelWidth, setPanelWidth] = useState(() => window.innerWidth < 1024 ? 240 : 320);
-  const panelDragging = useRef(false);
-  const panelLastX = useRef(0);
-
-  const handlePanelResizeDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    panelDragging.current = true;
-    panelLastX.current = e.clientX;
-  };
-  const handlePanelResizeMove = (e: React.PointerEvent) => {
-    if (!panelDragging.current) return;
-    const dx = e.clientX - panelLastX.current;
-    panelLastX.current = e.clientX;
-    setPanelWidth((w) => Math.max(200, Math.min(900, w - dx)));
-  };
-  const handlePanelResizeUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    panelDragging.current = false;
-  };
-
-  /* ── Chat vertical resize ───────────────────────────── */
-  const [chatHeight, setChatHeight] = useState(320);
-  const chatDragging = useRef(false);
-  const chatLastY = useRef(0);
-
-  const handleChatResizeDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    chatDragging.current = true;
-    chatLastY.current = e.clientY;
-  };
-  const handleChatResizeMove = (e: React.PointerEvent) => {
-    if (!chatDragging.current) return;
-    const dy = e.clientY - chatLastY.current;
-    chatLastY.current = e.clientY;
-    setChatHeight((h) => Math.max(80, h - dy));
-  };
-  const handleChatResizeUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    chatDragging.current = false;
-  };
+  /* ── (Right panel resize removed — now handled by floating panel) ── */
 
   /* ── Render ──────────────────────────────────────────── */
   if (!ready) {
@@ -882,6 +845,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
         currentSection={currentSection}
         currentPage={currentPage}
         onSelect={handleSelect}
+        app={app}
       />
 
       {/* ── Main area ── */}
@@ -911,20 +875,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               className="noteometry-hidden"
             />
 
-            {/* ── Viewport: the full drawing surface (toolbar removed — use right-click) ── */}
+            {/* ── Viewport: the full drawing surface ── */}
             <div ref={viewportRef} className="noteometry-canvas-viewport">
-              {!panelOpen && (
-                <div className="noteometry-canvas-actions">
-                  <button
-                    className="noteometry-canvas-action-btn"
-                    onClick={() => setPanelOpen(true)}
-                    title="Open panel"
-                  >
-                    ◨ Panel
-                  </button>
-                </div>
-              )}
-
               {/* Ink canvas */}
               <InkCanvas
                 strokes={strokes}
@@ -941,6 +893,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 scrollY={scrollY}
                 zoom={zoom}
                 zoomLocked={zoomLocked}
+                showGrid={showGrid}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
                 onCycleTool={handleCycleTool}
                 onViewportChange={handleViewportChange}
@@ -973,68 +926,178 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />
+
+              {/* P0-1: Zoom Widget — always visible, bottom-right */}
+              <ZoomWidget
+                zoom={zoom}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onReset={resetZoom}
+              />
+
+              {/* P2-8: Stamp script toggle — appears below selected stamp */}
+              {selectedStampId && (() => {
+                const stamp = stamps.find(s => s.id === selectedStampId);
+                if (!stamp) return null;
+                const bb = stampBBox(stamp);
+                // Convert world coords to screen coords
+                const screenX = (bb.x - scrollX) * zoom;
+                const screenY = (bb.y + bb.h - scrollY) * zoom + 4;
+                const mode = stamp.scriptMode || 'norm';
+                const setMode = (m: 'norm' | 'sub' | 'super') => {
+                  setStamps(prev => prev.map(s => s.id === selectedStampId ? { ...s, scriptMode: m } : s));
+                };
+                return (
+                  <div className="nm-stamp-script-toggle" style={{ position: 'absolute', left: screenX, top: screenY, zIndex: 1100 }}>
+                    <button className={`nm-script-btn ${mode === 'sub' ? 'nm-script-active' : ''}`} onClick={() => setMode('sub')} title="Subscript">x&#x2082;</button>
+                    <button className={`nm-script-btn ${mode === 'norm' ? 'nm-script-active' : ''}`} onClick={() => setMode('norm')} title="Normal">x</button>
+                    <button className={`nm-script-btn ${mode === 'super' ? 'nm-script-active' : ''}`} onClick={() => setMode('super')} title="Superscript">x&#xB2;</button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
-
-          {/* ── Right panel ── */}
-          {panelOpen && (
-            <div className="noteometry-right" style={{ width: panelWidth }}>
-              <div
-                className="noteometry-right-resize"
-                onPointerDown={handlePanelResizeDown}
-                onPointerMove={handlePanelResizeMove}
-                onPointerUp={handlePanelResizeUp}
-              />
-              <div className="noteometry-right-inner">
-                <Panel
-                  inputCode={inputCode}
-                  setInputCode={setInputCode}
-                  onInsertSymbol={handleInsertSymbol}
-                  onStampSymbol={(sym) => setPendingSymbol(sym)}
-                  onDropStamp={(display, screenX, screenY) => {
-                    // Direct stamp placement from touch drag. Divide
-                    // by zoom before adding scroll so the drop lands
-                    // under the finger at any zoom level — same screen
-                    // → world math used by InkCanvas pointer handlers.
-                    const rect = canvasAreaRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    const x = (screenX - rect.left) / zoom + scrollX;
-                    const y = (screenY - rect.top) / zoom + scrollY;
-                    setStamps(prev => [...prev, {
-                      id: newStampId(), x, y,
-                      text: display, fontSize: 96, color: activeColor,
-                    }]);
-                  }}
-                  onSolve={handleSolveInput}
-                  onClosePanel={() => setPanelOpen(false)}
-                />
-                <div
-                  className="noteometry-resize-handle"
-                  onPointerDown={handleChatResizeDown}
-                  onPointerMove={handleChatResizeMove}
-                  onPointerUp={handleChatResizeUp}
-                />
-                <div style={{ height: chatHeight, flexShrink: 0 }}>
-                  <ChatPanel
-                    messages={chatMessages}
-                    onSend={sendToChat}
-                    onStop={stopChat}
-                    onClear={() => setChatMessages([])}
-                    loading={chatLoading}
-                    onDropToCanvas={handleDropChatToCanvas}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* ── P1-7: Floating AI Panel ── */}
+      {panelOpen && (() => {
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        const cw = containerRect?.width ?? window.innerWidth;
+        const ch = containerRect?.height ?? window.innerHeight;
+        const dockedX = cw - fpSize.w;
+        const posX = fpDocked ? dockedX : (fpPos.x < 0 ? dockedX : fpPos.x);
+        const posY = fpDocked ? 0 : fpPos.y;
+        return (
+          <div
+            className={`nm-floating-panel ${fpMinimized ? "nm-fp-minimized" : ""} ${fpDocked ? "nm-fp-docked" : ""}`}
+            style={{
+              position: "absolute",
+              left: posX,
+              top: posY,
+              width: fpSize.w,
+              height: fpMinimized ? 28 : fpSize.h,
+              zIndex: 500,
+              maxHeight: fpDocked ? "100%" : undefined,
+            }}
+          >
+            {/* Title bar — drag handle */}
+            <div
+              className="nm-fp-titlebar"
+              onPointerDown={(e) => {
+                if (fpMinimized) return;
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                fpDragRef.current = { startX: e.clientX, startY: e.clientY, posX, posY };
+              }}
+              onPointerMove={(e) => {
+                if (!fpDragRef.current) return;
+                const dx = e.clientX - fpDragRef.current.startX;
+                const dy = e.clientY - fpDragRef.current.startY;
+                const nx = Math.max(0, Math.min(cw - 100, fpDragRef.current.posX + dx));
+                const ny = Math.max(0, Math.min(ch - 28, fpDragRef.current.posY + dy));
+                setFpPos({ x: nx, y: ny });
+                setFpDocked(false);
+              }}
+              onPointerUp={() => { fpDragRef.current = null; }}
+            >
+              <span className="nm-fp-drag-icon">⋮⋮</span>
+              <span className="nm-fp-title">{fpMinimized ? "AI Panel ▼" : "AI Panel"}</span>
+              <div className="nm-fp-titlebar-actions">
+                {!fpDocked && !fpMinimized && (
+                  <button className="nm-fp-dock-btn" onClick={() => { setFpDocked(true); setFpPos({ x: -1, y: 0 }); }} title="Dock">⬒</button>
+                )}
+                <button className="nm-fp-min-btn" onClick={() => setFpMinimized((v) => !v)} title={fpMinimized ? "Expand" : "Minimize"}>
+                  {fpMinimized ? "▲" : "▬"}
+                </button>
+              </div>
+            </div>
+            {!fpMinimized && (
+              <div className="nm-fp-body">
+                {/* Resize handle on left edge */}
+                <div
+                  className="nm-fp-resize-left"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    fpResizeRef.current = { startX: e.clientX, startW: fpSize.w };
+                  }}
+                  onPointerMove={(e) => {
+                    if (!fpResizeRef.current) return;
+                    const dx = fpResizeRef.current.startX - e.clientX;
+                    const nw = Math.max(280, Math.min(900, fpResizeRef.current.startW + dx));
+                    setFpSize((prev) => ({ ...prev, w: nw }));
+                  }}
+                  onPointerUp={() => { fpResizeRef.current = null; }}
+                />
+                <div className="nm-fp-content">
+                  <Panel
+                    inputCode={inputCode}
+                    setInputCode={setInputCode}
+                    onInsertSymbol={handleInsertSymbol}
+                    onStampSymbol={(sym) => setPendingSymbol(sym)}
+                    onDropStamp={(display, screenX, screenY) => {
+                      const rect = canvasAreaRef.current?.getBoundingClientRect();
+                      if (!rect) return;
+                      const x = (screenX - rect.left) / zoom + scrollX;
+                      const y = (screenY - rect.top) / zoom + scrollY;
+                      setStamps(prev => [...prev, {
+                        id: newStampId(), x, y,
+                        text: display, fontSize: 96, color: activeColor,
+                      }]);
+                    }}
+                    onSolve={handleSolveInput}
+                    onClosePanel={() => setPanelOpen(false)}
+                  />
+                  <div className="noteometry-resize-handle" />
+                  <div style={{ flex: 1, minHeight: 200 }}>
+                    <ChatPanel
+                      messages={chatMessages}
+                      onSend={sendToChat}
+                      onStop={stopChat}
+                      onClear={() => setChatMessages([])}
+                      loading={chatLoading}
+                      onDropToCanvas={handleDropChatToCanvas}
+                      presets={presets}
+                      activePreset={activePreset}
+                      onPresetChange={setActivePresetId}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Show panel button when minimized or closed */}
+      {!panelOpen && (
+        <button
+          className="nm-fp-show-btn"
+          onClick={() => setPanelOpen(true)}
+          title="Show AI Panel"
+        >
+          AI Panel
+        </button>
+      )}
+
       {ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
           items={ctxMenu.items}
           onClose={() => setCtxMenu(null)}
+        />
+      )}
+      {colorPanel && (
+        <ColorThicknessPanel
+          activeColor={activeColor}
+          activeWidth={strokeWidth}
+          onColorChange={setActiveColor}
+          onWidthChange={setStrokeWidth}
+          anchorX={colorPanel.x}
+          anchorY={colorPanel.y}
+          onClose={() => setColorPanel(null)}
         />
       )}
     </div>

@@ -22,6 +22,8 @@ interface Props {
   zoom?: number;
   /** If true, pinch-zoom is a no-op. Matches the toolbar lock button. */
   zoomLocked?: boolean;
+  /** Whether to draw grid lines on the canvas. */
+  showGrid?: boolean;
   /** Called when the user pinches to zoom. Parent should clamp + setZoom. */
   onZoomChange?: (zoom: number) => void;
   /** Called when the user double-taps/double-clicks on empty canvas.
@@ -42,6 +44,7 @@ export default function InkCanvas({
   tool, onToolChange, scrollX, scrollY, onViewportChange,
   zoom = 1,
   zoomLocked = false,
+  showGrid = true,
   onZoomChange,
   onCycleTool,
   disabled = false, selectedStampId = null,
@@ -107,6 +110,8 @@ export default function InkCanvas({
   useEffect(() => { selectedStampIdRef.current = selectedStampId; }, [selectedStampId]);
   useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
   useEffect(() => { zoomLockedRef.current = zoomLocked; }, [zoomLocked]);
+  const showGridRef = useRef(showGrid);
+  useEffect(() => { showGridRef.current = showGrid; }, [showGrid]);
   useEffect(() => { onCycleToolRef.current = onCycleTool; }, [onCycleTool]);
 
   // ── Canvas sizing ──────────────────────────────────
@@ -147,7 +152,7 @@ export default function InkCanvas({
     // CSS width, so we pass w/zoom to avoid drawing off-screen ticks.
     const worldW = sizeRef.current.w / zoom;
     const worldH = sizeRef.current.h / zoom;
-    drawGrid(ctx, scrollRef.current.x, scrollRef.current.y, worldW, worldH);
+    drawGrid(ctx, scrollRef.current.x, scrollRef.current.y, worldW, worldH, showGridRef.current);
   }, []);
 
   const redrawInk = useCallback(() => {
@@ -216,7 +221,7 @@ export default function InkCanvas({
     }
   }, []);
 
-  useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId, zoom]);
+  useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId, zoom, showGrid]);
 
   // ── Pen/Eraser pointer handlers (NO touch — that's separate) ───
   const handlePointerDown = useCallback((e: PointerEvent) => {

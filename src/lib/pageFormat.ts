@@ -65,7 +65,7 @@ export const EMPTY_PAGE: CanvasData = {
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.1.0";
+export const V3_SOURCE_TAG = "noteometry-1.2.0";
 
 export interface StrokeElementV3 {
   type: "stroke";
@@ -83,6 +83,8 @@ export interface StampElementV3 {
   text: string;
   fontSize: number;
   color: string;
+  /** P2-8: Sub/superscript mode. Omitted when 'norm' (default). */
+  scriptMode?: 'norm' | 'sub' | 'super';
 }
 
 export interface TextboxElementV3 {
@@ -184,7 +186,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
   }
 
   for (const s of data.stamps ?? []) {
-    elements.push({
+    const stampEl: StampElementV3 = {
       type: "stamp",
       id: s.id,
       x: s.x,
@@ -192,7 +194,12 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
       text: s.text,
       fontSize: s.fontSize,
       color: s.color,
-    });
+    };
+    // P2-8: Only persist scriptMode if non-default (keeps v3 files lean)
+    if (s.scriptMode && s.scriptMode !== 'norm') {
+      stampEl.scriptMode = s.scriptMode;
+    }
+    elements.push(stampEl);
   }
 
   for (const obj of data.canvasObjects ?? []) {
@@ -279,6 +286,8 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           text: el.text,
           fontSize: el.fontSize,
           color: el.color,
+          // P2-8: Restore scriptMode (undefined ≡ 'norm')
+          ...(el.scriptMode ? { scriptMode: el.scriptMode } : {}),
         });
         break;
       case "textbox":

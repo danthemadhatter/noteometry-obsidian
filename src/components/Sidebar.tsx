@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Notice } from "obsidian";
+import { App, Notice, TFolder, TFile } from "obsidian";
 import {
   IconPlus, IconTrash, IconFolder, IconFile,
-  IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook,
+  IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook, IconCopy,
 } from "./Icons";
 import type NoteometryPlugin from "../main";
 import {
@@ -19,9 +19,10 @@ interface Props {
   currentSection: string;
   currentPage: string;
   onSelect: (section: string, page: string) => void;
+  app?: App;
 }
 
-export default function Sidebar({ plugin, currentSection, currentPage, onSelect }: Props) {
+export default function Sidebar({ plugin, currentSection, currentPage, onSelect, app }: Props) {
   const [sections, setSections] = useState<string[]>([]);
   const [pagesMap, setPagesMap] = useState<Record<string, string[]>>({});
   const [expandedSection, setExpandedSection] = useState(currentSection);
@@ -180,6 +181,61 @@ const handleDeletePage = async (section: string, name: string) => {
   }
 };
 
+  /* ── P1-5: Duplicate section as template ── */
+  const handleDuplicateAsTemplate = async (sectionName: string) => {
+    try {
+      const adapter = plugin.app.vault.adapter;
+      const root = plugin.settings.vaultFolder || "Noteometry";
+      const sourcePath = `${root}/${sectionName}`;
+
+      // Generate unique copy name
+      let copyName = `${sectionName} (Copy)`;
+      let counter = 2;
+      while (await adapter.exists(`${root}/${copyName}`)) {
+        copyName = `${sectionName} (Copy ${counter})`;
+        counter++;
+      }
+
+      // Create the new folder
+      await adapter.mkdir(`${root}/${copyName}`);
+
+      // Recursively duplicate structure with empty canvases
+      const duplicateDir = async (srcDir: string, destDir: string) => {
+        const listing = await adapter.list(srcDir);
+        // Create sub-folders
+        for (const folder of listing.folders) {
+          const folderName = folder.split("/").pop() ?? "";
+          if (!folderName || folderName === "attachments") continue;
+          const newSubDir = `${destDir}/${folderName}`;
+          await adapter.mkdir(newSubDir);
+          await duplicateDir(folder, newSubDir);
+        }
+        // Create empty files with same names
+        for (const file of listing.files) {
+          const fileName = file.split("/").pop() ?? "";
+          if (!fileName) continue;
+          const destFile = `${destDir}/${fileName}`;
+          if (fileName.endsWith(".canvas")) {
+            await adapter.write(destFile, '{"nodes":[],"edges":[]}');
+          } else if (fileName.endsWith(".md")) {
+            await adapter.write(destFile, "");
+          }
+        }
+      };
+
+      await duplicateDir(sourcePath, `${root}/${copyName}`);
+
+      new Notice(`Template created: ${copyName}`);
+      await refreshSections();
+      setExpandedSection(copyName);
+      const p = await listPages(plugin, copyName);
+      setPagesMap((prev) => ({ ...prev, [copyName]: p }));
+    } catch (err) {
+      console.error("[Noteometry] Duplicate as template failed:", err);
+      new Notice("Failed to duplicate as template", 8000);
+    }
+  };
+
   const selectPage = (section: string, page: string) => {
     onSelect(section, page);
     if (window.innerWidth < 768) setOpen(false);
@@ -274,6 +330,13 @@ const handleDeletePage = async (section: string, name: string) => {
                       title="Rename"
                     >
                       <IconPen />
+                    </button>
+                    <button
+                      className="noteometry-sidebar-item-action"
+                      onPointerUp={(e) => { e.stopPropagation(); handleDuplicateAsTemplate(s); }}
+                      title="Duplicate as Template"
+                    >
+                      <IconCopy />
                     </button>
                     <button
                       className="noteometry-sidebar-item-del"

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
 import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
+import type { PromptPreset } from "../features/pipeline/presets";
 
 interface Props {
   messages: ChatMessage[];
@@ -14,6 +15,12 @@ interface Props {
    * Receives the pre-rendered HTML (LaTeX → MathML) ready to drop into a
    * contenteditable text box on the canvas. */
   onDropToCanvas?: (html: string) => void;
+  /** Available prompt presets (v1.2). */
+  presets?: PromptPreset[];
+  /** Currently active preset. */
+  activePreset?: PromptPreset;
+  /** Called when user selects a different preset. */
+  onPresetChange?: (id: string) => void;
 }
 
 /**
@@ -67,11 +74,12 @@ function toMathMLForClipboard(text: string): string {
 
 export default function ChatPanel({
   messages, onSend, onClear, onStop, loading,
-  onDropToCanvas,
+  onDropToCanvas, presets, activePreset, onPresetChange,
 }: Props) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [slashChatToast, setSlashChatToast] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -115,7 +123,20 @@ export default function ChatPanel({
 
   const send = () => {
     if (!input.trim() && !attachments.length) return;
-    onSend(input, [...attachments]);
+    let text = input;
+    // /? shortcut: one-shot switch to Plain Chat
+    if (text.startsWith("/?") && onPresetChange) {
+      const prevPresetId = activePreset?.id;
+      onPresetChange("plainChat");
+      text = text.slice(2).trim();
+      setSlashChatToast(true);
+      setTimeout(() => {
+        setSlashChatToast(false);
+        // Revert to previous preset after send
+        if (prevPresetId) onPresetChange(prevPresetId);
+      }, 2000);
+    }
+    onSend(text, [...attachments]);
     setInput("");
     setAttachments([]);
   };
@@ -145,6 +166,27 @@ export default function ChatPanel({
           </button>
         )}
       </div>
+
+      {/* P1-6: Prompt preset strip */}
+      {presets && presets.length > 0 && (
+        <div className="nm-preset-strip">
+          {presets.map((p) => (
+            <button
+              key={p.id}
+              className={`nm-preset-btn ${activePreset?.id === p.id ? "nm-preset-active" : ""}`}
+              onClick={() => onPresetChange?.(p.id)}
+              title={p.description}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* /? toast */}
+      {slashChatToast && (
+        <div className="nm-slash-toast">Switched to Plain Chat</div>
+      )}
 
       {/* Messages */}
       <div className="noteometry-chat-messages">

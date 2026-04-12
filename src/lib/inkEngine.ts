@@ -25,6 +25,20 @@ export interface Stamp {
   text: string;     // display character (e.g., "∫", "3", "α")
   fontSize: number;
   color: string;
+  /** P2-8: Sub/superscript mode for the stamp.
+   *  'norm' (default) = normal, 'sub' = subscript, 'super' = superscript. */
+  scriptMode?: 'norm' | 'sub' | 'super';
+}
+
+/** P2-8: Convert a stamp's text to its LaTeX representation based on scriptMode.
+ *  - 'norm' or undefined → character as-is
+ *  - 'sub' → `_{char}`
+ *  - 'super' → `^{char}` */
+export function stampToLatex(stamp: Stamp): string {
+  const mode = stamp.scriptMode || 'norm';
+  if (mode === 'sub') return `_{${stamp.text}}`;
+  if (mode === 'super') return `^{${stamp.text}}`;
+  return stamp.text;
 }
 
 export function newStampId(): string {

@@ -1,6 +1,6 @@
 # Noteometry – Obsidian Plugin
 
-Ink-first STEM notebook. Pencil + eraser + AI-powered math recognition and solving. Claude AI + LM Studio.
+EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students.
 
 ## Features
 

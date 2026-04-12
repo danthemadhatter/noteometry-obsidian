@@ -12,6 +12,14 @@ export interface NoteometrySettings {
   vaultFolder: string;
   autoSave: boolean;
   autoSaveDelay: number;
+  showGrid: boolean;
+  activePresetId: string;
+  floatingPanelX: number;
+  floatingPanelY: number;
+  floatingPanelWidth: number;
+  floatingPanelHeight: number;
+  floatingPanelDocked: boolean;
+  floatingPanelMinimized: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -26,6 +34,14 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   vaultFolder: "Noteometry",
   autoSave: true,
   autoSaveDelay: 2000,
+  showGrid: false,
+  activePresetId: "solve",
+  floatingPanelX: -1,
+  floatingPanelY: 60,
+  floatingPanelWidth: 320,
+  floatingPanelHeight: 600,
+  floatingPanelDocked: true,
+  floatingPanelMinimized: false,
 };
 
 export interface ChatMessage {

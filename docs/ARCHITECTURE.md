@@ -2,7 +2,7 @@
 
 ## Overview
 
-Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, eraser, lasso OCR, shape tools, and AI-powered math/circuit solving. It renders as a full-screen React app inside an Obsidian ItemView.
+Noteometry is an Obsidian plugin — an EE workstation with canvas, ink, AI, and drop-ins for electrical engineering students. It renders as a full-screen React app inside an Obsidian ItemView.
 
 ## Tech Stack
 

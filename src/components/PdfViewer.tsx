@@ -19,6 +19,7 @@ interface Props {
    * can persist the new page into the canvas object. */
   onPageChange: (page: number) => void;
   plugin?: NoteometryPlugin;
+  onRelink?: () => void;
 }
 
 interface PdfState {
@@ -33,11 +34,13 @@ interface PdfState {
  * Iframes would have been simpler but cross-origin sandboxing would
  * have broken the rect-lasso → vision-model OCR pipeline.
  */
-export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props) {
+export default function PdfViewer({ fileRef, page, onPageChange, plugin, onRelink }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PdfState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [renderSize, setRenderSize] = useState(0);
 
   // Load the document once per fileRef. Re-reads if the path changes
   // (e.g. if the user replaces the PDF via some future feature).
@@ -78,6 +81,19 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
     return () => { cancelled = true; };
   }, [fileRef, plugin]);
 
+  // Track container width so we can re-render when the element resizes.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setRenderSize(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Render the requested page any time the doc OR the page changes.
   useEffect(() => {
     if (!state || !canvasRef.current) return;
@@ -92,19 +108,18 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
           getPage: (n: number) => Promise<unknown>;
         }).getPage(safePage);
         if (cancelled) return;
-        // Render at 1.5x scale so the text is crisp when the canvas
-        // object is small and pixel-perfect when lassoed.
-        const viewport = (pdfPage as {
-          getViewport: (opts: { scale: number }) => { width: number; height: number };
-        }).getViewport({ scale: 1.5 });
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(viewport.width * dpr);
-        canvas.height = Math.floor(viewport.height * dpr);
+        // Scale the page to fill the container width. Fall back to 400px
+        // if the container hasn't been measured yet.
+        const containerWidth = containerRef.current?.clientWidth || 400;
+        const baseViewport = (pdfPage as any).getViewport({ scale: 1 });
+        const scale = (containerWidth / baseViewport.width) * (window.devicePixelRatio || 1);
+        const viewport = (pdfPage as any).getViewport({ scale });
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
         canvas.style.width = "100%";
         canvas.style.height = "100%";
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) throw new Error("Could not get 2D context for PDF canvas");
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, viewport.width, viewport.height);
         await (pdfPage as {
@@ -120,7 +135,7 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
     })();
 
     return () => { cancelled = true; };
-  }, [state, page]);
+  }, [state, page, renderSize]);
 
   const prev = useCallback(() => {
     if (!state) return;
@@ -135,7 +150,12 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
   if (error) {
     return (
       <div className="noteometry-pdf-error">
-        <span>PDF error: {error}</span>
+        <span>PDF not found: {fileRef}</span>
+        {onRelink && (
+          <button className="noteometry-pdf-relink" onClick={onRelink}>
+            Re-link
+          </button>
+        )}
       </div>
     );
   }
@@ -163,7 +183,7 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
           ▶
         </button>
       </div>
-      <div className="noteometry-pdf-canvas-wrap">
+      <div ref={containerRef} className="noteometry-pdf-canvas-wrap">
         <canvas ref={canvasRef} className="noteometry-pdf-canvas" />
       </div>
     </div>
