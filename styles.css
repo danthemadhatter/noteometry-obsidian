@@ -2315,3 +2315,110 @@
 .noteometry-sidebar-add-course {
   border-bottom: 1px solid var(--nm-paper-border);
 }
+
+/* ── Mini Toolbar (persistent, left edge) ─────────────────────── */
+.nm-mini-toolbar {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 20px;
+  width: 44px;
+  padding: 4px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nm-mt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #333333;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nm-mt-btn:hover {
+  background: #F0F0F0;
+}
+
+.nm-mt-btn:active {
+  background: #E0E0E0;
+}
+
+.nm-mt-btn.nm-mt-active {
+  background: #F5A623;
+  color: #FFFFFF;
+}
+
+.nm-mt-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.nm-mt-btn:disabled:hover {
+  background: transparent;
+}
+
+/* Insert popout */
+.nm-mt-insert-wrap {
+  position: relative;
+}
+
+.nm-mt-insert-popout {
+  position: absolute;
+  left: 48px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  z-index: 501;
+}
+
+.nm-mt-popout-btn {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #333333;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nm-mt-popout-btn:hover {
+  background: #F0F0F0;
+}
+
+.nm-mt-popout-btn:active {
+  background: #E0E0E0;
+}

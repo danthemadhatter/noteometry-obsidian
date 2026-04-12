@@ -4,6 +4,9 @@ import {
   IconPlus, IconTrash, IconFolder, IconFile,
   IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook, IconCopy,
 } from "./Icons";
+import ContextMenu from "./ContextMenu";
+import type { ContextMenuItem } from "./ContextMenu";
+import { useLongPress } from "../hooks/useLongPress";
 import type NoteometryPlugin from "../main";
 import {
   listSections,
@@ -13,6 +16,25 @@ import {
   deletePage,
   deleteSection,
 } from "../lib/persistence";
+
+/** Small wrapper that applies useLongPress to a div rendered inside a map. */
+function LongPressDiv({
+  onLongPress,
+  children,
+  ...rest
+}: {
+  onLongPress: (pos: { x: number; y: number }) => void;
+  children: React.ReactNode;
+} & Omit<React.HTMLAttributes<HTMLDivElement>, "onContextMenu">) {
+  const handlers = useLongPress(
+    useCallback((pos: { x: number; y: number }) => onLongPress(pos), [onLongPress]),
+  );
+  return (
+    <div {...rest} {...handlers}>
+      {children}
+    </div>
+  );
+}
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -33,6 +55,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
   const [renamingItem, setRenamingItem] = useState<{ type: "section" | "page"; section: string; name: string } | null>(null);
   const [newName, setNewName] = useState("");
   const submitting = useRef(false);
+  const [sidebarCtxMenu, setSidebarCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
   const refreshSections = useCallback(async () => {
     const s = await listSections(plugin);
@@ -236,6 +259,26 @@ const handleDeletePage = async (section: string, name: string) => {
     }
   };
 
+  /* ── Long-press context menus for section/page items ── */
+  const openSectionCtxMenu = useCallback((section: string, x: number, y: number) => {
+    const items: ContextMenuItem[] = [
+      { label: "Rename", onClick: () => { startRename("section", section, section); setSidebarCtxMenu(null); } },
+      { label: "Duplicate as Template", onClick: () => { handleDuplicateAsTemplate(section); setSidebarCtxMenu(null); } },
+      { label: "", separator: true },
+      { label: "Delete", danger: true, onClick: () => { handleDeleteSection(section); setSidebarCtxMenu(null); } },
+    ];
+    setSidebarCtxMenu({ x, y, items });
+  }, [handleDuplicateAsTemplate, handleDeleteSection]);
+
+  const openPageCtxMenu = useCallback((section: string, page: string, x: number, y: number) => {
+    const items: ContextMenuItem[] = [
+      { label: "Rename", onClick: () => { startRename("page", section, page); setSidebarCtxMenu(null); } },
+      { label: "", separator: true },
+      { label: "Delete", danger: true, onClick: () => { handleDeletePage(section, page); setSidebarCtxMenu(null); } },
+    ];
+    setSidebarCtxMenu({ x, y, items });
+  }, [handleDeletePage]);
+
   const selectPage = (section: string, page: string) => {
     onSelect(section, page);
     if (window.innerWidth < 768) setOpen(false);
@@ -317,9 +360,10 @@ const handleDeletePage = async (section: string, name: string) => {
             return (
               <div key={s} className="noteometry-sidebar-section">
                 {isRenamingSection ? inlineInput(handleRename) : (
-                  <div
+                  <LongPressDiv
                     className={`noteometry-sidebar-item noteometry-sidebar-section-item ${s === currentSection ? "active" : ""}`}
                     onClick={() => setExpandedSection(isExpanded ? "" : s)}
+                    onLongPress={(pos) => openSectionCtxMenu(s, pos.x, pos.y)}
                   >
                     {isExpanded ? <IconChevDown /> : <IconChevRight />}
                     <IconFolder />
@@ -345,7 +389,7 @@ const handleDeletePage = async (section: string, name: string) => {
                     >
                       <IconTrash />
                     </button>
-                  </div>
+                  </LongPressDiv>
                 )}
 
                 {isExpanded && (
@@ -355,10 +399,11 @@ const handleDeletePage = async (section: string, name: string) => {
                       return isRenamingPage ? (
                         <div key={p}>{inlineInput(handleRename)}</div>
                       ) : (
-                        <div
+                        <LongPressDiv
                           key={p}
                           className={`noteometry-sidebar-item noteometry-sidebar-page-item ${s === currentSection && p === currentPage ? "active" : ""}`}
                           onClick={() => selectPage(s, p)}
+                          onLongPress={(pos) => openPageCtxMenu(s, p, pos.x, pos.y)}
                         >
                           <IconFile />
                           <span className="noteometry-sidebar-item-name">{p}</span>
@@ -376,7 +421,7 @@ const handleDeletePage = async (section: string, name: string) => {
                           >
                             <IconTrash />
                           </button>
-                        </div>
+                        </LongPressDiv>
                       );
                     })}
                     {addingPage === s
@@ -407,6 +452,14 @@ const handleDeletePage = async (section: string, name: string) => {
             </button>
           )}
       </div>
+      {sidebarCtxMenu && (
+        <ContextMenu
+          x={sidebarCtxMenu.x}
+          y={sidebarCtxMenu.y}
+          items={sidebarCtxMenu.items}
+          onClose={() => setSidebarCtxMenu(null)}
+        />
+      )}
     </>
   );
 }

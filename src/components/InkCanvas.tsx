@@ -44,7 +44,7 @@ export default function InkCanvas({
   tool, onToolChange, scrollX, scrollY, onViewportChange,
   zoom = 1,
   zoomLocked = false,
-  showGrid = true,
+  showGrid = false,
   onZoomChange,
   onCycleTool,
   disabled = false, selectedStampId = null,

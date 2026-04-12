@@ -25,7 +25,9 @@ import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import ZoomWidget from "./ZoomWidget";
+import MiniToolbar from "./MiniToolbar";
 import ColorThicknessPanel, { PEN_COLORS, PEN_WIDTHS } from "./ColorThicknessPanel";
+import { useLongPress } from "../hooks/useLongPress";
 
 /* ── Color and width presets for context-menu cycling ───────────── */
 const INK_COLORS = PEN_COLORS;
@@ -545,28 +547,19 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
   }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
-  /* ── Right-click context menu ──────────────────────────
+  /* ── Context menu (right-click / long-press) ────────────
    * This is now the PRIMARY tool interface — the toolbar has been removed
-   * entirely. Detects what the user right-clicked on (canvas object /
-   * stamp / empty canvas) and builds the appropriate menu. */
-  const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
-    // Don't hijack right-clicks on inputs/textareas/contenteditable so
-    // those retain their native browser context menus.
-    const target = e.target as HTMLElement | null;
-    if (target && (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.closest("[contenteditable='true']")
-    )) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
+   * entirely. Detects what the user tapped/clicked on (canvas object /
+   * stamp / empty canvas) and builds the appropriate menu.
+   * Triggered by:
+   *   - Right-click (desktop) via useLongPress contextmenu handler
+   *   - Long-press (iPad/touch, ~500ms) via useLongPress pointer handler */
+  const openCanvasContextMenu = useCallback((clientX: number, clientY: number) => {
     const rect = canvasAreaRef.current?.getBoundingClientRect();
     if (!rect) return;
     // World-space click position (used for hit tests and paste anchor)
-    const worldX = (e.clientX - rect.left) / zoom + scrollX;
-    const worldY = (e.clientY - rect.top) / zoom + scrollY;
+    const worldX = (clientX - rect.left) / zoom + scrollX;
+    const worldY = (clientY - rect.top) / zoom + scrollY;
 
     // Hit-test canvas objects first (they're above strokes)
     const hitObj = [...canvasObjects].reverse().find((o) =>
@@ -631,7 +624,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Eraser", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
         { label: `Color & Width: \u25CF ${colorEntry.label} / ${widthEntry.label}`, onClick: () => {
           // Open the color/thickness sub-panel at the click position
-          setColorPanel({ x: e.clientX, y: e.clientY });
+          setColorPanel({ x: clientX, y: clientY });
         }},
         { label: "", separator: true },
       );
@@ -687,7 +680,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       );
     }
 
-    setCtxMenu({ x: e.clientX, y: e.clientY, items });
+    setCtxMenu({ x: clientX, y: clientY, items });
   }, [
     zoom, zoomLocked, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, tool, activeColor, strokeWidth,
     lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage, showGrid,
@@ -695,6 +688,59 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
   ]);
+
+  /* ── Long-press hook for the canvas area ────────────────
+   * On desktop: right-click fires the context menu immediately.
+   * On iPad/touch: long-press (~500ms hold, no movement) fires it. */
+  const canvasLongPress = useLongPress(
+    useCallback((pos: { x: number; y: number }, e: React.PointerEvent | React.MouseEvent) => {
+      // Don't hijack right-clicks on inputs/textareas/contenteditable so
+      // those retain their native browser context menus.
+      const target = e.target as HTMLElement | null;
+      if (target && (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.closest("[contenteditable='true']")
+      )) return;
+      openCanvasContextMenu(pos.x, pos.y);
+    }, [openCanvasContextMenu]),
+  );
+
+  /* ── Object long-press context menu (for CanvasObjectLayer) ── */
+  const handleObjectContextMenu = useCallback((objId: string, clientX: number, clientY: number) => {
+    const hitObj = canvasObjects.find((o) => o.id === objId);
+    if (!hitObj) return;
+    setSelectedObjectId(hitObj.id);
+    const items: ContextMenuItem[] = [
+      { label: "Rename\u2026", onClick: () => {
+        const current = hitObj.name ?? "";
+        const next = window.prompt("Rename this drop-in:", current);
+        if (next !== null && next.trim()) {
+          setCanvasObjects((prev) => prev.map((o) => o.id === hitObj.id ? { ...o, name: next.trim() } : o));
+        }
+      }},
+      { label: "Duplicate", onClick: () => {
+        const dup: CanvasObject = { ...hitObj, id: crypto.randomUUID(), x: hitObj.x + 24, y: hitObj.y + 24 };
+        setCanvasObjects((prev) => [...prev, dup]);
+        setSelectedObjectId(dup.id);
+      }},
+      { label: "", separator: true },
+      { label: "Cut", shortcut: "\u2318X", onClick: () => {
+        objectClipboardRef.current = { ...hitObj };
+        setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
+        setSelectedObjectId(null);
+      }},
+      { label: "Copy", shortcut: "\u2318C", onClick: () => {
+        objectClipboardRef.current = { ...hitObj };
+      }},
+      { label: "", separator: true },
+      { label: "Delete", danger: true, onClick: () => {
+        setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
+        if (selectedObjectId === hitObj.id) setSelectedObjectId(null);
+      }},
+    ];
+    setCtxMenu({ x: clientX, y: clientY, items });
+  }, [canvasObjects, selectedObjectId, setCanvasObjects, setSelectedObjectId]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -854,7 +900,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
           {/* ── Canvas area ── */}
           <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}${pendingSymbol ? " noteometry-placing-symbol" : ""}`}
             onClick={handleCanvasAreaClick}
-            onContextMenu={handleCanvasContextMenu}
+            {...canvasLongPress}
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
@@ -912,6 +958,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 selectedObjectId={selectedObjectId}
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
+                onObjectContextMenu={handleObjectContextMenu}
               />
 
               {/* Lasso overlay — operates within the viewport */}
@@ -956,6 +1003,24 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 );
               })()}
             </div>
+
+            {/* ── Persistent Mini Toolbar (left edge) ── */}
+            <MiniToolbar
+              tool={tool}
+              lassoActive={lassoActive}
+              lassoMode={lassoMode}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onToolChange={setTool}
+              onToggleLasso={toggleLasso}
+              onSetLassoActive={setLassoActive}
+              onUndo={handleUndoWrapped}
+              onRedo={handleRedoWrapped}
+              onInsertTextBox={handleInsertTextBox}
+              onInsertTable={handleInsertTable}
+              onInsertImage={handleInsertImage}
+              onInsertPdf={handleInsertPdf}
+            />
           </div>
         </div>
       </div>

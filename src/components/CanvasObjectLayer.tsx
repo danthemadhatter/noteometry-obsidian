@@ -4,6 +4,7 @@ import { defaultObjectName } from "../lib/canvasObjects";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
 import { loadImageFromVault } from "../lib/persistence";
+import { useLongPress } from "../hooks/useLongPress";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
@@ -86,6 +87,9 @@ interface Props {
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
   plugin?: NoteometryPlugin;
+  /** Called when the user long-presses / right-clicks on an object.
+   *  Parent builds the context menu items. */
+  onObjectContextMenu?: (objId: string, clientX: number, clientY: number) => void;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -165,10 +169,34 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
   );
 }
 
+/** Per-object wrapper that applies useLongPress for context menu on touch. */
+function ObjectLongPressWrapper({
+  objId,
+  onObjectContextMenu,
+  children,
+  ...rest
+}: {
+  objId: string;
+  onObjectContextMenu?: (objId: string, clientX: number, clientY: number) => void;
+  children: React.ReactNode;
+} & Omit<React.HTMLAttributes<HTMLDivElement>, "onContextMenu">) {
+  const handlers = useLongPress(
+    useCallback((pos: { x: number; y: number }) => {
+      onObjectContextMenu?.(objId, pos.x, pos.y);
+    }, [objId, onObjectContextMenu]),
+  );
+  return (
+    <div {...rest} {...handlers}>
+      {children}
+    </div>
+  );
+}
+
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
   zoom = 1,
   tool, selectedObjectId, onSelectObject, plugin,
+  onObjectContextMenu,
 }: Props) {
   // Mirror zoom into a ref so the drag/resize handlers (which close over
   // stale values) always read the latest scale.
@@ -268,8 +296,10 @@ export default function CanvasObjectLayer({
       }}
     >
       {objects.map(obj => (
-        <div
+        <ObjectLongPressWrapper
           key={obj.id}
+          objId={obj.id}
+          onObjectContextMenu={onObjectContextMenu}
           className={`noteometry-canvas-object ${selectedObjectId === obj.id ? "noteometry-object-selected" : ""}`}
           style={{
             position: "absolute",
@@ -334,7 +364,7 @@ export default function CanvasObjectLayer({
             onPointerMove={handleDragMove}
             onPointerUp={handleDragEnd}
           />
-        </div>
+        </ObjectLongPressWrapper>
       ))}
     </div>
   );
