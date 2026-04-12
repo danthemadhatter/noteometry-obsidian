@@ -74,14 +74,13 @@
   --nm-paper: var(--nm-faceplate);              /* paper inserts */
   --nm-paper-muted: var(--nm-ink-muted);
 
-  /* Geometry — machined, not extruded */
-  --nm-radius: 4px;
-  --nm-radius-sm: 3px;
+  /* Geometry — rounded, premium iPad app feel */
+  --nm-radius: 6px;
+  --nm-radius-sm: 4px;
 
-  /* Shadows — softer, less heavy. Was "warm workshop lighting" in v5,
-   * now "clean iPad app elevation". Lower alphas, cooler tones. */
-  --nm-shadow-soft: 0 1px 2px rgba(35, 40, 58, 0.08), 0 0 1px rgba(35, 40, 58, 0.12);
-  --nm-shadow-toolbar: 0 2px 8px rgba(35, 40, 58, 0.10), 0 0 1px rgba(35, 40, 58, 0.16);
+  /* Shadows — soft, subtle elevation. Premium tablet app aesthetic. */
+  --nm-shadow-soft: 0 1px 3px rgba(35, 40, 58, 0.06), 0 0 1px rgba(35, 40, 58, 0.08);
+  --nm-shadow-toolbar: 0 2px 10px rgba(35, 40, 58, 0.08), 0 0 1px rgba(35, 40, 58, 0.10);
 
   /* Typography — IBM Plex family if installed, graceful system fallback */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
@@ -176,16 +175,12 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-  /* Battleship gray Tek 545A cabinet — the metal body behind the
-   * cream faceplate panels. Where panels don't cover the full surface
-   * (borders, seams, padding), the cabinet shows through. */
-  background: var(--nm-cabinet);
+  background: var(--nm-faceplate-alt);
   color: var(--text-normal);
   font-family: var(--nm-font);
-  /* Thin cabinet bezel around the whole plugin view */
-  padding: 2px;
+  padding: 0;
   box-sizing: border-box;
-  gap: 2px;
+  gap: 0;
 }
 
 /* Give the main (canvas + toolbar) area its own explicit gap so the
@@ -195,13 +190,9 @@
   gap: 0;
 }
 
-/* Visible battleship-gray trim strips between panels (replaces the
- * old thin borders so the cabinet reads as a real metal seam). */
+/* Clean single border between panels — no double borders. */
 .noteometry-sidebar {
-  border-right: 2px solid var(--nm-cabinet-dark);
-}
-.noteometry-right {
-  border-left: 2px solid var(--nm-cabinet-dark);
+  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-main {
@@ -225,15 +216,13 @@
   align-items: flex-start;
   padding-top: 6px;
   background: var(--nm-faceplate-alt);
-  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-open {
-  width: 180px;
+  width: 170px;
   display: flex;
   flex-direction: column;
   background: var(--nm-faceplate-alt);
-  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-backdrop {
@@ -280,17 +269,17 @@
 .noteometry-sidebar-hdr {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 12px 10px;
+  gap: 6px;
+  padding: 8px 10px 6px;
   border-bottom: 1px solid var(--nm-paper-border);
   flex-shrink: 0;
 }
 
 .noteometry-sidebar-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-normal, #1e1e1e);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.1px;
 }
 
 .noteometry-sidebar-section {
@@ -309,23 +298,27 @@
 
 .noteometry-sidebar-section-item {
   font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   color: var(--text-normal, #1e1e1e);
 }
 .noteometry-sidebar-page-item {
   padding-left: 28px !important;
-  font-size: 13px;
+  font-size: 11px;
 }
 .noteometry-sidebar-add-page {
   padding-left: 28px !important;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .noteometry-sidebar-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 4px 10px;
+  min-height: 28px;
+  font-size: 11px;
   cursor: pointer;
   color: var(--text-normal);
   border-left: 3px solid transparent;
@@ -413,8 +406,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
-  font-size: 12px;
+  padding: 6px 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--nm-accent);
   background: none;
@@ -434,8 +427,8 @@
   background: var(--nm-accent-light);
   border: 1px solid var(--nm-accent);
   border-radius: var(--nm-radius-sm);
-  margin: 6px 10px;
-  padding: 8px 14px;
+  margin: 4px 8px;
+  padding: 6px 10px;
   font-weight: 600;
 }
 
@@ -540,7 +533,8 @@
   display: flex;
   flex-direction: row;
   overflow: hidden;
-  background: var(--nm-warm-bg);
+  background: var(--nm-faceplate);
+  border-left: 1px solid var(--nm-paper-border);
 }
 
 /* Vertical drag handle on left edge of right panel */
@@ -886,8 +880,8 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--nm-paper-border);
-  border-radius: var(--nm-radius);
-  margin: 0 10px;
+  border-radius: 6px;
+  margin: 0 8px;
   background: var(--nm-faceplate);
   box-shadow: var(--nm-shadow-soft);
 }
@@ -1119,9 +1113,9 @@
   flex-direction: column;
   height: 100%;
   background: var(--nm-faceplate);
-  border: 1px solid var(--nm-warm-border-strong);
-  border-radius: var(--nm-radius);
-  margin: 0 10px 10px;
+  border: 1px solid var(--nm-paper-border);
+  border-radius: 6px;
+  margin: 0 8px 8px;
   overflow: hidden;
   box-shadow: var(--nm-shadow-soft);
 }
@@ -1191,19 +1185,19 @@
   -webkit-user-select: text;
   cursor: text;
 }
-/* User messages — amber backlit indicator (the "transmit" dial glow) */
+/* User messages — warm amber indicator */
 .noteometry-chat-bubble.user {
   background: var(--nm-phosphor) !important;
   color: var(--nm-ink) !important;
-  border-radius: 4px;
-  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: 12px 12px 4px 12px;
+  border: none;
 }
-/* Assistant messages — raised faceplate readout panel with gunmetal trim */
+/* Assistant messages — soft cream panel */
 .noteometry-chat-bubble.assistant {
   background: var(--nm-faceplate-light) !important;
   color: var(--nm-ink) !important;
-  border-radius: 4px;
-  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: 12px 12px 12px 4px;
+  border: 1px solid var(--nm-paper-border);
 }
 
 /* Action row at the bottom of assistant messages (Copy for Word + Drop onto canvas) */
@@ -1395,7 +1389,7 @@
 
 .noteometry-canvas-object {
   border: 1px solid var(--nm-paper-border);
-  border-radius: var(--nm-radius-sm);
+  border-radius: var(--nm-radius);
   background: var(--nm-paper);
   color: var(--nm-paper-ink);
   box-shadow: var(--nm-shadow-soft);
@@ -1499,14 +1493,16 @@
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.3px;
   color: var(--nm-paper-ink);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 0;
-  padding: 3px 6px;
+  padding: 2px 6px;
+  max-height: 20px;
+  line-height: 16px;
   outline: none;
   cursor: inherit;
 }
@@ -1522,17 +1518,17 @@
 
 /* ── Right-click context menu ─────────────────────────── */
 .noteometry-ctx-menu {
-  min-width: 220px;
-  padding: 4px 0;
+  min-width: 200px;
+  padding: 3px 0;
   background: var(--nm-faceplate);
   color: var(--nm-paper-ink);
-  border: 1px solid var(--nm-chassis-dark);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius);
   box-shadow:
-    0 6px 20px rgba(10, 20, 35, 0.25),
-    0 2px 6px rgba(10, 20, 35, 0.18);
+    0 4px 16px rgba(10, 20, 35, 0.12),
+    0 1px 4px rgba(10, 20, 35, 0.08);
   font-family: var(--nm-font);
-  font-size: 13px;
+  font-size: 12px;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1541,14 +1537,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
   width: 100%;
-  padding: 6px 14px;
+  min-height: 28px;
+  padding: 4px 12px;
   background: none;
   border: none;
   color: var(--nm-paper-ink);
   cursor: pointer;
   font: inherit;
+  font-size: 12px;
   text-align: left;
 }
 .noteometry-ctx-item:hover:not(.disabled) {
@@ -1580,7 +1578,7 @@
 
 .noteometry-ctx-sep {
   height: 1px;
-  margin: 4px 8px;
+  margin: 3px 8px;
   background: var(--nm-paper-border);
 }
 
@@ -1824,7 +1822,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--nm-chassis-fg);
+  color: var(--nm-faceplate-light);
   align-self: center;
 }
 

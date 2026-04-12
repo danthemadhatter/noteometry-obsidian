@@ -22,7 +22,7 @@ export interface CanvasData {
   strokes: Stroke[];
   stamps: Stamp[];
   canvasObjects: CanvasObject[];
-  viewport: { scrollX: number; scrollY: number };
+  viewport: { scrollX: number; scrollY: number; zoom?: number };
   panelInput: string;
   chatMessages: ChatMessage[];
   tableData: Record<string, string[][]>;
@@ -65,7 +65,7 @@ export const EMPTY_PAGE: CanvasData = {
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.0.2";
+export const V3_SOURCE_TAG = "noteometry-1.1.0";
 
 export interface StrokeElementV3 {
   type: "stroke";
@@ -240,7 +240,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
     viewport: {
       scrollX: data.viewport?.scrollX ?? 0,
       scrollY: data.viewport?.scrollY ?? 0,
-      zoom: 1.0,
+      zoom: data.viewport?.zoom ?? 1.0,
     },
     pipeline: {
       panelInput: data.panelInput ?? "",
@@ -328,6 +328,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
     viewport: {
       scrollX: v3.viewport?.scrollX ?? 0,
       scrollY: v3.viewport?.scrollY ?? 0,
+      zoom: v3.viewport?.zoom ?? 1.0,
     },
     panelInput: v3.pipeline?.panelInput ?? "",
     chatMessages: v3.pipeline?.chatMessages ?? [],

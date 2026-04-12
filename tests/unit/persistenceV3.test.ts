@@ -40,7 +40,7 @@ describe("persistence v3 pack/unpack", () => {
       { id: "table-1", type: "table", x: 200, y: 200, w: 400, h: 250 },
       { id: "img-1", type: "image", x: 300, y: 300, w: 400, h: 300, dataURL: "Noteometry/General/attachments/abc.png" },
     ],
-    viewport: { scrollX: 42, scrollY: 84 },
+    viewport: { scrollX: 42, scrollY: 84, zoom: 1.5 },
     panelInput: "$$\\int 3x^2 dx$$",
     chatMessages: [
       { role: "user", text: "Solve this:" },
@@ -87,8 +87,14 @@ describe("persistence v3 pack/unpack", () => {
     expect(img.fileRef).toBe("Noteometry/General/attachments/abc.png");
   });
 
-  it("packToV3 writes viewport.zoom default of 1.0", () => {
+  it("packToV3 preserves viewport.zoom from CanvasData", () => {
     const v3 = packToV3(sampleData);
+    expect(v3.viewport.zoom).toBe(1.5);
+  });
+
+  it("packToV3 defaults viewport.zoom to 1.0 when not set", () => {
+    const noZoom = { ...sampleData, viewport: { scrollX: 0, scrollY: 0 } };
+    const v3 = packToV3(noZoom);
     expect(v3.viewport.zoom).toBe(1.0);
   });
 

@@ -99,7 +99,10 @@ export function drawGrid(
   ctx.stroke();
 }
 
-/** Draw a single stroke — uniform width, no pressure sensitivity */
+/** Draw a single stroke with optional pressure-based width variation.
+ * When points carry pressure data (e.g. from Apple Pencil), the stroke
+ * width varies smoothly between 30% and 100% of the base width. Points
+ * without pressure (mouse/trackpad) render at uniform base width. */
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
   stroke: Stroke,
@@ -119,28 +122,60 @@ export function drawStroke(
     return;
   }
 
+  // Check if any point has meaningful pressure data.
+  // Mouse/trackpad events report 0.5 uniformly — treat those as no-pressure.
+  const hasPressure = pts.some(
+    (p) => p.pressure !== undefined && p.pressure !== 0.5 && p.pressure > 0
+  );
+
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = stroke.color;
-  ctx.lineWidth = stroke.width;
 
-  // Draw as a single smooth path
-  ctx.beginPath();
-  const p0 = pts[0]!;
-  ctx.moveTo(p0.x - scrollX, p0.y - scrollY);
+  if (!hasPressure) {
+    // No pressure data — draw as a single smooth path at uniform width
+    ctx.lineWidth = stroke.width;
+    ctx.beginPath();
+    const p0 = pts[0]!;
+    ctx.moveTo(p0.x - scrollX, p0.y - scrollY);
 
-  for (let i = 1; i < pts.length - 1; i++) {
-    const a = pts[i]!;
-    const b = pts[i + 1]!;
-    const midX = (a.x + b.x) / 2;
-    const midY = (a.y + b.y) / 2;
-    ctx.quadraticCurveTo(a.x - scrollX, a.y - scrollY, midX - scrollX, midY - scrollY);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      ctx.quadraticCurveTo(a.x - scrollX, a.y - scrollY, midX - scrollX, midY - scrollY);
+    }
+    const last = pts[pts.length - 1]!;
+    ctx.lineTo(last.x - scrollX, last.y - scrollY);
+    ctx.stroke();
+  } else {
+    // Pressure-sensitive: draw segment by segment with varying width.
+    // Width ranges from 30% (light touch) to 100% (full press) of base.
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const pA = a.pressure ?? 0.5;
+      const pB = b.pressure ?? 0.5;
+      // Average pressure of the two endpoints for this segment
+      const avgP = (pA + pB) / 2;
+      // Map pressure [0..1] → width factor [0.3..1.0]
+      const factor = 0.3 + avgP * 0.7;
+      ctx.lineWidth = stroke.width * factor;
+
+      ctx.beginPath();
+      ctx.moveTo(a.x - scrollX, a.y - scrollY);
+      if (i < pts.length - 2) {
+        const c = pts[i + 2]!;
+        const midX = (b.x + c.x) / 2;
+        const midY = (b.y + c.y) / 2;
+        ctx.quadraticCurveTo(b.x - scrollX, b.y - scrollY, midX - scrollX, midY - scrollY);
+      } else {
+        ctx.lineTo(b.x - scrollX, b.y - scrollY);
+      }
+      ctx.stroke();
+    }
   }
-
-  // Final segment
-  const last = pts[pts.length - 1]!;
-  ctx.lineTo(last.x - scrollX, last.y - scrollY);
-  ctx.stroke();
 }
 
 /** Draw all strokes */

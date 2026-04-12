@@ -278,6 +278,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     loadAllTextBoxData(data.textBoxData ?? {});
     setScrollX(data.viewport?.scrollX ?? 0);
     setScrollY(data.viewport?.scrollY ?? 0);
+    setZoom(clampZoom(data.viewport?.zoom ?? 1));
     // Clear loading flag after React processes the state updates
     requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [hydratePipeline, hydrateInk, hydrateObjects]);
@@ -289,6 +290,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     hydrateObjects([]);
     setScrollX(0);
     setScrollY(0);
+    setZoom(1);
     requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [hydratePipeline, hydrateInk, hydrateObjects]);
 
@@ -309,7 +311,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       strokes,
       stamps,
       canvasObjects,
-      viewport: { scrollX, scrollY },
+      viewport: { scrollX, scrollY, zoom },
       panelInput: inputCode,
       chatMessages,
       tableData: getAllTableData(),
@@ -317,7 +319,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       lastSaved: new Date().toISOString(),
     };
     await savePage(plugin, sec, pg, data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, sectionRef, pageRef]);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, zoom, inputCode, chatMessages, plugin, sectionRef, pageRef]);
 
   // Keep the indirection ref up to date so flushPendingSave sees the latest saveNow.
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
@@ -619,6 +621,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       // ── Drawing ──
       items.push(
         { label: "\u2500\u2500 Drawing \u2500\u2500", disabled: true },
+        { label: "Select (Pointer)", shortcut: tool === "select" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("select"); setLassoActive(false); }},
         { label: "Pen", shortcut: tool === "pen" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("pen"); setLassoActive(false); }},
         { label: "Eraser", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
         { label: `Color: \u25CF ${colorEntry.label}`, onClick: nextColor },
@@ -659,6 +662,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
         { label: "Zoom Out", onClick: zoomOut },
         { label: "Reset Zoom (100%)", onClick: resetZoom },
+        { label: "Lock Zoom", shortcut: zoomLocked ? "\u2713" : "", onClick: () => setZoomLocked((v) => !v) },
         { label: "", separator: true },
         { label: "Export PNG", onClick: () => {
           const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
@@ -680,10 +684,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
   }, [
-    zoom, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, tool, activeColor, strokeWidth,
+    zoom, zoomLocked, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, tool, activeColor, strokeWidth,
     lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage,
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
-    toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
+    setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
   ]);
 
