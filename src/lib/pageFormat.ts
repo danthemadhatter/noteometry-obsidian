@@ -94,6 +94,8 @@ export interface TextboxElementV3 {
   h: number;
   /** Rich-text HTML content (was previously in the textBoxData sidecar dict) */
   html: string;
+  /** User-editable display name. Optional for back-compat with old pages. */
+  name?: string;
 }
 
 export interface TableElementV3 {
@@ -105,6 +107,7 @@ export interface TableElementV3 {
   h: number;
   /** Row-by-column cell strings (was previously in the tableData sidecar dict) */
   rows: string[][];
+  name?: string;
 }
 
 export interface ImageElementV3 {
@@ -116,6 +119,7 @@ export interface ImageElementV3 {
   h: number;
   /** Vault-relative path to the PNG file (never a data: URL). */
   fileRef: string;
+  name?: string;
 }
 
 export interface PdfElementV3 {
@@ -130,6 +134,7 @@ export interface PdfElementV3 {
   /** Current page (1-based). Restored on reload so the user lands on
    * whichever page they were studying. */
   page: number;
+  name?: string;
 }
 
 export type PageElementV3 =
@@ -197,6 +202,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         html: textBoxData[obj.id] ?? "",
+        name: obj.name,
       });
     } else if (obj.type === "table") {
       elements.push({
@@ -204,6 +210,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         rows: tableData[obj.id] ?? [],
+        name: obj.name,
       });
     } else if (obj.type === "image") {
       elements.push({
@@ -211,6 +218,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         fileRef: obj.dataURL,
+        name: obj.name,
       });
     } else if (obj.type === "pdf") {
       elements.push({
@@ -219,6 +227,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         fileRef: obj.fileRef,
         page: obj.page,
+        name: obj.name,
       });
     }
   }
@@ -277,6 +286,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           id: el.id,
           type: "textbox",
           x: el.x, y: el.y, w: el.w, h: el.h,
+          name: el.name,
         });
         textBoxData[el.id] = el.html;
         break;
@@ -285,6 +295,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           id: el.id,
           type: "table",
           x: el.x, y: el.y, w: el.w, h: el.h,
+          name: el.name,
         });
         tableData[el.id] = el.rows;
         break;
@@ -294,6 +305,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           type: "image",
           x: el.x, y: el.y, w: el.w, h: el.h,
           dataURL: el.fileRef,
+          name: el.name,
         });
         break;
       case "pdf":
@@ -303,6 +315,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           fileRef: el.fileRef,
           page: el.page ?? 1,
+          name: el.name,
         });
         break;
     }

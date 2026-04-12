@@ -1,11 +1,78 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import type { CanvasObject } from "../lib/canvasObjects";
+import { defaultObjectName } from "../lib/canvasObjects";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
 import { loadImageFromVault } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
+
+/** Inline editable label that lives in the drag handle of every canvas
+ * object. Click to rename, Enter to commit, Escape to revert. */
+function EditableObjectName({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onChange(trimmed);
+    setEditing(false);
+  };
+  const revert = () => {
+    setDraft(value);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="noteometry-object-name-input"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); revert(); }
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+  return (
+    <span
+      className="noteometry-object-drag-label"
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Double-click to rename"
+    >
+      {value}
+    </span>
+  );
+}
 
 interface Props {
   objects: CanvasObject[];
@@ -221,12 +288,14 @@ export default function CanvasObjectLayer({
             className="noteometry-object-drag-handle"
             onPointerDown={(e) => handleDragStart(e, obj)}
           >
-            <span className="noteometry-object-drag-label">
-              {obj.type === "textbox" ? "Text"
-                : obj.type === "table" ? "Table"
-                : obj.type === "pdf" ? "PDF"
-                : "Image"}
-            </span>
+            <EditableObjectName
+              value={defaultObjectName(obj)}
+              onChange={(next) => {
+                onObjectsChange(objects.map(o =>
+                  o.id === obj.id ? { ...o, name: next } : o
+                ));
+              }}
+            />
             <button
               className="noteometry-object-delete"
               onPointerUp={(e) => {

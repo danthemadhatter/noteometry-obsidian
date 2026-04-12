@@ -13,6 +13,9 @@ import ChatPanel from "./ChatPanel";
 import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
+import ContextMenu from "./ContextMenu";
+import type { ContextMenuItem } from "./ContextMenu";
+import type { CanvasObject } from "../lib/canvasObjects";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
@@ -125,6 +128,13 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  /* ── Context menu (right-click) state ────────────────── */
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+
+  /* Internal clipboard for cut/copy of canvas objects. Stores a deep
+   * clone so later edits to the original don't mutate the clipboard. */
+  const objectClipboardRef = useRef<CanvasObject | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Swipe blocking is handled in NoteometryView.ts at the view boundary
@@ -196,6 +206,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedObjectId(null);
     setSelectedStampId(null);
   }, [tool, stamps, scrollX, scrollY, pendingSymbol, activeColor]);
+
+  // handleCanvasContextMenu moved below handleInsertPdf to avoid TDZ on
+  // the handleInsert* handlers it closes over.
 
   // Wrapped undo/redo that also clears cross-feature selection (canvas objects).
   // Stamp selection is cleared inside useInk.
@@ -501,6 +514,99 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
   }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
+  /* ── Right-click context menu ──────────────────────────
+   * Detects what the user right-clicked on (canvas object / stamp /
+   * empty canvas) and builds the appropriate menu. Cut/Copy work on
+   * canvas objects via an internal clipboard ref; Paste duplicates the
+   * clipboard entry at the click position. System clipboard image
+   * paste is still handled by the Cmd+V paste listener below. */
+  const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
+    // Don't hijack right-clicks on inputs/textareas/contenteditable so
+    // those retain their native browser context menus.
+    const target = e.target as HTMLElement | null;
+    if (target && (
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.closest("[contenteditable='true']")
+    )) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = canvasAreaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // World-space click position (used for hit tests and paste anchor)
+    const worldX = (e.clientX - rect.left) / zoom + scrollX;
+    const worldY = (e.clientY - rect.top) / zoom + scrollY;
+
+    // Hit-test canvas objects first (they're above strokes)
+    const hitObj = [...canvasObjects].reverse().find((o) =>
+      worldX >= o.x && worldX <= o.x + o.w && worldY >= o.y && worldY <= o.y + o.h
+    );
+    const hitStamp = stamps.find((st) => {
+      const bb = stampBBox(st);
+      return worldX >= bb.x && worldX <= bb.x + bb.w && worldY >= bb.y && worldY <= bb.y + bb.h;
+    });
+
+    const items: ContextMenuItem[] = [];
+
+    if (hitObj) {
+      setSelectedObjectId(hitObj.id);
+      items.push(
+        { label: "Cut", shortcut: "⌘X", onClick: () => {
+          objectClipboardRef.current = { ...hitObj };
+          setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
+          setSelectedObjectId(null);
+        }},
+        { label: "Copy", shortcut: "⌘C", onClick: () => {
+          objectClipboardRef.current = { ...hitObj };
+        }},
+        { label: "Duplicate", onClick: () => {
+          const dup: CanvasObject = { ...hitObj, id: crypto.randomUUID(), x: hitObj.x + 24, y: hitObj.y + 24 };
+          setCanvasObjects((prev) => [...prev, dup]);
+          setSelectedObjectId(dup.id);
+        }},
+        { label: "Rename…", onClick: () => {
+          const current = hitObj.name ?? "";
+          const next = window.prompt("Rename this drop-in:", current);
+          if (next !== null && next.trim()) {
+            setCanvasObjects((prev) => prev.map((o) => o.id === hitObj.id ? { ...o, name: next.trim() } : o));
+          }
+        }},
+        { label: "", separator: true },
+        { label: "Delete", danger: true, onClick: () => {
+          setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
+          if (selectedObjectId === hitObj.id) setSelectedObjectId(null);
+        }},
+      );
+    } else if (hitStamp) {
+      items.push(
+        { label: "Delete stamp", danger: true, onClick: () => {
+          setStamps((prev) => prev.filter((s) => s.id !== hitStamp.id));
+        }},
+      );
+    } else {
+      // Empty canvas — show paste + insert actions.
+      const canPaste = !!objectClipboardRef.current;
+      items.push(
+        { label: canPaste ? "Paste drop-in" : "Paste", shortcut: "⌘V", disabled: !canPaste, onClick: () => {
+          const src = objectClipboardRef.current;
+          if (!src) return;
+          const dup: CanvasObject = { ...src, id: crypto.randomUUID(), x: worldX, y: worldY };
+          setCanvasObjects((prev) => [...prev, dup]);
+          setSelectedObjectId(dup.id);
+        }},
+        { label: "", separator: true },
+        { label: "Insert text box", onClick: handleInsertTextBox },
+        { label: "Insert table", onClick: handleInsertTable },
+        { label: "Insert image…", onClick: handleInsertImage },
+        { label: "Insert PDF…", onClick: handleInsertPdf },
+      );
+    }
+
+    setCtxMenu({ x: e.clientX, y: e.clientY, items });
+  }, [zoom, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, setCanvasObjects, setSelectedObjectId, setStamps, handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf]);
+
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -700,6 +806,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
           {/* ── Canvas area ── */}
           <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}${pendingSymbol ? " noteometry-placing-symbol" : ""}`}
             onClick={handleCanvasAreaClick}
+            onContextMenu={handleCanvasContextMenu}
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
@@ -926,6 +1033,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
           )}
         </div>
       </div>
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={ctxMenu.items}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
     </div>
   );
 }

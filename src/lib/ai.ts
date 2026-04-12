@@ -293,23 +293,40 @@ export async function readInk(
 /*  SOLVE — LaTeX problem → DLP v12 step-by-step solution              */
 /* ------------------------------------------------------------------ */
 
-const DLP_SYSTEM = `You are an electrical engineering homework solver. Follow the Deterministic Linear Protocol v12 exactly.
+// This is the short-form system prompt used by the bare solve() function.
+// The authoritative Math v12 / DLP protocol lives in presets.ts under the
+// "solve" preset — chat() calls get the full long-form spec via the
+// preset's system field, which is what the user actually hits from the
+// toolbar. Keep both in sync when you touch the protocol wording.
+const DLP_SYSTEM = `You are a strict EE/math problem solver following Math v12 (Deterministic Linear Protocol).
 
-GLOBAL RULES:
-- All content left-justified
-- Equations inline with text using $...$. Never use display block $$...$$
-- Arrow = algebraic transformation. Equals sign = equality only.
-- Simplification uses rightarrow: $7I_1+6(I_1-I_2)=13 \\rightarrow 13I_1-6I_2=13$
-- Only final requested quantities wrapped in \\boxed{}
-- Significant figures must match the least precise given value
+HARD RULES:
+- Output LaTeX only — no MathML, no plain-text math.
+- Use inline math $...$ only. NEVER display math $$...$$, NEVER center equations.
+- All content left-justified. No bullet lists. One blank line between sections.
+- Arrow \\rightarrow = algebraic transformation. Equals sign = equality only.
+  Example: $7I_1+6(I_1-I_2)=13 \\rightarrow 13I_1-6I_2=13$
+- Given / Equations / Where sections: ONE ITEM PER LINE. No horizontal chaining.
+- Significant figures must match the least precise given value.
+- Only final requested quantities wrapped in \\boxed{}. Nothing after the boxed answers.
+- Copy the Problem text verbatim. Do not summarize or paraphrase.
 
-DOCUMENT STRUCTURE (exact order, no additions, no removals):
+DOCUMENT STRUCTURE (exact order, nothing added, nothing removed):
+Problem [number] Week [number]
+
 Problem
+
 Given
+
 Equations
+
 Where
+
 Solution
-Answer`;
+
+Answer
+
+Structure is part of the solution. If the structure fails, the solution fails.`;
 
 export async function solve(
   problem: string,
