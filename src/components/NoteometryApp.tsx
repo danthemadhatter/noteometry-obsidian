@@ -6,7 +6,7 @@ import { renderStrokesToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
-import CanvasToolbar from "./CanvasToolbar";
+// CanvasToolbar removed — all tools now live in the right-click context menu
 import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
@@ -25,6 +25,23 @@ import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
+
+/* ── Color and width presets for context-menu cycling ───────────── */
+const INK_COLORS = [
+  { color: "#202124", label: "Black" },
+  { color: "#d93025", label: "Red" },
+  { color: "#1a73e8", label: "Blue" },
+  { color: "#188038", label: "Green" },
+  { color: "#e8710a", label: "Orange" },
+  { color: "#9334e6", label: "Purple" },
+];
+
+const STROKE_WIDTHS = [
+  { width: 1.5, label: "Fine" },
+  { width: 3, label: "Medium" },
+  { width: 5, label: "Thick" },
+  { width: 8, label: "Marker" },
+];
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -94,9 +111,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [scrollY, setScrollY] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [zoomLocked, setZoomLocked] = useState(false);
-  // viewportRef = the drawing-surface sub-area below the top toolbar.
-  // Lasso, rasterization, and zoom wheel events all key off this, not the
-  // full canvas-area (which now includes the top bar).
+  // viewportRef = the drawing surface inside the canvas area.
+  // Lasso, rasterization, and zoom wheel events all key off this.
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Zoom controls — bounds and step.
@@ -121,9 +137,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setZoom(1);
   }, [zoomLocked]);
 
-  const toggleZoomLock = useCallback(() => {
-    setZoomLocked((v) => !v);
-  }, []);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -172,7 +185,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   // Click canvas to place pending symbol, select stamps, or deselect
   const handleCanvasAreaClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest(".noteometry-canvas-object, .noteometry-canvas-toolbar")) return;
+    if (target.closest(".noteometry-canvas-object")) return;
 
     const rect = canvasAreaRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -514,11 +527,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
   /* ── Right-click context menu ──────────────────────────
-   * Detects what the user right-clicked on (canvas object / stamp /
-   * empty canvas) and builds the appropriate menu. Cut/Copy work on
-   * canvas objects via an internal clipboard ref; Paste duplicates the
-   * clipboard entry at the click position. System clipboard image
-   * paste is still handled by the Cmd+V paste listener below. */
+   * This is now the PRIMARY tool interface — the toolbar has been removed
+   * entirely. Detects what the user right-clicked on (canvas object /
+   * stamp / empty canvas) and builds the appropriate menu. */
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
     // Don't hijack right-clicks on inputs/textareas/contenteditable so
     // those retain their native browser context menus.
@@ -550,14 +561,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
     const items: ContextMenuItem[] = [];
 
     if (hitObj) {
+      /* ── Right-clicked on a canvas object (drop-in) ── */
       setSelectedObjectId(hitObj.id);
       items.push(
-        { label: "Cut", shortcut: "⌘X", onClick: () => {
+        { label: "Cut", shortcut: "\u2318X", onClick: () => {
           objectClipboardRef.current = { ...hitObj };
           setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
           setSelectedObjectId(null);
         }},
-        { label: "Copy", shortcut: "⌘C", onClick: () => {
+        { label: "Copy", shortcut: "\u2318C", onClick: () => {
           objectClipboardRef.current = { ...hitObj };
         }},
         { label: "Duplicate", onClick: () => {
@@ -565,7 +577,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
           setCanvasObjects((prev) => [...prev, dup]);
           setSelectedObjectId(dup.id);
         }},
-        { label: "Rename…", onClick: () => {
+        { label: "Rename\u2026", onClick: () => {
           const current = hitObj.name ?? "";
           const next = window.prompt("Rename this drop-in:", current);
           if (next !== null && next.trim()) {
@@ -579,32 +591,101 @@ export default function NoteometryApp({ plugin, app }: Props) {
         }},
       );
     } else if (hitStamp) {
+      /* ── Right-clicked on a stamp ── */
       items.push(
-        { label: "Delete stamp", danger: true, onClick: () => {
+        { label: "Delete Stamp", danger: true, onClick: () => {
           setStamps((prev) => prev.filter((s) => s.id !== hitStamp.id));
         }},
       );
     } else {
-      // Empty canvas — show paste + insert actions.
-      const canPaste = !!objectClipboardRef.current;
+      /* ── Right-clicked on empty canvas — full tool interface ── */
+
+      // Resolve current color/width labels for display
+      const colorEntry = INK_COLORS.find((c) => c.color === activeColor) ?? INK_COLORS[0]!;
+      const widthEntry = STROKE_WIDTHS.find((w) => w.width === strokeWidth) ?? STROKE_WIDTHS[1]!;
+
+      // Helper: cycle to next entry in an array
+      const nextColor = () => {
+        const idx = INK_COLORS.findIndex((c) => c.color === activeColor);
+        const next = INK_COLORS[(idx + 1) % INK_COLORS.length]!;
+        setActiveColor(next.color);
+      };
+      const nextWidth = () => {
+        const idx = STROKE_WIDTHS.findIndex((w) => w.width === strokeWidth);
+        const next = STROKE_WIDTHS[(idx + 1) % STROKE_WIDTHS.length]!;
+        setStrokeWidth(next.width);
+      };
+
+      // ── Drawing ──
       items.push(
-        { label: canPaste ? "Paste drop-in" : "Paste", shortcut: "⌘V", disabled: !canPaste, onClick: () => {
-          const src = objectClipboardRef.current;
-          if (!src) return;
-          const dup: CanvasObject = { ...src, id: crypto.randomUUID(), x: worldX, y: worldY };
-          setCanvasObjects((prev) => [...prev, dup]);
-          setSelectedObjectId(dup.id);
+        { label: "\u2500\u2500 Drawing \u2500\u2500", disabled: true },
+        { label: "Pen", shortcut: tool === "pen" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("pen"); setLassoActive(false); }},
+        { label: "Eraser", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
+        { label: `Color: \u25CF ${colorEntry.label}`, onClick: nextColor },
+        { label: `Width: \u2500\u2500 ${widthEntry.label}`, onClick: nextWidth },
+        { label: "", separator: true },
+      );
+
+      // ── Select ──
+      items.push(
+        { label: "\u2500\u2500 Select \u2500\u2500", disabled: true },
+        { label: "Freehand Lasso", shortcut: lassoActive && lassoMode === "freehand" ? "\u2713" : "", onClick: () => {
+          if (!lassoActive) setTool("pen");
+          toggleLasso("freehand");
+        }},
+        { label: "Rectangle Lasso", shortcut: lassoActive && lassoMode === "rect" ? "\u2713" : "", onClick: () => {
+          if (!lassoActive) setTool("pen");
+          toggleLasso("rect");
         }},
         { label: "", separator: true },
-        { label: "Insert text box", onClick: handleInsertTextBox },
-        { label: "Insert table", onClick: handleInsertTable },
-        { label: "Insert image…", onClick: handleInsertImage },
-        { label: "Insert PDF…", onClick: handleInsertPdf },
+      );
+
+      // ── Insert ──
+      items.push(
+        { label: "\u2500\u2500 Insert \u2500\u2500", disabled: true },
+        { label: "Text Box", onClick: handleInsertTextBox },
+        { label: "Table", onClick: handleInsertTable },
+        { label: "Image\u2026", onClick: handleInsertImage },
+        { label: "PDF\u2026", onClick: handleInsertPdf },
+        { label: "", separator: true },
+      );
+
+      // ── Canvas ──
+      items.push(
+        { label: "\u2500\u2500 Canvas \u2500\u2500", disabled: true },
+        { label: "Undo", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
+        { label: "Redo", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
+        { label: "", separator: true },
+        { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
+        { label: "Zoom Out", onClick: zoomOut },
+        { label: "Reset Zoom (100%)", onClick: resetZoom },
+        { label: "", separator: true },
+        { label: "Export PNG", onClick: () => {
+          const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
+          if (!dataUrl) return;
+          const link = document.createElement("a");
+          link.download = `${currentPage || "canvas"}.png`;
+          link.href = dataUrl;
+          link.click();
+        }},
+        { label: "Clear Canvas", danger: true, onClick: () => {
+          if (!confirm("Clear all strokes and stamps from this page?")) return;
+          if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
+          pushUndo();
+          setStrokes([]);
+          setStamps([]);
+        }},
       );
     }
 
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
-  }, [zoom, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, setCanvasObjects, setSelectedObjectId, setStamps, handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf]);
+  }, [
+    zoom, scrollX, scrollY, canvasObjects, stamps, selectedObjectId, tool, activeColor, strokeWidth,
+    lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage,
+    setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
+    toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
+    handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
+  ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -826,89 +907,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               className="noteometry-hidden"
             />
 
-            {/* ── Top bar: zoom controls only (tools moved to vertical strip) ── */}
-            <div className="noteometry-canvas-topbar">
-              <div className="noteometry-zoom-controls">
-                <button
-                  className="noteometry-zoom-btn"
-                  onClick={zoomOut}
-                  disabled={zoomLocked || zoom <= 0.5}
-                  title="Zoom out"
-                  aria-label="Zoom out"
-                >
-                  −
-                </button>
-                <button
-                  className="noteometry-zoom-btn noteometry-zoom-percent"
-                  onClick={resetZoom}
-                  disabled={zoomLocked}
-                  title="Reset zoom to 100%"
-                >
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button
-                  className="noteometry-zoom-btn"
-                  onClick={zoomIn}
-                  disabled={zoomLocked || zoom >= 4}
-                  title="Zoom in"
-                  aria-label="Zoom in"
-                >
-                  +
-                </button>
-                <button
-                  className={`noteometry-zoom-btn noteometry-zoom-lock ${zoomLocked ? "locked" : ""}`}
-                  onClick={toggleZoomLock}
-                  title={zoomLocked ? "Unlock zoom" : "Lock zoom"}
-                  aria-label={zoomLocked ? "Unlock zoom" : "Lock zoom"}
-                >
-                  {zoomLocked ? "🔒" : "🔓"}
-                </button>
-              </div>
-            </div>
-
-            {/* ── Canvas body: vertical toolbar + viewport ── */}
-            <div className="noteometry-canvas-body">
-              {/* ── Vertical tool strip (left of viewport) ── */}
-              <CanvasToolbar
-                tool={tool}
-                onToolChange={(t) => { setTool(t); setLassoActive(false); }}
-                lassoActive={lassoActive}
-                lassoMode={lassoMode}
-                onLassoToggle={(requestedMode) => {
-                  if (!lassoActive) setTool("pen");
-                  toggleLasso(requestedMode);
-                }}
-                activeColor={activeColor}
-                onColorChange={setActiveColor}
-                strokeWidth={strokeWidth}
-                onStrokeWidthChange={setStrokeWidth}
-                onInsertTextBox={handleInsertTextBox}
-                onInsertTable={handleInsertTable}
-                onInsertImage={handleInsertImage}
-                onInsertPdf={handleInsertPdf}
-                onUndo={handleUndoWrapped}
-                onRedo={handleRedoWrapped}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onClearCanvas={() => {
-                  if (!confirm("Clear all strokes and stamps from this page?")) return;
-                  if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
-                  pushUndo();
-                  setStrokes([]);
-                  setStamps([]);
-                }}
-                onExportImage={() => {
-                  const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
-                  if (!dataUrl) return;
-                  const link = document.createElement("a");
-                  link.download = `${currentPage || "canvas"}.png`;
-                  link.href = dataUrl;
-                  link.click();
-                }}
-              />
-
-              {/* ── Viewport: the actual drawing surface ── */}
-              <div ref={viewportRef} className="noteometry-canvas-viewport">
+            {/* ── Viewport: the full drawing surface (toolbar removed — use right-click) ── */}
+            <div ref={viewportRef} className="noteometry-canvas-viewport">
               {!panelOpen && (
                 <div className="noteometry-canvas-actions">
                   <button
@@ -957,8 +957,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 plugin={plugin}
               />
 
-              {/* Lasso overlay — operates within the viewport only,
-                  so the lasso can't be drawn over the top toolbar */}
+              {/* Lasso overlay — operates within the viewport */}
               <LassoOverlay
                 active={lassoActive}
                 mode={lassoMode}
@@ -971,7 +970,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onMoveComplete={handleLassoMoveComplete}
               />
             </div>
-            </div>{/* end noteometry-canvas-body */}
           </div>
 
           {/* ── Right panel ── */}

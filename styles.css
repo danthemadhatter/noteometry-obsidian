@@ -109,8 +109,7 @@
  * be black if it's in a white icon box". Inside any cream/paper/faceplate
  * surface we flip the color defaults AND re-scope --text-normal/muted/faint
  * so descendant elements that reach for those vars resolve to dark navy. */
-.noteometry-canvas-topbar,
-.noteometry-canvas-toolbar,
+.noteometry-ctx-menu,
 .noteometry-table-editor,
 .noteometry-richtext,
 .noteometry-panel-box,
@@ -118,8 +117,6 @@
 .noteometry-chat-textarea,
 .noteometry-chat-bubble.assistant,
 .noteometry-canvas-object,
-.noteometry-zoom-btn,
-.noteometry-zoom-controls,
 .noteometry-mathpal,
 .noteometry-mathpal-btn {
   color: var(--nm-paper-ink);
@@ -519,39 +516,15 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* No background here — the viewport draws the canvas color, the top
-   * bar has its own faceplate color. Keeping canvas-area transparent
-   * lets the cabinet gray show through if anything gets mis-sized. */
+  /* No background here — the viewport draws the canvas color.
+   * Keeping canvas-area transparent lets the cabinet gray show
+   * through if anything gets mis-sized. */
   background: transparent;
 }
 
-/* ── Canvas top bar ──────────────────
-   Now ONLY holds the zoom controls (tools moved to vertical strip). */
-.noteometry-canvas-topbar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 4px 10px;
-  background: var(--nm-faceplate-light);
-  border-bottom: 1px solid var(--nm-paper-border);
-  box-shadow: var(--nm-shadow-soft);
-  min-height: 0;
-  overflow: visible;
-}
-
-/* ── Canvas body: vertical toolbar + viewport side by side ── */
-.noteometry-canvas-body {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* The drawing surface below the top bar. This is what InkCanvas,
- * CanvasObjectLayer, and LassoOverlay render into. */
+/* ── Canvas viewport ──────────────────
+   Full drawing surface — toolbar and topbar removed entirely.
+   All tool selection happens via right-click context menu. */
 .noteometry-canvas-viewport {
   flex: 1;
   position: relative;
@@ -1373,27 +1346,7 @@
    Canvas Toolbar
    ═══════════════════════════════════════════════════════════════════ */
 
-.noteometry-canvas-toolbar {
-  /* Vertical strip to the left of the canvas viewport */
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 48px;
-  padding: 6px 4px;
-  gap: 4px;
-  background: var(--nm-faceplate);
-  color: var(--nm-ink);
-  border-right: 1px solid var(--nm-paper-border);
-  border-radius: 0;
-  box-shadow: none;
-  pointer-events: auto;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.noteometry-canvas-toolbar::-webkit-scrollbar { display: none; }
+/* Canvas toolbar removed — all tools in right-click context menu */
 
 /* Pending symbol placement indicator */
 .noteometry-placing-symbol {
@@ -1417,54 +1370,7 @@
 }
 @keyframes nm-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
-.noteometry-toolbar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 0;
-  flex-shrink: 0;
-  width: 100%;
-}
-.noteometry-toolbar-group + .noteometry-toolbar-group {
-  border-top: 1px solid var(--nm-warm-border);
-  margin-top: 2px;
-  padding-top: 5px;
-}
-
-.noteometry-toolbar-readink {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  width: auto !important;
-  padding: 0 8px !important;
-}
-.noteometry-toolbar-readink.reading {
-  opacity: 0.5;
-}
-.noteometry-toolbar-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
-.noteometry-toolbar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--nm-radius-sm);
-  cursor: pointer;
-  color: var(--nm-ink);
-  transition: all 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-/* Ensure inline SVG icons render correctly inside Noteometry */
-.noteometry-toolbar-btn svg,
+/* Ensure inline SVG icons render correctly inside Noteometry sidebar */
 .noteometry-sidebar svg,
 .noteometry-sidebar-add svg,
 .noteometry-sidebar-item svg {
@@ -1478,96 +1384,9 @@
   vertical-align: middle;
   flex-shrink: 0;
 }
-.noteometry-toolbar-btn svg {
-  width: 20px !important;
-  height: 20px !important;
-}
 .noteometry-sidebar-item-del svg {
   width: 13px !important;
   height: 13px !important;
-}
-.noteometry-toolbar-btn:hover {
-  background: var(--nm-accent-light);
-}
-.noteometry-toolbar-btn:active {
-  transform: scale(0.92);
-}
-/* Active tool = amber phosphor LED "on" — matches the analog
- * equipment aesthetic: the currently-selected knob is lit up. */
-.noteometry-toolbar-btn.active {
-  background: var(--nm-phosphor);
-  color: var(--nm-ink);
-  box-shadow: inset 0 0 0 1px var(--nm-warm-border-strong);
-}
-.noteometry-toolbar-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.noteometry-toolbar-btn:disabled:active {
-  transform: none;
-}
-
-.noteometry-toolbar-sep {
-  display: none;
-}
-
-/* Toolbar popups (shapes, width, insert, more) */
-/* Toolbar is vertical strip — popup opens to the RIGHT of the button */
-.noteometry-toolbar-popup {
-  position: absolute;
-  left: calc(100% + 4px);
-  top: 0;
-  transform: none;
-  display: flex;
-  gap: 2px;
-  padding: 6px;
-  background: var(--nm-faceplate);
-  color: var(--nm-paper-ink);
-  border: 1px solid var(--nm-paper-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
-  white-space: nowrap;
-  z-index: 200;
-}
-
-/* Stroke width picker popup */
-.noteometry-width-picker {
-  position: absolute;
-  bottom: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-}
-.noteometry-width-option {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 28px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.noteometry-width-option.active {
-  background: var(--nm-accent-light);
-}
-.noteometry-width-option:active {
-  transform: scale(0.92);
-}
-.noteometry-width-preview {
-  display: block;
-  border-radius: 4px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1864,25 +1683,6 @@
    * Previous values (36px buttons, 14px color dots) were designed for
    * mouse precision — on an iPad with a finger they're unhittable. */
 
-  /* Toolbar: vertical strip, finger-friendly on touch */
-  .noteometry-canvas-toolbar {
-    width: 56px;
-    padding: 4px;
-  }
-  .noteometry-toolbar-btn {
-    width: 44px;
-    height: 44px;
-  }
-  .noteometry-toolbar-colors .noteometry-color-dot {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    min-height: 28px !important;
-    max-width: 28px !important;
-    max-height: 28px !important;
-    margin: 3px 0;
-  }
-
   /* Lasso action bar — was desktop density, now finger-friendly */
   .noteometry-lasso-action-btn {
     min-height: 44px;
@@ -1894,16 +1694,6 @@
     font-size: 12px;
     padding: 10px 10px;
   }
-
-  /* Zoom controls in the top bar */
-  .noteometry-zoom-btn {
-    min-width: 60px;
-    height: 44px;
-    font-size: 12px;
-    padding: 0 12px;
-  }
-  .noteometry-zoom-percent { min-width: 60px; }
-  .noteometry-zoom-lock { min-width: 44px; }
 
   /* Math palette — both the tab row and the symbol grid */
   .noteometry-mathpal-btn {
@@ -2152,73 +1942,5 @@
   white-space: normal;
 }
 
-/* ── Phase 4 Pt 2: zoom controls ─────────────────────── */
-/* Flex child of .noteometry-canvas-topbar — sits to the right of the
- * main tool row. No longer absolute-positioned. */
-.noteometry-zoom-controls {
-  flex-shrink: 0;
-  display: flex;
-  gap: 3px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  font-family: var(--nm-font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  user-select: none;
-}
-
-.noteometry-zoom-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 26px;
-  padding: 0 6px;
-  background: var(--nm-faceplate);
-  color: var(--nm-paper-ink);
-  border: 1px solid var(--nm-paper-border);
-  border-radius: var(--nm-radius-sm);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  transition: background 100ms, border-color 100ms;
-}
-
-.noteometry-zoom-btn:hover:not(:disabled) {
-  background: var(--nm-faceplate-recessed);
-  border-color: var(--nm-warm-border-strong);
-}
-
-.noteometry-zoom-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.noteometry-zoom-percent {
-  min-width: 36px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.noteometry-zoom-lock {
-  min-width: 24px;
-  font-size: 14px;
-}
-
-.noteometry-zoom-lock.locked {
-  background: var(--nm-phosphor);
-  color: var(--nm-ink);
-  border-color: var(--nm-warm-border-strong);
-  box-shadow: 0 0 0 1px var(--nm-phosphor-light) inset;
-}
-
-.noteometry-zoom-lock.locked:hover {
-  background: var(--nm-phosphor);
-  filter: brightness(1.08);
-}
+/* Zoom controls removed from topbar — zoom now in right-click menu.
+ * Ctrl+wheel and pinch-zoom still work in InkCanvas. */
