@@ -14,6 +14,8 @@ const ANNOTATION_COLORS = [
 const MIN_PRESSURE_WIDTH = 1.5;
 const MAX_PRESSURE_WIDTH = 6;
 
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
+
 interface Props {
   obj: ImageAnnotatorObject;
   onChange: (patch: Partial<ImageAnnotatorObject>) => void;
@@ -30,6 +32,10 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
   const [strokeColor, setStrokeColor] = useState(ANNOTATION_COLORS[0]!.color);
   const activeStrokeRef = useRef<{ x: number; y: number; pressure: number }[]>([]);
   const isDrawingRef = useRef(false);
+
+  // Vault picker state
+  const [showVaultPicker, setShowVaultPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
 
   // Resolve vault path to data URL
   useEffect(() => {
@@ -196,6 +202,65 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
     onSendToAI(offscreen.toDataURL("image/png"));
   }, [onSendToAI]);
 
+  // Load image from a vault file path
+  const loadFromVault = useCallback(async (filePath: string) => {
+    setShowVaultPicker(false);
+    setPickerSearch("");
+    onChange({ imagePath: filePath, strokes: [] });
+  }, [onChange]);
+
+  // Load image from blob URL (clipboard)
+  const loadFromBlob = useCallback((blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      // Convert to data URL for persistence
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const dataUrl = canvas.toDataURL("image/png");
+      URL.revokeObjectURL(url);
+      onChange({
+        imagePath: dataUrl,
+        imageAspectRatio: img.naturalWidth / img.naturalHeight,
+        strokes: [],
+      });
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }, [onChange]);
+
+  // Paste from clipboard handler
+  const handlePasteFromClipboard = useCallback(async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          if (type.startsWith("image/")) {
+            const blob = await item.getType(type);
+            loadFromBlob(blob);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Fallback: ignored — clipboard may not have image data
+    }
+  }, [loadFromBlob]);
+
+  // Get filtered image files from vault
+  const getImageFiles = useCallback(() => {
+    if (!plugin) return [];
+    return plugin.app.vault.getFiles()
+      .filter(f => IMAGE_EXTENSIONS.includes(f.extension.toLowerCase()))
+      .sort((a, b) => a.path.localeCompare(b.path));
+  }, [plugin]);
+
+  const hasImage = !!obj.imagePath;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
       {/* Toolbar */}
@@ -219,6 +284,19 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
           />
         ))}
         <div style={{ flex: 1 }} />
+        {hasImage && (
+          <button
+            onClick={() => setShowVaultPicker(true)}
+            title="Change Image"
+            style={{
+              padding: "4px 10px", fontSize: "12px", fontWeight: 600,
+              background: "none", border: "1px solid var(--nm-paper-border, #ccc)",
+              borderRadius: "4px", cursor: "pointer", minHeight: "32px", minWidth: "44px",
+            }}
+          >
+            Change
+          </button>
+        )}
         <button
           onClick={handleClearInk}
           title="Clear Ink"
@@ -243,12 +321,12 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
           Read
         </button>
       </div>
-      {/* Content: image + ink overlay */}
+      {/* Content: image + ink overlay, or file picker */}
       <div
         ref={contentRef}
         style={{ flex: 1, position: "relative", overflow: "hidden", touchAction: "none" }}
       >
-        {obj.imagePath ? (
+        {hasImage ? (
           imgError ? (
             <div style={{
               width: "100%", height: "100%", display: "flex",
@@ -268,12 +346,38 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
             />
           )
         ) : (
+          /* ── Empty state: vault picker + clipboard buttons ── */
           <div style={{
             width: "100%", height: "100%", display: "flex",
-            alignItems: "center", justifyContent: "center",
-            color: "#999", fontSize: "14px", userSelect: "none",
+            flexDirection: "column", alignItems: "center", justifyContent: "center",
+            gap: "12px", padding: "16px",
           }}>
-            Insert an image to annotate
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+              <button
+                onClick={() => setShowVaultPicker(true)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  padding: "8px 16px", fontSize: "13px", fontWeight: 600,
+                  background: "var(--nm-accent, #4a6fa5)", color: "#fff",
+                  border: "none", borderRadius: "6px", cursor: "pointer",
+                  minHeight: "44px", minWidth: "44px",
+                }}
+              >
+                Choose Image from Vault
+              </button>
+              <button
+                onClick={handlePasteFromClipboard}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  padding: "8px 16px", fontSize: "13px", fontWeight: 600,
+                  background: "var(--nm-panel-bg, #fff)", color: "var(--nm-text, #333)",
+                  border: "1px solid var(--nm-paper-border, #ccc)", borderRadius: "6px",
+                  cursor: "pointer", minHeight: "44px", minWidth: "44px",
+                }}
+              >
+                Paste from Clipboard
+              </button>
+            </div>
           </div>
         )}
         <canvas
@@ -289,6 +393,100 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
+
+        {/* ── Vault image picker dropdown ── */}
+        {showVaultPicker && (() => {
+          const allFiles = getImageFiles();
+          const query = pickerSearch.toLowerCase();
+          const filtered = query
+            ? allFiles.filter(f => f.name.toLowerCase().includes(query))
+            : allFiles;
+          return (
+            <div
+              style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 50, display: "flex", flexDirection: "column",
+                background: "var(--nm-panel-bg, #fff)",
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div style={{
+                display: "flex", alignItems: "center", gap: "4px",
+                padding: "6px", borderBottom: "1px solid var(--nm-paper-border, #ddd)",
+              }}>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search images..."
+                  value={pickerSearch}
+                  onChange={(e) => setPickerSearch(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  style={{
+                    flex: 1, padding: "6px 8px", fontSize: "12px",
+                    border: "1px solid var(--nm-paper-border, #ccc)",
+                    borderRadius: "4px", minHeight: "36px",
+                    background: "var(--nm-canvas-bg, #fff)",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  onClick={() => { setShowVaultPicker(false); setPickerSearch(""); }}
+                  style={{
+                    padding: "4px 10px", fontSize: "12px", fontWeight: 600,
+                    background: "none", border: "1px solid var(--nm-paper-border, #ccc)",
+                    borderRadius: "4px", cursor: "pointer",
+                    minHeight: "36px", minWidth: "44px",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div style={{ flex: 1, overflow: "auto", maxHeight: 200 }}>
+                {filtered.length === 0 ? (
+                  <div style={{
+                    textAlign: "center", color: "var(--nm-text, #aaa)",
+                    padding: "20px", fontSize: "12px",
+                  }}>
+                    No image files found.
+                  </div>
+                ) : (
+                  filtered.map(f => {
+                    const folder = f.path.includes("/")
+                      ? f.path.slice(0, f.path.lastIndexOf("/"))
+                      : "";
+                    return (
+                      <div
+                        key={f.path}
+                        onClick={() => loadFromVault(f.path)}
+                        style={{
+                          padding: "6px 8px", cursor: "pointer",
+                          borderBottom: "1px solid var(--nm-paper-border, #eee)",
+                          display: "flex", alignItems: "center", gap: "6px",
+                          minHeight: "36px",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = "var(--nm-accent, #4a6fa5)";
+                          (e.currentTarget as HTMLElement).style.color = "#fff";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.background = "";
+                          (e.currentTarget as HTMLElement).style.color = "";
+                        }}
+                      >
+                        <span style={{ fontSize: "12px", fontWeight: 600 }}>{f.name}</span>
+                        {folder && (
+                          <span style={{ fontSize: "10px", color: "inherit", opacity: 0.6 }}>
+                            {folder}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

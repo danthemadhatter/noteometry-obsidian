@@ -318,6 +318,7 @@ export default function CircuitSniper({ obj, onChange, plugin, onSendToAI }: Pro
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [dragNode, setDragNode] = useState<{
     id: string; offsetX: number; offsetY: number;
@@ -787,6 +788,7 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
         >
           <svg
             ref={svgRef}
@@ -829,10 +831,15 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
             const compDef = COMP_LIB[el.type];
             if (!compDef) return null;
             const activeEl = dragNode?.id === el.id ? { ...el, x: dragNode.x, y: dragNode.y } : el;
+            const isSelected = selectedId === el.id;
             return (
               <div
                 key={el.id}
-                onPointerDown={(e) => startNodeMove(e, activeEl)}
+                className="nm-circuit-component"
+                onPointerDown={(e) => {
+                  setSelectedId(el.id);
+                  startNodeMove(e, activeEl);
+                }}
                 style={{
                   position: "absolute", left: activeEl.x, top: activeEl.y,
                   width: 60, height: 60, zIndex: 10,
@@ -840,18 +847,19 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                   touchAction: "none",
                 }}
               >
-                {/* Rotate button */}
+                {/* Rotate button — hidden by default, visible on hover (desktop) or selection (touch) */}
                 <div
+                  className="nm-circuit-rotate-btn"
                   style={{
-                    position: "absolute", top: -12, right: -12,
-                    width: 28, height: 28, borderRadius: "50%",
+                    position: "absolute", top: -28, right: -8,
+                    width: 22, height: 22, borderRadius: "50%",
                     background: "var(--nm-panel-bg, #fff)",
                     border: "1px solid var(--nm-border, #ccc)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", fontSize: "14px", zIndex: 30,
-                    minWidth: "44px", minHeight: "44px",
-                    // Make hit target 44px but visual 28px via transform
-                    transform: "scale(0.636)", transformOrigin: "center",
+                    cursor: "pointer", fontSize: "12px", zIndex: 30,
+                    opacity: isSelected ? 1 : 0,
+                    transition: "opacity 0.15s",
+                    pointerEvents: isSelected ? "auto" : undefined,
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -865,7 +873,7 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                   <svg width="60" height="60" viewBox="0 0 60 60" style={{ pointerEvents: "none" }}>
                     {compDef.draw()}
                   </svg>
-                  {/* Pins */}
+                  {/* Pins — 20×20 invisible hit target, 8px visible dot */}
                   {compDef.pins.map(pin => {
                     const pinCoords = getPinCoords(activeEl, pin);
                     const isTarget = hoverPin?.elId === el.id && hoverPin?.pinId === pin.id;
@@ -880,13 +888,17 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                         onPointerEnter={() => setHoverPin({ elId: el.id, pinId: pin.id, x: pinCoords.x, y: pinCoords.y })}
                         onPointerLeave={() => setHoverPin(null)}
                         style={{
-                          position: "absolute", left: pin.x - 6, top: pin.y - 6,
-                          width: 12, height: 12, borderRadius: "50%",
+                          position: "absolute", left: pin.x - 10, top: pin.y - 10,
+                          width: 20, height: 20,
                           cursor: "crosshair", zIndex: 20,
                           pointerEvents: "auto",
-                          minWidth: "44px", minHeight: "44px",
-                          // 44px touch target, 12px visual
-                          transform: "scale(0.27)", transformOrigin: "center",
+                          background: "transparent",
+                        }}
+                      >
+                        {/* Visible 8px pin dot */}
+                        <div style={{
+                          position: "absolute", top: 6, left: 6,
+                          width: 8, height: 8, borderRadius: "50%",
                           background: isTarget || drawWire
                             ? "var(--nm-accent, #60a5fa)"
                             : isSoldered ? "var(--nm-text, #333)" : "var(--nm-panel-bg, #fff)",
@@ -894,13 +906,14 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                             ? "2px solid #fff"
                             : isSoldered ? "2px solid var(--nm-text, #333)" : "2px solid var(--nm-border, #94a3b8)",
                           transition: "all 0.15s",
-                        }}
-                      />
+                          boxSizing: "border-box",
+                        }} />
+                      </div>
                     );
                   })}
                 </div>
-                {/* Label & value below component */}
-                <div style={{ position: "absolute", bottom: -24, left: "50%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none", whiteSpace: "nowrap" }}>
+                {/* Label & value below component — positioned at top: 64px for pin clearance */}
+                <div style={{ position: "absolute", top: 64, left: "50%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none", whiteSpace: "nowrap" }}>
                   <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--nm-text, #333)" }}>{el.label}</div>
                   <div style={{ fontSize: "10px", color: "var(--nm-text, #888)" }}>{el.value}</div>
                 </div>

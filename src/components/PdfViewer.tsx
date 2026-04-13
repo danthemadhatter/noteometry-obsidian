@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import type { App } from "obsidian";
 
-// pdfjs-dist v2.x — the last version that supports disableWorker: true
-// CRITICAL: disable worker entirely — Obsidian blocks web workers
-// @ts-expect-error — pdfjs-dist@2 ships untyped CJS; TS can't resolve the module but esbuild bundles it fine.
-import * as pdfjsLib from "pdfjs-dist/build/pdf";
+// pdfjs-dist v2.x legacy build — designed for environments without worker support.
+// CRITICAL: disable worker entirely — Obsidian blocks web workers.
+// @ts-ignore — pdfjs-dist@2 legacy CJS; TS may or may not resolve the module but esbuild bundles it fine.
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+
+// Disable worker via BOTH available knobs
 (pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
+(pdfjsLib as any).GlobalWorkerOptions.workerPort = null;
 
 interface Props {
   app: App;
@@ -63,7 +66,7 @@ async function loadAndRenderPdf(
   // Read raw bytes from vault — this is the ONLY safe way in Obsidian
   const arrayBuffer = await app.vault.adapter.readBinary(resolvedPath);
 
-  // Load with disableWorker — MUST be in the options object
+  // Load with ALL worker/fetch options disabled for Obsidian compatibility
   const loadingTask = (pdfjsLib as unknown as {
     getDocument: (opts: unknown) => { promise: Promise<unknown> };
   }).getDocument({
@@ -71,6 +74,9 @@ async function loadAndRenderPdf(
     disableWorker: true,
     disableRange: true,
     disableStream: true,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
   });
 
   const pdf = await loadingTask.promise;
@@ -125,8 +131,10 @@ export default function PdfViewer({ app, vaultPath, page, onPageChange }: Props)
       setPageCount(result.numPages);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load PDF";
-      setError(msg);
-      console.error("[Noteometry] PDF load/render failed for path:", vaultPath, e);
+      console.error("[Noteometry PDF] Load failed:", e);
+      console.error("[Noteometry PDF] Attempted path:", vaultPath);
+      console.error("[Noteometry PDF] pdfjs version:", (pdfjsLib as any).version);
+      setError(`PDF load failed: ${msg}\nPath tried: ${vaultPath}`);
     } finally {
       setLoading(false);
     }

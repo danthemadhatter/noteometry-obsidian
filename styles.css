@@ -2635,3 +2635,14 @@
 .nm-mt-popout-btn:active {
   background: #E0E0E0;
 }
+
+/* ── Circuit Sniper: hover-reveal rotate button (desktop) ── */
+.nm-circuit-component .nm-circuit-rotate-btn {
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .nm-circuit-component:hover .nm-circuit-rotate-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
