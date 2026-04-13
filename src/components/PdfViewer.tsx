@@ -150,12 +150,14 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin, onRelin
   if (error) {
     return (
       <div className="noteometry-pdf-error">
-        <span>PDF not found: {fileRef}</span>
-        {onRelink && (
-          <button className="noteometry-pdf-relink" onClick={onRelink}>
-            Re-link
-          </button>
-        )}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <span>PDF not found: {fileRef}</span>
+          {onRelink && (
+            <button className="noteometry-pdf-relink" onClick={onRelink}>
+              Re-link PDF
+            </button>
+          )}
+        </div>
       </div>
     );
   }

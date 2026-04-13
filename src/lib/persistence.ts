@@ -54,7 +54,7 @@ function sectionPath(plugin: NoteometryPlugin, section: string): string {
   return `${rootDir(plugin)}/${section}`;
 }
 
-function pagePath(plugin: NoteometryPlugin, section: string, page: string): string {
+export function pagePath(plugin: NoteometryPlugin, section: string, page: string): string {
   return `${rootDir(plugin)}/${section}/${page}.md`;
 }
 
@@ -208,6 +208,9 @@ export async function savePage(
       await adapter.mkdir(secPath);
     }
     const path = pagePath(plugin, section, name);
+    // Mark that we're about to write, so the file watcher ignores
+    // the resulting 'modify' event (prevents reload loops with Sync).
+    plugin.lastWriteTs = Date.now();
     // Always write v3 format to disk. v2 files load correctly because
     // loadPage has a v2 fallback, and get rewritten to v3 on next save.
     const v3 = packToV3(data);
@@ -321,7 +324,29 @@ export async function loadImageFromVault(
   vaultPath: string
 ): Promise<string> {
   const adapter = plugin.app.vault.adapter;
-  const buf = await adapter.readBinary(vaultPath);
+
+  // Resolve path with fallback strategies (same as PDF)
+  let resolvedPath = vaultPath;
+  if (!(await adapter.exists(resolvedPath))) {
+    // Strategy 2: strip leading vault name prefix
+    const parts = vaultPath.split("/");
+    if (parts.length > 1) {
+      const stripped = parts.slice(1).join("/");
+      if (await adapter.exists(stripped)) {
+        resolvedPath = stripped;
+      }
+    }
+    // Strategy 3: search by filename alone
+    if (!(await adapter.exists(resolvedPath))) {
+      const filename = vaultPath.split("/").pop() ?? "";
+      if (filename) {
+        const found = plugin.app.vault.getFiles().find((f) => f.name === filename);
+        if (found) resolvedPath = found.path;
+      }
+    }
+  }
+
+  const buf = await adapter.readBinary(resolvedPath);
   const bytes = new Uint8Array(buf);
   let binaryStr = "";
   for (let i = 0; i < bytes.length; i++) {
@@ -358,7 +383,34 @@ export async function loadPdfFromVault(
   vaultPath: string
 ): Promise<ArrayBuffer> {
   const adapter = plugin.app.vault.adapter;
-  return await adapter.readBinary(vaultPath);
+
+  // Strategy 1: exact path as stored
+  if (await adapter.exists(vaultPath)) {
+    return await adapter.readBinary(vaultPath);
+  }
+
+  // Strategy 2: strip leading vault name prefix
+  // e.g. "Noteometry/APUS/attachments/foo.pdf" → "APUS/attachments/foo.pdf"
+  const parts = vaultPath.split("/");
+  if (parts.length > 1) {
+    const stripped = parts.slice(1).join("/");
+    if (await adapter.exists(stripped)) {
+      return await adapter.readBinary(stripped);
+    }
+  }
+
+  // Strategy 3: search by filename alone
+  const filename = parts[parts.length - 1] ?? "";
+  if (filename) {
+    const allFiles = plugin.app.vault.getFiles();
+    const found = allFiles.find((f) => f.name === filename);
+    if (found) {
+      return await adapter.readBinary(found.path);
+    }
+  }
+
+  // If none found, throw a clear error
+  throw new Error(`PDF not found: ${vaultPath}`);
 }
 
 export async function migrateBase64Images(

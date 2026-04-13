@@ -4,7 +4,7 @@ import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
-import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
+import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
@@ -367,6 +367,29 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => { flushSave = null; };
   }, [saveNow]);
 
+  // Sync file watcher — reload the page when Obsidian Sync updates the
+  // underlying .md file from another device.
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.path) return;
+      const sec = sectionRef.current;
+      const pg = pageRef.current;
+      if (!sec || !pg) return;
+      const currentPath = pagePath(plugin, sec, pg);
+      if (detail.path !== currentPath) return;
+
+      // The file we're currently viewing was modified externally — reload.
+      const data = await loadPage(plugin, sec, pg);
+      const objs = data.canvasObjects ?? [];
+      const imgResult = await migrateBase64Images(plugin, sec, objs);
+      data.canvasObjects = imgResult.objects;
+      await onPageLoaded(data);
+    };
+    window.addEventListener("noteometry:file-changed", handler);
+    return () => window.removeEventListener("noteometry:file-changed", handler);
+  }, [plugin, sectionRef, pageRef, onPageLoaded]);
+
   /* ── Lasso complete → rasterize + push to stack ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
     const container = viewportRef.current;
@@ -421,6 +444,61 @@ export default function NoteometryApp({ plugin, app }: Props) {
     // Hand off to the pipeline (OCR + solve + chat with image attached)
     await processCrop(composite);
   }, [lassoRegions, clearStack, setLassoActive, processCrop]);
+
+  /* ── Lasso Clear — delete strokes/stamps/objects inside the lasso regions ── */
+  const handleLassoClear = useCallback(() => {
+    if (lassoRegions.length === 0) {
+      clearStack();
+      setLassoActive(false);
+      return;
+    }
+
+    pushUndo();
+
+    const z = zoom;
+    // Build world-space polygons and bounds for all regions
+    const worldRegions = lassoRegions.map((r) => ({
+      polygon: r.bounds.points.map((p) => ({
+        x: p.x / z + scrollX,
+        y: p.y / z + scrollY,
+      })),
+      bounds: {
+        minX: r.bounds.minX / z + scrollX,
+        minY: r.bounds.minY / z + scrollY,
+        maxX: r.bounds.maxX / z + scrollX,
+        maxY: r.bounds.maxY / z + scrollY,
+      },
+    }));
+
+    // Remove strokes inside any lasso region
+    setStrokes((prev) =>
+      prev.filter((s) =>
+        !worldRegions.some((wr) => strokeIntersectsPolygon(s, wr.polygon))
+      )
+    );
+
+    // Remove stamps inside any lasso region
+    setStamps((prev) =>
+      prev.filter((s) =>
+        !worldRegions.some((wr) => stampIntersectsPolygon(s, wr.polygon))
+      )
+    );
+
+    // Remove canvas objects whose bbox overlaps any lasso region
+    setCanvasObjects((prev) =>
+      prev.filter((obj) => {
+        const objRight = obj.x + obj.w;
+        const objBottom = obj.y + obj.h;
+        return !worldRegions.some((wr) =>
+          !(objRight < wr.bounds.minX || obj.x > wr.bounds.maxX ||
+            objBottom < wr.bounds.minY || obj.y > wr.bounds.maxY)
+        );
+      })
+    );
+
+    clearStack();
+    setLassoActive(false);
+  }, [lassoRegions, zoom, scrollX, scrollY, pushUndo, clearStack, setLassoActive, setStrokes, setStamps, setCanvasObjects]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
     // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
@@ -660,7 +738,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Redo", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
         { label: "", separator: true },
         { label: "Lock Zoom", shortcut: zoomLocked ? "\u2713" : "", onClick: () => setZoomLocked((v) => !v) },
-        { label: showGrid ? "Hide Grid" : "Show Grid", onClick: () => setShowGrid((v) => !v) },
+        { label: "Grid Paper", shortcut: showGrid ? "\u2713" : "", onClick: () => setShowGrid((v) => !v) },
         { label: "", separator: true },
         { label: "Export PNG", onClick: () => {
           const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
@@ -969,7 +1047,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 regions={lassoRegions}
                 onComplete={handleLassoComplete}
                 onCancel={clearStack}
-                onClear={clearStack}
+                onClear={handleLassoClear}
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />
@@ -1084,16 +1162,24 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   className="nm-fp-resize-left"
                   onPointerDown={(e) => {
                     e.preventDefault();
-                    e.currentTarget.setPointerCapture(e.pointerId);
                     fpResizeRef.current = { startX: e.clientX, startW: fpSize.w };
+                    const onMove = (ev: PointerEvent) => {
+                      ev.preventDefault();
+                      if (!fpResizeRef.current) return;
+                      const dx = fpResizeRef.current.startX - ev.clientX;
+                      const nw = Math.max(280, Math.min(600, fpResizeRef.current.startW + dx));
+                      setFpSize((prev) => ({ ...prev, w: nw }));
+                    };
+                    const onUp = () => {
+                      fpResizeRef.current = null;
+                      document.removeEventListener("pointermove", onMove);
+                      document.removeEventListener("pointerup", onUp);
+                      // Persist width to settings
+                      plugin.saveSettings();
+                    };
+                    document.addEventListener("pointermove", onMove, { passive: false } as EventListenerOptions);
+                    document.addEventListener("pointerup", onUp);
                   }}
-                  onPointerMove={(e) => {
-                    if (!fpResizeRef.current) return;
-                    const dx = fpResizeRef.current.startX - e.clientX;
-                    const nw = Math.max(280, Math.min(900, fpResizeRef.current.startW + dx));
-                    setFpSize((prev) => ({ ...prev, w: nw }));
-                  }}
-                  onPointerUp={() => { fpResizeRef.current = null; }}
                 />
                 <div className="nm-fp-content">
                   <Panel

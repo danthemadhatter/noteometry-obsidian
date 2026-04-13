@@ -1,10 +1,18 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Plugin, WorkspaceLeaf, TAbstractFile } from "obsidian";
 import { NoteometryView, VIEW_TYPE } from "./NoteometryView";
 import { NoteometrySettingTab } from "./settings";
 import { NoteometrySettings, DEFAULT_SETTINGS } from "./types";
 
 export default class NoteometryPlugin extends Plugin {
   settings: NoteometrySettings = { ...DEFAULT_SETTINGS };
+
+  /**
+   * Timestamp of the most recent write performed by this plugin. Used to
+   * distinguish our own saves from external modifications (Obsidian Sync).
+   * A 2-second window prevents reload loops — if a 'modify' event fires
+   * within 2s of our last write, we assume it's our own echo.
+   */
+  lastWriteTs = 0;
 
   async onload() {
     await this.loadSettings();
@@ -22,6 +30,26 @@ export default class NoteometryPlugin extends Plugin {
       name: "Open Noteometry canvas",
       callback: () => this.activateView(),
     });
+
+    // File watcher for Obsidian Sync — when another device syncs a page
+    // file, detect the change and signal the React app to reload.
+    this.registerEvent(
+      this.app.vault.on("modify", (file: TAbstractFile) => {
+        // Only care about .md files inside the Noteometry vault folder
+        const root = this.settings.vaultFolder || "Noteometry";
+        if (!file.path.startsWith(root + "/") || !file.path.endsWith(".md")) return;
+
+        // Skip if we just wrote this file ourselves (within 2s window)
+        if (Date.now() - this.lastWriteTs < 2000) return;
+
+        // Dispatch a custom event so NoteometryApp can pick it up
+        window.dispatchEvent(
+          new CustomEvent("noteometry:file-changed", {
+            detail: { path: file.path },
+          })
+        );
+      })
+    );
 
     // On layout ready, auto-open Noteometry and kill empty tabs
     this.app.workspace.onLayoutReady(() => {

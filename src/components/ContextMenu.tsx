@@ -45,16 +45,18 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     };
   }, [onClose]);
 
-  // Clamp to viewport so the menu never clips off the right or bottom
-  // edge. Measured after first render via the ref.
+  // Clamp to viewport so the menu is always fully visible — all four edges.
   useEffect(() => {
     const el = menuRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    if (rect.right > vw) el.style.left = `${Math.max(8, vw - rect.width - 8)}px`;
-    if (rect.bottom > vh) el.style.top = `${Math.max(8, vh - rect.height - 8)}px`;
+    const pad = 8;
+    if (rect.right > vw - pad) el.style.left = `${Math.max(pad, vw - rect.width - pad)}px`;
+    if (rect.left < pad) el.style.left = `${pad}px`;
+    if (rect.bottom > vh - pad) el.style.top = `${Math.max(pad, vh - rect.height - pad)}px`;
+    if (rect.top < pad) el.style.top = `${pad}px`;
   }, [x, y]);
 
   return (
