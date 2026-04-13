@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
-import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
+import { strokeIntersectsPolygon, strokeFullyInsidePolygon, stampIntersectsPolygon, stampBBox, newStampId, groupStrokes } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
-import CanvasObjectLayer from "./CanvasObjectLayer";
+import CanvasObjectLayer, { DropinIcon } from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
 import Sidebar from "./Sidebar";
@@ -520,7 +520,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
     // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
-    // At 2x zoom, a screen bound of 100px maps to 50 world units.
     const z = zoom;
     const scenePolygon = bounds.points.map((p) => ({
       x: p.x / z + scrollX,
@@ -540,13 +539,38 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
     pushUndo();
 
-    // Move strokes inside lasso
-    setStrokes(prev => prev.map(s => {
-      if (strokeIntersectsPolygon(s, scenePolygon)) {
-        return { ...s, points: s.points.map(p => ({ ...p, x: p.x + worldDx, y: p.y + worldDy })) };
+    // Intelligent grouping (Nebo-style): group strokes by spatial proximity,
+    // then only move groups where at least one stroke is fully inside the lasso.
+    setStrokes(prev => {
+      // Build groups from ALL strokes
+      const groups = groupStrokes(prev, 8);
+
+      // Determine which strokes are fully inside the lasso polygon
+      const fullySelectedIds = new Set<string>();
+      for (const s of prev) {
+        if (strokeFullyInsidePolygon(s, scenePolygon)) {
+          fullySelectedIds.add(s.id);
+        }
       }
-      return s;
-    }));
+
+      // For each group: if the lasso fully contains at least one stroke in
+      // the group, move ALL strokes in that group. This keeps connected
+      // handwriting together (can't split a cursive word).
+      const moveIds = new Set<string>();
+      for (const group of groups) {
+        const hasFullySelected = group.strokeIds.some(id => fullySelectedIds.has(id));
+        if (hasFullySelected) {
+          for (const id of group.strokeIds) moveIds.add(id);
+        }
+      }
+
+      return prev.map(s => {
+        if (moveIds.has(s.id)) {
+          return { ...s, points: s.points.map(p => ({ ...p, x: p.x + worldDx, y: p.y + worldDy })) };
+        }
+        return s;
+      });
+    });
 
     // Move stamps inside lasso
     setStamps(prev => prev.map(s => {
@@ -770,14 +794,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
       // ── Insert ──
       items.push(
         { label: "\u2500\u2500 Insert \u2500\u2500", disabled: true },
-        { label: "Text Box", onClick: handleInsertTextBox },
-        { label: "Table", onClick: handleInsertTable },
-        { label: "Image\u2026", onClick: handleInsertImage },
-        { label: "Image Annotator", onClick: handleInsertImageAnnotator },
-        { label: "Formula Card", onClick: handleInsertFormulaCard },
-        { label: "Unit Converter", onClick: handleInsertUnitConverter },
-        { label: "Circuit Sniper", onClick: handleInsertCircuitSniper },
-        { label: "PDF\u2026", onClick: handleInsertPdf },
+        { label: "Text Box", icon: <DropinIcon type="textbox" />, onClick: handleInsertTextBox },
+        { label: "Table", icon: <DropinIcon type="table" />, onClick: handleInsertTable },
+        { label: "Image\u2026", icon: <DropinIcon type="image" />, onClick: handleInsertImage },
+        { label: "Image Annotator", icon: <DropinIcon type="image-annotator" />, onClick: handleInsertImageAnnotator },
+        { label: "Formula Card", icon: <DropinIcon type="formula-card" />, onClick: handleInsertFormulaCard },
+        { label: "Unit Converter", icon: <DropinIcon type="unit-converter" />, onClick: handleInsertUnitConverter },
+        { label: "Circuit Sniper", icon: <DropinIcon type="circuit-sniper" />, onClick: handleInsertCircuitSniper },
+        { label: "PDF\u2026", icon: <DropinIcon type="pdf" />, onClick: handleInsertPdf },
         { label: "", separator: true },
       );
 

@@ -174,6 +174,88 @@ export function strokeIntersectsPolygon(
   return false;
 }
 
+/* ── Stroke Bounding Box ─────────────────────────────── */
+
+export function strokeBBox(stroke: Stroke): BBox {
+  if (stroke.points.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of stroke.points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/* ── Intelligent Stroke Grouping (Nebo-style) ───────── */
+
+export interface StrokeGroup {
+  id: string;
+  strokeIds: string[];
+}
+
+/** Check if two bounding boxes overlap or are within `tolerance` px of each other */
+function bboxesOverlap(a: BBox, b: BBox, tolerance: number): boolean {
+  const aRight = a.x + a.w;
+  const aBottom = a.y + a.h;
+  const bRight = b.x + b.w;
+  const bBottom = b.y + b.h;
+  return !(aRight + tolerance < b.x ||
+           bRight + tolerance < a.x ||
+           aBottom + tolerance < b.y ||
+           bBottom + tolerance < a.y);
+}
+
+/** Group strokes by spatial proximity. Two strokes are connected if their
+ *  bounding boxes are within `connectionTolerance` px of each other.
+ *  Uses BFS to find connected components. */
+export function groupStrokes(strokes: Stroke[], connectionTolerance = 8): StrokeGroup[] {
+  const groups: StrokeGroup[] = [];
+  const visited = new Set<string>();
+  const bboxes = new Map<string, BBox>();
+  for (const s of strokes) bboxes.set(s.id, strokeBBox(s));
+
+  for (const stroke of strokes) {
+    if (visited.has(stroke.id)) continue;
+    const group: string[] = [stroke.id];
+    visited.add(stroke.id);
+
+    // BFS: find all strokes connected to this one
+    const queue = [stroke.id];
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const currentBBox = bboxes.get(currentId)!;
+
+      for (const other of strokes) {
+        if (visited.has(other.id)) continue;
+        const otherBBox = bboxes.get(other.id)!;
+
+        if (bboxesOverlap(currentBBox, otherBBox, connectionTolerance)) {
+          group.push(other.id);
+          visited.add(other.id);
+          queue.push(other.id);
+        }
+      }
+    }
+
+    groups.push({ id: crypto.randomUUID(), strokeIds: group });
+  }
+  return groups;
+}
+
+/** Check if a stroke is fully contained within a polygon (ALL points inside) */
+export function strokeFullyInsidePolygon(
+  stroke: Stroke,
+  polygon: { x: number; y: number }[],
+): boolean {
+  if (stroke.points.length === 0) return false;
+  for (const p of stroke.points) {
+    if (!pointInPolygon(p.x, p.y, polygon)) return false;
+  }
+  return true;
+}
+
 /** Ray-casting point-in-polygon test */
 function pointInPolygon(
   x: number, y: number,

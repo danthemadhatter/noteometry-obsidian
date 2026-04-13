@@ -433,6 +433,25 @@ export default function CircuitSniper({ obj, onChange, plugin, onSendToAI }: Pro
     setEditWire({ id: wire.id, endKey, currentX: coords.x, currentY: coords.y });
   }, [elements]);
 
+  /** Find the nearest pin within `radius` px of the given mouse position.
+   *  Returns the pin coords + IDs, or null if no pin is close enough.
+   *  This allows wires to snap directly to diagonal pins (e.g. NPN C/E)
+   *  rather than being forced onto the 45-degree grid. */
+  const findNearestPin = useCallback((mouseX: number, mouseY: number, radius: number) => {
+    for (const el of elements.filter(e => e.type !== "Wire")) {
+      const compDef = COMP_LIB[el.type];
+      if (!compDef) continue;
+      for (const pin of compDef.pins) {
+        const pinCoords = getPinCoords(el, pin);
+        const dist = Math.hypot(pinCoords.x - mouseX, pinCoords.y - mouseY);
+        if (dist < radius) {
+          return { x: pinCoords.x, y: pinCoords.y, elId: el.id, pinId: pin.id };
+        }
+      }
+    }
+    return null;
+  }, [elements]);
+
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -444,16 +463,33 @@ export default function CircuitSniper({ obj, onChange, plugin, onSendToAI }: Pro
       if (!dragNode.isDragging && dist > 5) setDragNode(prev => prev ? { ...prev, isDragging: true } : null);
       if (dragNode.isDragging) setDragNode(prev => prev ? { ...prev, x: snap(mouseX + prev.offsetX), y: snap(mouseY + prev.offsetY) } : null);
     } else if (drawWire) {
-      const snapped = getSnap45(drawWire.start.x, drawWire.start.y, mouseX, mouseY);
-      setDrawWire(prev => prev ? { ...prev, currentX: snapped.x, currentY: snapped.y } : null);
+      // Check for nearby pin first — snap directly to pin, bypassing angle snap.
+      // This fixes NPN collector/emitter pins at 45-degree angles.
+      const nearPin = findNearestPin(mouseX, mouseY, 20);
+      if (nearPin) {
+        setHoverPin({ elId: nearPin.elId, pinId: nearPin.pinId, x: nearPin.x, y: nearPin.y });
+        setDrawWire(prev => prev ? { ...prev, currentX: nearPin.x, currentY: nearPin.y } : null);
+      } else {
+        setHoverPin(null);
+        const snapped = getSnap45(drawWire.start.x, drawWire.start.y, mouseX, mouseY);
+        setDrawWire(prev => prev ? { ...prev, currentX: snapped.x, currentY: snapped.y } : null);
+      }
     } else if (editWire) {
       const wire = elements.find(w => w.id === editWire.id);
       if (!wire) return;
-      const otherEnd = resolveEndpoint(wire[editWire.endKey === "from" ? "to" : "from"]!, elements);
-      const snapped = getSnap45(otherEnd.x, otherEnd.y, mouseX, mouseY);
-      setEditWire(prev => prev ? { ...prev, currentX: snapped.x, currentY: snapped.y } : null);
+      // Check for nearby pin first
+      const nearPin = findNearestPin(mouseX, mouseY, 20);
+      if (nearPin) {
+        setHoverPin({ elId: nearPin.elId, pinId: nearPin.pinId, x: nearPin.x, y: nearPin.y });
+        setEditWire(prev => prev ? { ...prev, currentX: nearPin.x, currentY: nearPin.y } : null);
+      } else {
+        setHoverPin(null);
+        const otherEnd = resolveEndpoint(wire[editWire.endKey === "from" ? "to" : "from"]!, elements);
+        const snapped = getSnap45(otherEnd.x, otherEnd.y, mouseX, mouseY);
+        setEditWire(prev => prev ? { ...prev, currentX: snapped.x, currentY: snapped.y } : null);
+      }
     }
-  }, [dragNode, drawWire, editWire, elements]);
+  }, [dragNode, drawWire, editWire, elements, findNearestPin]);
 
   const handlePointerUp = useCallback(() => {
     if (dragNode) {
@@ -895,10 +931,14 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                           background: "transparent",
                         }}
                       >
-                        {/* Visible 8px pin dot */}
+                        {/* Visible pin dot — 12px when targeted for clearer snap feedback */}
                         <div style={{
-                          position: "absolute", top: 6, left: 6,
-                          width: 8, height: 8, borderRadius: "50%",
+                          position: "absolute",
+                          top: isTarget ? 2 : 6,
+                          left: isTarget ? 2 : 6,
+                          width: isTarget ? 16 : 8,
+                          height: isTarget ? 16 : 8,
+                          borderRadius: "50%",
                           background: isTarget || drawWire
                             ? "var(--nm-accent, #60a5fa)"
                             : isSoldered ? "var(--nm-text, #333)" : "var(--nm-panel-bg, #fff)",

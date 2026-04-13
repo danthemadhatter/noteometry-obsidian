@@ -6,8 +6,14 @@ import type { App } from "obsidian";
 // @ts-ignore — pdfjs-dist@2 legacy CJS; TS may or may not resolve the module but esbuild bundles it fine.
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 
-// Disable worker via BOTH available knobs
-(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
+// Create a minimal fake worker blob that satisfies pdfjs — setting workerSrc
+// to "" triggers "No GlobalWorkerOptions.workerSrc specified". This inline
+// no-op script tricks pdfjs into thinking it has a worker while we also pass
+// disableWorker: true to getDocument() so it actually runs synchronously.
+const fakeWorkerSrc = URL.createObjectURL(
+  new Blob(["self.onmessage=function(){}"], { type: "application/javascript" })
+);
+(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = fakeWorkerSrc;
 (pdfjsLib as any).GlobalWorkerOptions.workerPort = null;
 
 interface Props {
@@ -19,40 +25,43 @@ interface Props {
 
 /**
  * Resolve a vault path by trying multiple strategies.
- * Returns the resolved path or throws with details of all attempts.
+ * Returns the resolved path or null if not found.
  */
 async function resolveVaultPath(
   app: App,
-  vaultPath: string,
-): Promise<string> {
-  const attempts: string[] = [];
-
-  // Strategy 1: path as-is
+  storedPath: string,
+): Promise<string | null> {
+  // Try 1: exact path
   try {
-    if (await app.vault.adapter.exists(vaultPath)) return vaultPath;
+    if (await app.vault.adapter.exists(storedPath)) return storedPath;
   } catch { /* continue */ }
-  attempts.push(vaultPath);
 
-  // Strategy 2: strip first path segment (vault name prefix)
-  const stripped = vaultPath.split("/").slice(1).join("/");
-  if (stripped) {
+  // Try 2: strip first segment (vault name prefix)
+  const withoutFirst = storedPath.split("/").slice(1).join("/");
+  if (withoutFirst) {
     try {
-      if (await app.vault.adapter.exists(stripped)) return stripped;
+      if (await app.vault.adapter.exists(withoutFirst)) return withoutFirst;
     } catch { /* continue */ }
-    attempts.push(stripped);
   }
 
-  // Strategy 3: search all vault files for matching filename
-  const filename = vaultPath.split("/").pop() ?? "";
+  // Try 3: strip two segments (e.g. VaultName/SubFolder/...)
+  const withoutTwo = storedPath.split("/").slice(2).join("/");
+  if (withoutTwo) {
+    try {
+      if (await app.vault.adapter.exists(withoutTwo)) return withoutTwo;
+    } catch { /* continue */ }
+  }
+
+  // Try 4: filename search across all vault files
+  const filename = storedPath.split("/").pop();
   if (filename) {
-    const match = app.vault.getFiles().find(f => f.name === filename);
+    const match = app.vault.getFiles().find(
+      f => f.name === filename || f.path.endsWith("/" + filename)
+    );
     if (match) return match.path;
-    attempts.push(`(filename search: ${filename})`);
   }
 
-  throw new Error(
-    `PDF not found. Tried:\n${attempts.map((a, i) => `  ${i + 1}. ${a}`).join("\n")}`
-  );
+  return null;
 }
 
 async function loadAndRenderPdf(
@@ -62,6 +71,11 @@ async function loadAndRenderPdf(
   pageNum: number,
 ): Promise<{ numPages: number; resolvedPath: string }> {
   const resolvedPath = await resolveVaultPath(app, vaultPath);
+  if (!resolvedPath) {
+    throw new Error(
+      `PDF not found. Tried:\n  1. ${vaultPath}\n  2. strip 1 segment\n  3. strip 2 segments\n  4. filename search`
+    );
+  }
 
   // Read raw bytes from vault — this is the ONLY safe way in Obsidian
   const arrayBuffer = await app.vault.adapter.readBinary(resolvedPath);

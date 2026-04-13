@@ -19,6 +19,33 @@ import type {
   CircuitSniperObject,
 } from "../lib/canvasObjects";
 
+/* ── Drop-in SVG icons (14×14, stroke=currentColor, fill=none) ─── */
+
+const iconProps = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+export function DropinIcon({ type }: { type: string }) {
+  switch (type) {
+    case "textbox":
+      return <svg {...iconProps}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>;
+    case "table":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>;
+    case "image":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>;
+    case "image-annotator":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><path d="M18.37 3.63a1 1 0 0 1 1.41 0l.59.59a1 1 0 0 1 0 1.41L14 12l-2.5.5L12 10l6.37-6.37z"/></svg>;
+    case "formula-card":
+      return <svg {...iconProps}><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 9l2 3-2 3" strokeWidth="1.5"/><line x1="14" y1="15" x2="17" y2="15"/></svg>;
+    case "unit-converter":
+      return <svg {...iconProps}><path d="M7 16l-4-4 4-4"/><path d="M17 8l4 4-4 4"/><line x1="3" y1="12" x2="21" y2="12"/></svg>;
+    case "pdf":
+      return <svg {...iconProps}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="17" fontSize="6" fontWeight="700" fill="currentColor" stroke="none" fontFamily="sans-serif">PDF</text></svg>;
+    case "circuit-sniper":
+      return <svg {...iconProps}><path d="M2 12h4l2-5 2 10 2-10 2 5h4"/><circle cx="20" cy="12" r="2"/></svg>;
+    default:
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>;
+  }
+}
+
 /** Editable title input at the top of every canvas object. Click to
  * edit, Enter/blur to commit, Escape to revert. The input also doubles
  * as the drag handle — onPointerDown on the wrapper starts the drag
@@ -27,10 +54,12 @@ function EditableObjectTitle({
   value,
   onChange,
   onDragStart,
+  icon,
 }: {
   value: string;
   onChange: (next: string) => void;
   onDragStart: (e: React.PointerEvent) => void;
+  icon?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -60,6 +89,7 @@ function EditableObjectTitle({
         if (!editing) onDragStart(e);
       }}
     >
+      {icon && <span className="noteometry-object-title-icon" style={{ display: "inline-flex", alignItems: "center", marginRight: 4, flexShrink: 0 }}>{icon}</span>}
       <input
         ref={inputRef}
         className="noteometry-object-title-input"
@@ -255,34 +285,48 @@ export default function CanvasObjectLayer({
     };
   }, [isResizing]);
 
+  // Track whether a drag is active via React state so we can attach
+  // document-level listeners (same pattern as resize). This avoids stale
+  // closures from onPointerMove on individual elements.
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleDragStart = useCallback((e: React.PointerEvent, obj: CanvasObject) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
     dragState.current = {
       id: obj.id,
       startX: e.clientX, startY: e.clientY,
       objStartX: obj.x, objStartY: obj.y,
     };
     onSelectObject(obj.id);
+    setIsDragging(true);
   }, [onSelectObject]);
 
-  const handleDragMove = useCallback((e: React.PointerEvent) => {
-    // Screen-space delta → world-space delta: divide by zoom.
-    const z = zoomRef.current;
-    if (dragState.current) {
-      const dx = (e.clientX - dragState.current.startX) / z;
-      const dy = (e.clientY - dragState.current.startY) / z;
-      const id = dragState.current.id;
-      onObjectsChange(objects.map(o =>
-        o.id === id ? { ...o, x: dragState.current!.objStartX + dx, y: dragState.current!.objStartY + dy } : o
+  // Document-level drag listeners — re-attached when isDragging changes,
+  // always reads fresh state via refs to avoid stale closures.
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: PointerEvent) => {
+      const z = zoomRef.current;
+      const ds = dragState.current;
+      if (!ds) return;
+      const dx = (e.clientX - ds.startX) / z;
+      const dy = (e.clientY - ds.startY) / z;
+      onObjectsChangeRef.current(objectsRef.current.map(o =>
+        o.id === ds.id ? { ...o, x: ds.objStartX + dx, y: ds.objStartY + dy } : o
       ));
-    }
-  }, [objects, onObjectsChange]);
-
-  const handleDragEnd = useCallback(() => {
-    dragState.current = null;
-  }, []);
+    };
+    const onUp = () => {
+      dragState.current = null;
+      setIsDragging(false);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+  }, [isDragging]);
 
   const handleResizeStart = useCallback((e: React.PointerEvent, obj: CanvasObject) => {
     e.preventDefault();
@@ -332,8 +376,6 @@ export default function CanvasObjectLayer({
             pointerEvents: objectsInteractive ? "auto" : "none",
           }}
           onClick={(e) => handleObjectClick(e, obj.id)}
-          onPointerMove={handleDragMove}
-          onPointerUp={handleDragEnd}
         >
           {/* Title bar — editable name that doubles as drag handle */}
           <EditableObjectTitle
@@ -344,6 +386,7 @@ export default function CanvasObjectLayer({
               ));
             }}
             onDragStart={(e) => handleDragStart(e, obj)}
+            icon={<DropinIcon type={obj.type} />}
           />
 
           {/* Content — stop propagation so drag handler doesn't steal focus */}

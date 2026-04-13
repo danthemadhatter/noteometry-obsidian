@@ -9,6 +9,8 @@ export interface ContextMenuItem {
   separator?: boolean;
   /** Optional keyboard shortcut hint shown on the right. */
   shortcut?: string;
+  /** Optional SVG icon rendered before the label. */
+  icon?: React.ReactNode;
 }
 
 interface Props {
@@ -87,6 +89,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
               onClose();
             }}
           >
+            {item.icon && <span className="noteometry-ctx-icon" style={{ display: "inline-flex", alignItems: "center", marginRight: 6, flexShrink: 0 }}>{item.icon}</span>}
             <span className="noteometry-ctx-label">{item.label}</span>
             {item.shortcut && (
               <span className="noteometry-ctx-shortcut">{item.shortcut}</span>
