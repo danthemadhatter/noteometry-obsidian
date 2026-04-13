@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject, RelativeStroke } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke, CircuitElement } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -177,6 +177,17 @@ export interface UnitConverterElementV3 {
   name?: string;
 }
 
+export interface CircuitSniperElementV3 {
+  type: "circuit-sniper";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  elements: CircuitElement[];
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
@@ -186,7 +197,8 @@ export type PageElementV3 =
   | PdfElementV3
   | ImageAnnotatorElementV3
   | FormulaCardElementV3
-  | UnitConverterElementV3;
+  | UnitConverterElementV3
+  | CircuitSniperElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -304,6 +316,14 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         activeCategory: obj.activeCategory,
         values: obj.values,
+        name: obj.name,
+      });
+    } else if (obj.type === "circuit-sniper") {
+      elements.push({
+        type: "circuit-sniper",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        elements: obj.elements,
         name: obj.name,
       });
     }
@@ -426,6 +446,15 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           activeCategory: el.activeCategory ?? "resistance",
           values: el.values ?? {},
+          name: el.name,
+        });
+        break;
+      case "circuit-sniper":
+        canvasObjects.push({
+          id: el.id,
+          type: "circuit-sniper",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          elements: el.elements ?? [],
           name: el.name,
         });
         break;

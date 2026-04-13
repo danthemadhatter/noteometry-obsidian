@@ -11,10 +11,12 @@ import PdfViewer from "./PdfViewer";
 import ImageAnnotator from "./dropins/ImageAnnotator";
 import FormulaCard from "./dropins/FormulaCard";
 import UnitConverter from "./dropins/UnitConverter";
+import CircuitSniper from "./dropins/CircuitSniper";
 import type {
   ImageAnnotatorObject,
   FormulaCardObject,
   UnitConverterObject,
+  CircuitSniperObject,
 } from "../lib/canvasObjects";
 
 /** Editable title input at the top of every canvas object. Click to
@@ -391,6 +393,18 @@ export default function CanvasObjectLayer({
             {obj.type === "unit-converter" && (
               <UnitConverter
                 obj={obj as UnitConverterObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "circuit-sniper" && (
+              <CircuitSniper
+                obj={obj as CircuitSniperObject}
+                plugin={plugin}
+                onSendToAI={onSendToAI}
                 onChange={(patch) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id ? { ...o, ...patch } as CanvasObject : o

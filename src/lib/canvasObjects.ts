@@ -77,6 +77,26 @@ export interface UnitConverterObject extends CanvasObjectBase {
   values: Record<string, number | null>;
 }
 
+/** Circuit element stored in the Circuit Sniper schematic. */
+export interface CircuitElement {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  rotation: number;
+  label: string;
+  value: string;
+  /** Wire-only fields */
+  from?: { elId?: string; pinId?: string; x: number; y: number };
+  to?: { elId?: string; pinId?: string; x: number; y: number };
+}
+
+export interface CircuitSniperObject extends CanvasObjectBase {
+  type: "circuit-sniper";
+  /** Schematic elements (components + wires). */
+  elements: CircuitElement[];
+}
+
 export type CanvasObject =
   | TextBoxObject
   | TableObject
@@ -84,7 +104,8 @@ export type CanvasObject =
   | PdfObject
   | ImageAnnotatorObject
   | FormulaCardObject
-  | UnitConverterObject;
+  | UnitConverterObject
+  | CircuitSniperObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -150,6 +171,17 @@ export function createUnitConverter(
   };
 }
 
+export function createCircuitSniper(
+  x: number, y: number,
+  name: string = "Circuit Sniper"
+): CircuitSniperObject {
+  return {
+    id: newObjectId(), type: "circuit-sniper", x, y,
+    w: 600, h: 500, name,
+    elements: [],
+  };
+}
+
 /** Default display name when an object has none set (old pages). */
 export function defaultObjectName(obj: CanvasObject): string {
   if (obj.name && obj.name.trim()) return obj.name;
@@ -161,5 +193,6 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "image-annotator": return "Image Annotator";
     case "formula-card": return "Formula";
     case "unit-converter": return "Unit Converter";
+    case "circuit-sniper": return "Circuit Sniper";
   }
 }
