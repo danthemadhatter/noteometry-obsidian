@@ -493,6 +493,8 @@ export default function InkCanvas({
     let lastPinchDist = 0;
 
     const handleTouchStart = (e: TouchEvent) => {
+      // Stop Obsidian from seeing multi-touch gestures
+      if (e.touches.length >= 2) e.stopPropagation();
       e.preventDefault();
       for (const t of Array.from(e.changedTouches)) {
         activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
@@ -514,6 +516,7 @@ export default function InkCanvas({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2) e.stopPropagation();
       e.preventDefault();
       for (const t of Array.from(e.changedTouches)) {
         activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
@@ -567,13 +570,14 @@ export default function InkCanvas({
       }
     };
 
-    el.addEventListener('touchstart', handleTouchStart, { passive: false });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
-    el.addEventListener('touchend', handleTouchEnd, { passive: false });
+    // Use capture phase to intercept touch events before Obsidian's gesture handlers
+    el.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+    el.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
     return () => {
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
-      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchstart', handleTouchStart, { capture: true } as EventListenerOptions);
+      el.removeEventListener('touchmove', handleTouchMove, { capture: true } as EventListenerOptions);
+      el.removeEventListener('touchend', handleTouchEnd, { capture: true } as EventListenerOptions);
     };
   }, []); // empty deps — refs keep values stable
 
@@ -594,6 +598,8 @@ export default function InkCanvas({
     const container = containerRef.current;
     if (!container) return;
     const handleWheel = (e: WheelEvent) => {
+      // Ctrl/Cmd+wheel = zoom — let it bubble to the parent handler
+      if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       const newX = scrollRef.current.x + e.deltaX;
       const newY = scrollRef.current.y + e.deltaY;

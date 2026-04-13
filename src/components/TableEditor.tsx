@@ -58,6 +58,7 @@ export default function TableEditor({ tableId }: Props) {
                     value={cell}
                     onChange={(e) => updateCell(ri, ci, e.target.value)}
                     onKeyDown={(e) => {
+                      e.stopPropagation(); // prevent canvas shortcuts from firing
                       if (e.key === "Tab") {
                         e.preventDefault();
                         // Move to next cell
@@ -66,6 +67,16 @@ export default function TableEditor({ tableId }: Props) {
                         const target = e.currentTarget.closest("table")
                           ?.querySelector(`tr:nth-child(${(nextRow % cells.length) + 1}) td:nth-child(${(nextCol % row.length) + 1}) input`) as HTMLInputElement | null;
                         target?.focus();
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        // Confirm and move down to next row
+                        const nextRow = (ri + 1) % cells.length;
+                        const target = e.currentTarget.closest("table")
+                          ?.querySelector(`tr:nth-child(${nextRow + 1}) td:nth-child(${ci + 1}) input`) as HTMLInputElement | null;
+                        target?.focus();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        (e.target as HTMLInputElement).blur();
                       }
                     }}
                   />

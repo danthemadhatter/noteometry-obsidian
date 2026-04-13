@@ -6,14 +6,11 @@ import type { App } from "obsidian";
 // @ts-ignore — pdfjs-dist@2 legacy CJS; TS may or may not resolve the module but esbuild bundles it fine.
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 
-// Create a minimal fake worker blob that satisfies pdfjs — setting workerSrc
-// to "" triggers "No GlobalWorkerOptions.workerSrc specified". This inline
-// no-op script tricks pdfjs into thinking it has a worker while we also pass
-// disableWorker: true to getDocument() so it actually runs synchronously.
-const fakeWorkerSrc = URL.createObjectURL(
-  new Blob(["self.onmessage=function(){}"], { type: "application/javascript" })
-);
-(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = fakeWorkerSrc;
+// Use a data URL for the fake worker — Blob URLs can hang in Obsidian's sandbox.
+// This prevents the "No workerSrc specified" error while disableWorker does the
+// real work of running pdfjs synchronously on the main thread.
+const FAKE_WORKER = `data:text/javascript,/* Fake pdfjs worker */self.addEventListener('message',function(e){self.postMessage({type:'ready'})})`;
+(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = FAKE_WORKER;
 (pdfjsLib as any).GlobalWorkerOptions.workerPort = null;
 
 interface Props {
@@ -82,7 +79,7 @@ async function loadAndRenderPdf(
 
   // Load with ALL worker/fetch options disabled for Obsidian compatibility
   const loadingTask = (pdfjsLib as unknown as {
-    getDocument: (opts: unknown) => { promise: Promise<unknown> };
+    getDocument: (opts: unknown) => { promise: Promise<unknown>; destroy?: () => void };
   }).getDocument({
     data: new Uint8Array(arrayBuffer),
     disableWorker: true,
@@ -93,7 +90,13 @@ async function loadAndRenderPdf(
     useSystemFonts: true,
   });
 
-  const pdf = await loadingTask.promise;
+  // Add a timeout so the loading promise never hangs forever
+  const pdf = await Promise.race([
+    loadingTask.promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("PDF load timeout after 10s")), 10000)
+    ),
+  ]);
   const numPages = (pdf as { numPages: number }).numPages;
   const safePage = Math.max(1, Math.min(numPages, pageNum));
 

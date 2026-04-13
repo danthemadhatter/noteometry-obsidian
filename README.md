@@ -3,8 +3,8 @@
 An EE workstation built as an Obsidian plugin. Infinite canvas, pressure-sensitive ink, floating drop-ins, and AI-powered math/circuit analysis — all visible at once without context switching.
 
 **Primary device:** iPad Pro with Apple Pencil. Also works on Mac.  
-**AI backend:** Claude (Anthropic) or LM Studio (local).  
-**Current version:** v1.3.3
+**AI backend:** Perplexity (cloud, routed models), Claude (Anthropic), or LM Studio (local).  
+**Current version:** v1.3.5
 
 ---
 
@@ -48,6 +48,7 @@ An EE workstation built as an Obsidian plugin. Infinite canvas, pressure-sensiti
 - Catmull-Rom stroke smoothing on all ink
 - **Pan:** single finger when Pan tool is active, or two-finger drag
 - **Pinch-to-zoom:** two fingers, range 25%–400%
+- **Ctrl/Cmd + scroll:** zoom with mouse wheel
 - **Zoom widget:** floating pill in the bottom-right corner
 
 ```
@@ -76,7 +77,7 @@ All tools are accessed via **long-press** (iPad) or **right-click** (Mac) contex
 The lasso is the primary AI input mechanism.
 
 - Draw a freehand or rectangle selection around any region of the canvas
-- Always uses a vision snapshot — captures actual pixels and sends them to Claude Vision
+- Always uses a vision snapshot — captures actual pixels and sends them to the configured AI provider's vision model
 - Works on handwriting, printed text, circuit diagrams, photos — anything visible on canvas
 - After selecting: an action bar appears with an **OCR** button
 - OCR result populates the AI Panel input box
@@ -368,8 +369,11 @@ Obsidian → Settings → Noteometry
 
 | Setting | Description | Default |
 |---|---|---|
+| AI Provider | Perplexity (routed), Claude, or LM Studio | Perplexity |
+| Perplexity API Key | From [perplexity.ai/settings/api](https://perplexity.ai/settings/api) | — |
+| Perplexity Model | Routed model (e.g. `openai/gpt-5.4`, `anthropic/claude-4.5-sonnet`) | `openai/gpt-5.4` |
 | Claude API Key | From [console.anthropic.com](https://console.anthropic.com) | — |
-| Claude Model | Claude model to use for AI requests | `claude-sonnet-4-6` |
+| Claude Model | Claude model to use for AI requests | `claude-opus-4-6` |
 | LM Studio URL | Base URL for local LM Studio server | `http://localhost:1234` |
 | LM Studio Text Model | Model name for text analysis requests | — |
 | LM Studio Vision Model | Model name for vision/image scan requests | — |
@@ -417,6 +421,26 @@ npm test         # Run test suite (70 tests)
 ---
 
 ## Release History
+
+### v1.3.5 — 2026-04-13
+
+- **PDF loading fix:** replaced Blob URL worker with data URL; added 10-second timeout to prevent hanging promises
+- **Pinch zoom fix:** touch listeners use `capture: true` with `stopPropagation` to intercept before Obsidian's gesture handlers
+- **Ctrl/Cmd + scroll zoom:** mouse wheel with modifier key zooms the canvas (InkCanvas passes Ctrl+wheel through to parent)
+- **AI Panel buttons:** replaced Unicode ⬒/▬ with SVG dock and minimize icons; added `aria-label` attributes
+- **Export PNG fix:** captures strokes, stamps, AND canvas objects (images, text boxes, tables) using full region renderer
+- **Image Annotator:** mouse drawing now supported (previously pen-only); all button handlers verified working
+- **Table editing:** Enter key confirms and moves down; Escape blurs; key events no longer leak to canvas shortcuts
+- **README:** added Perplexity AI provider documentation; corrected version, settings table, and stale references
+
+### v1.3.4 — 2026-04-13
+
+- **PDF stub fix:** pdfjs worker blob approach for Obsidian sandbox
+- **Drop-in drag:** improved drag handle interaction
+- **SVG icons:** replaced Unicode symbols with proper SVG icon components
+- **Text box LaTeX:** KaTeX rendering in RichTextEditor
+- **Circuit pin snap:** 20px snap radius for pin-to-pin wire routing
+- **Intelligent lasso move:** Nebo-style grouping keeps connected handwriting together
 
 ### v1.3.3 — 2026-04-13
 

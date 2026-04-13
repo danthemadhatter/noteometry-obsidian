@@ -814,8 +814,42 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Lock Zoom", shortcut: zoomLocked ? "\u2713" : "", onClick: () => setZoomLocked((v) => !v) },
         { label: "Grid Paper", shortcut: showGrid ? "\u2713" : "", onClick: () => setShowGrid((v) => !v) },
         { label: "", separator: true },
-        { label: "Export PNG", onClick: () => {
-          const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
+        { label: "Export PNG", onClick: async () => {
+          // Use the full region renderer to capture strokes, stamps, AND canvas objects
+          if (strokes.length === 0 && stamps.length === 0 && canvasObjects.length === 0) return;
+
+          // Compute bounding box of ALL content
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (const s of strokes) {
+            for (const p of s.points) {
+              if (p.x < minX) minX = p.x;
+              if (p.y < minY) minY = p.y;
+              if (p.x > maxX) maxX = p.x;
+              if (p.y > maxY) maxY = p.y;
+            }
+          }
+          for (const st of stamps) {
+            const estW = st.fontSize * st.text.length * 0.7;
+            const estH = st.fontSize * 1.2;
+            if (st.x < minX) minX = st.x;
+            if (st.y - estH < minY) minY = st.y - estH;
+            if (st.x + estW > maxX) maxX = st.x + estW;
+            if (st.y > maxY) maxY = st.y;
+          }
+          for (const obj of canvasObjects) {
+            if (obj.x < minX) minX = obj.x;
+            if (obj.y < minY) minY = obj.y;
+            if (obj.x + obj.w > maxX) maxX = obj.x + obj.w;
+            if (obj.y + obj.h > maxY) maxY = obj.y + obj.h;
+          }
+
+          if (!isFinite(minX)) return; // nothing on canvas
+
+          const { renderLassoRegionToImage } = await import("../lib/canvasRenderer");
+          const dataUrl = await renderLassoRegionToImage(
+            { minX, minY, maxX, maxY },
+            strokes, stamps, canvasObjects, 20, 2
+          );
           if (!dataUrl) return;
           const link = document.createElement("a");
           link.download = `${currentPage || "canvas"}.png`;
@@ -1213,10 +1247,18 @@ export default function NoteometryApp({ plugin, app }: Props) {
               <span className="nm-fp-title">{fpMinimized ? "AI Panel ▼" : "AI Panel"}</span>
               <div className="nm-fp-titlebar-actions">
                 {!fpDocked && !fpMinimized && (
-                  <button className="nm-fp-dock-btn" onClick={() => { setFpDocked(true); setFpPos({ x: -1, y: 0 }); }} title="Dock">⬒</button>
+                  <button className="nm-fp-dock-btn" onClick={() => { setFpDocked(true); setFpPos({ x: -1, y: 0 }); }} title="Dock to right edge" aria-label="Dock to right edge">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 4h6v8H3z" /><path d="M12 3v10" /><path d="M9 8h3" />
+                    </svg>
+                  </button>
                 )}
-                <button className="nm-fp-min-btn" onClick={() => setFpMinimized((v) => !v)} title={fpMinimized ? "Expand" : "Minimize"}>
-                  {fpMinimized ? "▲" : "▬"}
+                <button className="nm-fp-min-btn" onClick={() => setFpMinimized((v) => !v)} title={fpMinimized ? "Expand" : "Minimize"} aria-label={fpMinimized ? "Expand" : "Minimize"}>
+                  {fpMinimized ? (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 10l4-4 4 4" /></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 12h10" /></svg>
+                  )}
                 </button>
               </div>
             </div>

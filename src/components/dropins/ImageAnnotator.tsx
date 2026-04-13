@@ -115,8 +115,8 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
 
   // Pointer handlers for annotation drawing
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // Only Apple Pencil (pen) draws
-    if (e.pointerType !== "pen") return;
+    // Apple Pencil (pen) or mouse draws — touch is reserved for pan/scroll
+    if (e.pointerType === "touch") return;
     e.preventDefault();
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -129,7 +129,7 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDrawingRef.current || e.pointerType !== "pen") return;
+    if (!isDrawingRef.current || e.pointerType === "touch") return;
     e.preventDefault();
     const rect = contentRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -163,7 +163,7 @@ export default function ImageAnnotator({ obj, onChange, plugin, onSendToAI }: Pr
   }, [strokeColor]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!isDrawingRef.current || e.pointerType !== "pen") return;
+    if (!isDrawingRef.current || e.pointerType === "touch") return;
     isDrawingRef.current = false;
     if (activeStrokeRef.current.length > 0) {
       const newStroke: RelativeStroke = {
