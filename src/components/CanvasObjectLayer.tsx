@@ -343,11 +343,11 @@ export default function CanvasObjectLayer({
             {obj.type === "image" && (
               <VaultImage src={obj.dataURL} plugin={plugin} />
             )}
-            {obj.type === "pdf" && (
+            {obj.type === "pdf" && plugin && (
               <PdfViewer
-                fileRef={obj.fileRef}
+                app={plugin.app}
+                vaultPath={obj.fileRef}
                 page={obj.page}
-                plugin={plugin}
                 onPageChange={(newPage) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id && o.type === "pdf" ? { ...o, page: newPage } : o

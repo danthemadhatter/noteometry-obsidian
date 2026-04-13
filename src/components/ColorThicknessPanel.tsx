@@ -11,12 +11,12 @@ export interface PenWidth {
 }
 
 export const PEN_COLORS: PenColor[] = [
-  { color: "#1A1A2E", label: "Dark Navy" },
-  { color: "#2563EB", label: "Blue" },
-  { color: "#DC2626", label: "Red" },
-  { color: "#16A34A", label: "Green" },
-  { color: "#F59E0B", label: "Amber" },
-  { color: "#6B7280", label: "Graphite" },
+  { color: "#1A1A2E", label: "Navy" },
+  { color: "#4A90D9", label: "Blue" },
+  { color: "#E53935", label: "Red" },
+  { color: "#43A047", label: "Green" },
+  { color: "#F5A623", label: "Amber" },
+  { color: "#757575", label: "Graphite" },
 ];
 
 export const PEN_WIDTHS: PenWidth[] = [
@@ -78,7 +78,8 @@ export default function ColorThicknessPanel({
         position: "fixed",
         left: Math.max(8, anchorX - 220),
         top: anchorY,
-        zIndex: 10001,
+        zIndex: 9999,
+        overflow: "visible",
       }}
     >
       <div className="nm-pen-section-label">Color</div>

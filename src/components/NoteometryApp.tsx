@@ -22,10 +22,8 @@ import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
 import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
-import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import ZoomWidget from "./ZoomWidget";
-import MiniToolbar from "./MiniToolbar";
 import ColorThicknessPanel, { PEN_COLORS, PEN_WIDTHS } from "./ColorThicknessPanel";
 import { useLongPress } from "../hooks/useLongPress";
 
@@ -113,6 +111,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [fpSize, setFpSize] = useState({ w: plugin.settings.floatingPanelWidth, h: plugin.settings.floatingPanelHeight });
   const fpDragRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(null);
   const fpResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const fpResizeBRRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   // viewportRef = the drawing surface inside the canvas area.
   // Lasso, rasterization, and zoom wheel events all key off this.
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -390,7 +389,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     return () => window.removeEventListener("noteometry:file-changed", handler);
   }, [plugin, sectionRef, pageRef, onPageLoaded]);
 
-  /* ── Lasso complete → rasterize + push to stack ── */
+  /* ── Lasso complete → ALWAYS snapshot canvas pixels + push to stack ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
     const container = viewportRef.current;
     if (!container) {
@@ -398,23 +397,43 @@ export default function NoteometryApp({ plugin, app }: Props) {
       return;
     }
 
-    // Rasterize the visible region through the dumb pipe.
-    // html2canvas captures ink strokes, text box contents, table cells,
-    // images, everything. Zero data-model interpretation.
-    const dataUrl = await rasterizeRegion(container, {
-      minX: bounds.minX,
-      minY: bounds.minY,
-      maxX: bounds.maxX,
-      maxY: bounds.maxY,
-    });
-
-    if (!dataUrl) {
-      new Notice("Lasso capture failed — see console", 8000);
+    // VISION SNAPSHOT: capture the actual pixels from the ink canvas.
+    // This is the ONLY lasso path — no text extraction, no hybrid.
+    // Everything goes to the vision model as an image.
+    const inkCanvas = container.querySelector<HTMLCanvasElement>(".noteometry-ink-layer");
+    if (!inkCanvas) {
+      new Notice("Lasso capture failed — ink canvas not found", 8000);
       return;
     }
 
-    // Add the captured region to the stack. The user can either process
-    // the stack now (via the action bar) or draw more regions first.
+    const dpr = window.devicePixelRatio || 1;
+    const regionX = Math.max(0, Math.floor(bounds.minX * dpr));
+    const regionY = Math.max(0, Math.floor(bounds.minY * dpr));
+    const regionW = Math.min(inkCanvas.width - regionX, Math.ceil((bounds.maxX - bounds.minX) * dpr));
+    const regionH = Math.min(inkCanvas.height - regionY, Math.ceil((bounds.maxY - bounds.minY) * dpr));
+
+    if (regionW <= 0 || regionH <= 0) {
+      new Notice("Lasso region too small", 4000);
+      return;
+    }
+
+    // Draw the selected region into an offscreen canvas
+    const offscreen = document.createElement("canvas");
+    offscreen.width = regionW;
+    offscreen.height = regionH;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) {
+      new Notice("Lasso capture failed — could not create offscreen canvas", 8000);
+      return;
+    }
+
+    // White background so the vision model sees clean content
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, regionW, regionH);
+    ctx.drawImage(inkCanvas, regionX, regionY, regionW, regionH, 0, 0, regionW, regionH);
+
+    const dataUrl = offscreen.toDataURL("image/png");
+
     const region: LassoRegion = {
       id: crypto.randomUUID(),
       bounds,
@@ -1052,12 +1071,16 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onMoveComplete={handleLassoMoveComplete}
               />
 
-              {/* P0-1: Zoom Widget — always visible, bottom-right */}
+              {/* P0-1: Zoom Widget — always visible, bottom-right. Includes undo/redo. */}
               <ZoomWidget
                 zoom={zoom}
                 onZoomIn={zoomIn}
                 onZoomOut={zoomOut}
                 onReset={resetZoom}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndoWrapped}
+                onRedo={handleRedoWrapped}
               />
 
               {/* P2-8: Stamp script toggle — appears below selected stamp */}
@@ -1082,23 +1105,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
               })()}
             </div>
 
-            {/* ── Persistent Mini Toolbar (left edge) ── */}
-            <MiniToolbar
-              tool={tool}
-              lassoActive={lassoActive}
-              lassoMode={lassoMode}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onToolChange={setTool}
-              onToggleLasso={toggleLasso}
-              onSetLassoActive={setLassoActive}
-              onUndo={handleUndoWrapped}
-              onRedo={handleRedoWrapped}
-              onInsertTextBox={handleInsertTextBox}
-              onInsertTable={handleInsertTable}
-              onInsertImage={handleInsertImage}
-              onInsertPdf={handleInsertPdf}
-            />
+            {/* Mini toolbar removed — all tools via context menu.
+                Undo/redo moved to ZoomWidget. */}
           </div>
         </div>
       </div>
@@ -1215,6 +1223,32 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     />
                   </div>
                 </div>
+                {/* Bottom-right resize handle */}
+                <div
+                  className="nm-fp-resize-br"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fpResizeBRRef.current = { startX: e.clientX, startY: e.clientY, startW: fpSize.w, startH: fpSize.h };
+                    const onMove = (ev: PointerEvent) => {
+                      ev.preventDefault();
+                      if (!fpResizeBRRef.current) return;
+                      const dx = ev.clientX - fpResizeBRRef.current.startX;
+                      const dy = ev.clientY - fpResizeBRRef.current.startY;
+                      const nw = Math.max(280, Math.min(600, fpResizeBRRef.current.startW + dx));
+                      const nh = Math.max(400, Math.min(900, fpResizeBRRef.current.startH + dy));
+                      setFpSize({ w: nw, h: nh });
+                    };
+                    const onUp = () => {
+                      fpResizeBRRef.current = null;
+                      document.removeEventListener("pointermove", onMove);
+                      document.removeEventListener("pointerup", onUp);
+                      plugin.saveSettings();
+                    };
+                    document.addEventListener("pointermove", onMove, { passive: false } as EventListenerOptions);
+                    document.addEventListener("pointerup", onUp);
+                  }}
+                />
               </div>
             )}
           </div>

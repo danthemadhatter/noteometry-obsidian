@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { App, Notice, TFolder, TFile } from "obsidian";
 import {
   IconPlus, IconTrash, IconFolder, IconFile,
-  IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook, IconCopy,
+  IconChevRight, IconMenu, IconX, IconPen, IconBook, IconCopy,
 } from "./Icons";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
@@ -64,6 +64,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
 
   useEffect(() => { refreshSections(); }, [refreshSections]);
 
+  // Load pages for expanded section
   useEffect(() => {
     if (!expandedSection) return;
     (async () => {
@@ -145,7 +146,6 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
         const oldPath = `${root}/${renamingItem.name}`;
         const newPath = `${root}/${name}`;
         if (await adapter.exists(oldPath)) {
-          // Rename folder by creating new, moving files, deleting old
           if (!(await adapter.exists(newPath))) await adapter.mkdir(newPath);
           const pages = await listPages(plugin, renamingItem.name);
           for (const p of pages) {
@@ -178,40 +178,40 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
   };
 
   const handleDeleteSection = async (name: string) => {
-  if (!confirm(`Delete "${name}" and all its pages?`)) return;
-  try {
-    await deleteSection(plugin, name);
-    new Notice(`✅ Deleted section "${name}"`, 3000);
-    await refreshSections();
-    if (currentSection === name) onSelect("", "");
-  } catch (err) {
-    console.error("[Noteometry] deleteSection failed:", err);
-    new Notice(`❌ Failed to delete section "${name}"`, 8000);
-  }
-};
+    if (!confirm(`Delete "${name}" and all its pages?`)) return;
+    try {
+      await deleteSection(plugin, name);
+      new Notice(`Deleted section "${name}"`, 3000);
+      await refreshSections();
+      if (expandedSection === name) setExpandedSection("");
+      if (currentSection === name) onSelect("", "");
+    } catch (err) {
+      console.error("[Noteometry] deleteSection failed:", err);
+      new Notice(`Failed to delete section "${name}"`, 8000);
+    }
+  };
 
-const handleDeletePage = async (section: string, name: string) => {
-  if (!confirm(`Delete "${name}"?`)) return;
-  try {
-    await deletePage(plugin, section, name);
-    new Notice(`✅ Deleted page "${name}"`, 3000);
-    const updated = await listPages(plugin, section);
-    setPagesMap((prev) => ({ ...prev, [section]: updated }));
-    if (currentPage === name) onSelect(section, updated[0] ?? "");
-  } catch (err) {
-    console.error("[Noteometry] deletePage failed:", err);
-    new Notice(`❌ Failed to delete page "${name}"`, 8000);
-  }
-};
+  const handleDeletePage = async (section: string, name: string) => {
+    if (!confirm(`Delete "${name}"?`)) return;
+    try {
+      await deletePage(plugin, section, name);
+      new Notice(`Deleted page "${name}"`, 3000);
+      const updated = await listPages(plugin, section);
+      setPagesMap((prev) => ({ ...prev, [section]: updated }));
+      if (currentPage === name) onSelect(section, updated[0] ?? "");
+    } catch (err) {
+      console.error("[Noteometry] deletePage failed:", err);
+      new Notice(`Failed to delete page "${name}"`, 8000);
+    }
+  };
 
-  /* ── P1-5: Duplicate section as template ── */
+  /* ── Duplicate section as template ── */
   const handleDuplicateAsTemplate = async (sectionName: string) => {
     try {
       const adapter = plugin.app.vault.adapter;
       const root = plugin.settings.vaultFolder || "Noteometry";
       const sourcePath = `${root}/${sectionName}`;
 
-      // Generate unique copy name
       let copyName = `${sectionName} (Copy)`;
       let counter = 2;
       while (await adapter.exists(`${root}/${copyName}`)) {
@@ -219,13 +219,10 @@ const handleDeletePage = async (section: string, name: string) => {
         counter++;
       }
 
-      // Create the new folder
       await adapter.mkdir(`${root}/${copyName}`);
 
-      // Recursively duplicate structure with empty canvases
       const duplicateDir = async (srcDir: string, destDir: string) => {
         const listing = await adapter.list(srcDir);
-        // Create sub-folders
         for (const folder of listing.folders) {
           const folderName = folder.split("/").pop() ?? "";
           if (!folderName || folderName === "attachments") continue;
@@ -233,7 +230,6 @@ const handleDeletePage = async (section: string, name: string) => {
           await adapter.mkdir(newSubDir);
           await duplicateDir(folder, newSubDir);
         }
-        // Create empty files with same names
         for (const file of listing.files) {
           const fileName = file.split("/").pop() ?? "";
           if (!fileName) continue;
@@ -259,7 +255,7 @@ const handleDeletePage = async (section: string, name: string) => {
     }
   };
 
-  /* ── Long-press context menus for section/page items ── */
+  /* ── Long-press context menus ── */
   const openSectionCtxMenu = useCallback((section: string, x: number, y: number) => {
     const items: ContextMenuItem[] = [
       { label: "Rename", onClick: () => { startRename("section", section, section); setSidebarCtxMenu(null); } },
@@ -330,127 +326,114 @@ const handleDeletePage = async (section: string, name: string) => {
     );
   }
 
+  const sectionPages = expandedSection ? (pagesMap[expandedSection] ?? []) : [];
+  const showPageColumn = !!expandedSection;
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
   return (
     <>
       <div className="noteometry-sidebar-backdrop" onClick={() => setOpen(false)} />
-      <div className="noteometry-sidebar noteometry-sidebar-open">
-        <div className="noteometry-sidebar-hdr">
-          {toggleBtn}
-          <span className="noteometry-sidebar-title">Notebooks</span>
+      <div className={`noteometry-sidebar noteometry-sidebar-open ${showPageColumn ? "nm-sidebar-two-col" : ""}`}>
+        {/* ── Column 1: Sections ── */}
+        <div className={`nm-sidebar-col nm-sidebar-sections-col ${showPageColumn && isMobile ? "nm-sidebar-col-hidden" : ""}`}>
+          <div className="noteometry-sidebar-hdr">
+            {toggleBtn}
+            <span className="noteometry-sidebar-title">Notebooks</span>
+          </div>
+
+          {/* New Course button */}
+          {addingCourse
+            ? inlineInput(handleAddCourse)
+            : (
+              <button
+                className="noteometry-sidebar-add noteometry-sidebar-add-course"
+                onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName("APUS"); }}
+              >
+                <IconBook /> New Course
+              </button>
+            )}
+
+          <div className="noteometry-sidebar-list">
+            {sections.map((s) => {
+              const isRenamingSection = renamingItem?.type === "section" && renamingItem.name === s;
+              return (
+                <div key={s} className="noteometry-sidebar-section">
+                  {isRenamingSection ? inlineInput(handleRename) : (
+                    <LongPressDiv
+                      className={`noteometry-sidebar-item noteometry-sidebar-section-item ${s === expandedSection ? "active" : ""}`}
+                      onClick={() => {
+                        setExpandedSection(s === expandedSection ? "" : s);
+                      }}
+                      onLongPress={(pos) => openSectionCtxMenu(s, pos.x, pos.y)}
+                    >
+                      <IconFolder />
+                      <span className="noteometry-sidebar-item-name">{s}</span>
+                      <IconChevRight />
+                    </LongPressDiv>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {addingSection
+            ? inlineInput(handleAddSection)
+            : (
+              <button
+                className="noteometry-sidebar-add"
+                onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+              >
+                <IconPlus /> New section
+              </button>
+            )}
         </div>
 
-        {/* ── New Course button — above section list per plan ── */}
-        {addingCourse
-          ? inlineInput(handleAddCourse)
-          : (
-            <button
-              className="noteometry-sidebar-add noteometry-sidebar-add-course"
-              onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName("APUS"); }}
-            >
-              <IconBook /> New Course
-            </button>
-          )}
-
-        <div className="noteometry-sidebar-list">
-          {sections.map((s) => {
-            const isExpanded = expandedSection === s;
-            const sectionPages = pagesMap[s] ?? [];
-            const isRenamingSection = renamingItem?.type === "section" && renamingItem.name === s;
-
-            return (
-              <div key={s} className="noteometry-sidebar-section">
-                {isRenamingSection ? inlineInput(handleRename) : (
+        {/* ── Column 2: Pages (slides in from right) ── */}
+        {showPageColumn && (
+          <div className="nm-sidebar-col nm-sidebar-pages-col">
+            <div className="nm-sidebar-pages-hdr">
+              {isMobile && (
+                <button
+                  className="noteometry-sidebar-toggle"
+                  onClick={() => setExpandedSection("")}
+                  title="Back"
+                  style={{ transform: "rotate(180deg)" }}
+                >
+                  <IconChevRight />
+                </button>
+              )}
+              <span className="noteometry-sidebar-title">{expandedSection}</span>
+            </div>
+            <div className="noteometry-sidebar-list">
+              {sectionPages.map((p) => {
+                const isRenamingPage = renamingItem?.type === "page" && renamingItem.section === expandedSection && renamingItem.name === p;
+                return isRenamingPage ? (
+                  <div key={p}>{inlineInput(handleRename)}</div>
+                ) : (
                   <LongPressDiv
-                    className={`noteometry-sidebar-item noteometry-sidebar-section-item ${s === currentSection ? "active" : ""}`}
-                    onClick={() => setExpandedSection(isExpanded ? "" : s)}
-                    onLongPress={(pos) => openSectionCtxMenu(s, pos.x, pos.y)}
+                    key={p}
+                    className={`noteometry-sidebar-item noteometry-sidebar-page-item ${expandedSection === currentSection && p === currentPage ? "active" : ""}`}
+                    onClick={() => selectPage(expandedSection, p)}
+                    onLongPress={(pos) => openPageCtxMenu(expandedSection, p, pos.x, pos.y)}
                   >
-                    {isExpanded ? <IconChevDown /> : <IconChevRight />}
-                    <IconFolder />
-                    <span className="noteometry-sidebar-item-name">{s}</span>
-                    <button
-                      className="noteometry-sidebar-item-action"
-                      onPointerUp={(e) => { e.stopPropagation(); startRename("section", s, s); }}
-                      title="Rename"
-                    >
-                      <IconPen />
-                    </button>
-                    <button
-                      className="noteometry-sidebar-item-action"
-                      onPointerUp={(e) => { e.stopPropagation(); handleDuplicateAsTemplate(s); }}
-                      title="Duplicate as Template"
-                    >
-                      <IconCopy />
-                    </button>
-                    <button
-                      className="noteometry-sidebar-item-del"
-                      onPointerUp={(e) => { e.stopPropagation(); handleDeleteSection(s); }}
-                      title="Delete"
-                    >
-                      <IconTrash />
-                    </button>
+                    <IconFile />
+                    <span className="noteometry-sidebar-item-name">{p}</span>
                   </LongPressDiv>
+                );
+              })}
+              {addingPage === expandedSection
+                ? inlineInput(() => handleAddPage(expandedSection))
+                : (
+                  <button
+                    className="noteometry-sidebar-add noteometry-sidebar-add-page"
+                    onClick={() => { setAddingPage(expandedSection); setAddingSection(false); setRenamingItem(null); setNewName(""); }}
+                  >
+                    <IconPlus /> New page
+                  </button>
                 )}
-
-                {isExpanded && (
-                  <div className="noteometry-sidebar-pages">
-                    {sectionPages.map((p) => {
-                      const isRenamingPage = renamingItem?.type === "page" && renamingItem.section === s && renamingItem.name === p;
-                      return isRenamingPage ? (
-                        <div key={p}>{inlineInput(handleRename)}</div>
-                      ) : (
-                        <LongPressDiv
-                          key={p}
-                          className={`noteometry-sidebar-item noteometry-sidebar-page-item ${s === currentSection && p === currentPage ? "active" : ""}`}
-                          onClick={() => selectPage(s, p)}
-                          onLongPress={(pos) => openPageCtxMenu(s, p, pos.x, pos.y)}
-                        >
-                          <IconFile />
-                          <span className="noteometry-sidebar-item-name">{p}</span>
-                          <button
-                            className="noteometry-sidebar-item-action"
-                            onPointerUp={(e) => { e.stopPropagation(); startRename("page", s, p); }}
-                            title="Rename"
-                          >
-                            <IconPen />
-                          </button>
-                          <button
-                            className="noteometry-sidebar-item-del"
-                            onPointerUp={(e) => { e.stopPropagation(); handleDeletePage(s, p); }}
-                            title="Delete"
-                          >
-                            <IconTrash />
-                          </button>
-                        </LongPressDiv>
-                      );
-                    })}
-                    {addingPage === s
-                      ? inlineInput(() => handleAddPage(s))
-                      : (
-                        <button
-                          className="noteometry-sidebar-add noteometry-sidebar-add-page"
-                          onClick={() => { setAddingPage(s); setAddingSection(false); setRenamingItem(null); setNewName(""); }}
-                        >
-                          <IconPlus /> New page
-                        </button>
-                      )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {addingSection
-          ? inlineInput(handleAddSection)
-          : (
-            <button
-              className="noteometry-sidebar-add"
-              onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
-            >
-              <IconPlus /> New section
-            </button>
-          )}
+            </div>
+          </div>
+        )}
       </div>
       {sidebarCtxMenu && (
         <ContextMenu

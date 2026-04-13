@@ -211,7 +211,7 @@
   flex-direction: column;
 }
 
-/* ── Sidebar — single-column, overlay on mobile ─────────── */
+/* ── Sidebar — cascading two-column layout ─────────── */
 
 .noteometry-sidebar {
   flex-shrink: 0;
@@ -228,17 +228,56 @@
 }
 
 .noteometry-sidebar-open {
-  width: 170px;
+  display: flex;
+  flex-direction: row;
+  background: var(--nm-faceplate-alt);
+  width: 140px;
+  transition: width 0.15s ease;
+}
+
+/* When page column is visible, double the width on desktop */
+.noteometry-sidebar-open.nm-sidebar-two-col {
+  width: 300px;
+}
+
+/* Column containers */
+.nm-sidebar-col {
   display: flex;
   flex-direction: column;
-  background: var(--nm-faceplate-alt);
+  height: 100%;
+  overflow: hidden;
+}
+
+.nm-sidebar-sections-col {
+  width: 140px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--nm-paper-border);
+}
+
+.nm-sidebar-pages-col {
+  width: 160px;
+  flex-shrink: 0;
+  background: var(--nm-faceplate-light);
+}
+
+.nm-sidebar-pages-hdr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--nm-paper-border);
+  flex-shrink: 0;
+}
+
+.nm-sidebar-col-hidden {
+  display: none;
 }
 
 .noteometry-sidebar-backdrop {
   display: none;
 }
 
-/* Mobile: sidebar overlays canvas */
+/* Mobile: sidebar overlays canvas, columns go full-width */
 @media (max-width: 768px) {
   .noteometry-sidebar-open {
     position: absolute;
@@ -248,6 +287,17 @@
     width: 200px;
     max-width: 220px;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  }
+  .noteometry-sidebar-open.nm-sidebar-two-col {
+    width: 200px;
+    max-width: 220px;
+  }
+  .nm-sidebar-sections-col {
+    width: 100%;
+    border-right: none;
+  }
+  .nm-sidebar-pages-col {
+    width: 100%;
   }
   .noteometry-sidebar-backdrop {
     display: block;
@@ -261,7 +311,6 @@
   .noteometry-sidebar-item-del {
     display: none !important;
   }
-  /* Ensure minimum font size */
   .noteometry-sidebar-section-item {
     font-size: 13px;
   }
@@ -313,7 +362,7 @@
 }
 
 .noteometry-sidebar-pages {
-  background: rgba(0, 0, 0, 0.02);
+  background: transparent;
 }
 
 .noteometry-sidebar-list {
@@ -2373,6 +2422,32 @@
 .nm-fp-resize-left:hover::after,
 .nm-fp-resize-left:active::after {
   opacity: 0.7;
+}
+.nm-fp-resize-br {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 10;
+  touch-action: none;
+}
+.nm-fp-resize-br::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--nm-ink-muted);
+  border-bottom: 2px solid var(--nm-ink-muted);
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.nm-fp-resize-br:hover::after,
+.nm-fp-resize-br:active::after {
+  opacity: 0.8;
 }
 .nm-fp-content {
   flex: 1;

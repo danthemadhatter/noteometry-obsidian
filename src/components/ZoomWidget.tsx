@@ -5,11 +5,27 @@ interface Props {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
-export default function ZoomWidget({ zoom, onZoomIn, onZoomOut, onReset }: Props) {
+export default function ZoomWidget({
+  zoom, onZoomIn, onZoomOut, onReset,
+  canUndo, canRedo, onUndo, onRedo,
+}: Props) {
   return (
     <div className="nm-zoom-widget">
+      <button
+        className="nm-zoom-btn"
+        onClick={onUndo}
+        disabled={!canUndo}
+        title="Undo"
+        aria-label="Undo"
+      >
+        ↩
+      </button>
       <button
         className="nm-zoom-btn"
         onClick={onZoomOut}
@@ -33,6 +49,15 @@ export default function ZoomWidget({ zoom, onZoomIn, onZoomOut, onReset }: Props
         aria-label="Zoom in"
       >
         +
+      </button>
+      <button
+        className="nm-zoom-btn"
+        onClick={onRedo}
+        disabled={!canRedo}
+        title="Redo"
+        aria-label="Redo"
+      >
+        ↪
       </button>
     </div>
   );

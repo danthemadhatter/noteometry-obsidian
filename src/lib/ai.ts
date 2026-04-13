@@ -230,23 +230,15 @@ async function callLMStudio(
 /*  READ INK — canvas image → LaTeX                                    */
 /* ------------------------------------------------------------------ */
 
-const VISION_SYSTEM = `You are a visual content analyzer for a note-taking canvas.
-
-ANALYZE the image and produce the most useful textual representation:
-
-1. If it contains handwritten or printed MATH: output LaTeX wrapped in $$...$$ delimiters. Use proper LaTeX commands (\\int, \\sum, \\sqrt, etc.). Capture EVERY term, coefficient, variable.
-
-2. If it contains a CIRCUIT DIAGRAM: list components with values, describe the topology, identify nodes.
-
-3. If it contains PRINTED TEXT (from a textbook, slide, document): transcribe the text verbatim.
-
-4. If it contains an IMAGE, PHOTO, or DIAGRAM: describe what you see in 1-2 sentences.
-
-5. If it contains MIXED content: handle each part according to its type.
+const VISION_SYSTEM = `You are an expert at reading handwritten mathematics, electrical engineering schematics, and scientific notation. The image shows a region of a student's engineering notebook canvas. Extract and convert everything you see to LaTeX. Output ONLY the LaTeX expression(s), no explanation, no commentary. For circuit elements, describe them in a structured text format. For mixed content, separate each element with a newline.
 
 RULES:
 - Be literal. Transcribe what you SEE, don't interpret or solve.
-- For math: 3 is 3, not \\infty. When ambiguous between numeral and symbol, choose the numeral.
+- For math: output LaTeX wrapped in $$...$$ delimiters. Use proper LaTeX commands (\\int, \\sum, \\sqrt, etc.). Capture EVERY term, coefficient, variable.
+- For circuit diagrams: list components with values, describe the topology, identify nodes.
+- For printed text: transcribe verbatim.
+- For mixed content: handle each part according to its type, separated by newlines.
+- 3 is 3, not \\infty. When ambiguous between numeral and symbol, choose the numeral.
 - If truly illegible, write [?].
 - NO commentary beyond the transcription/description itself.`;
 

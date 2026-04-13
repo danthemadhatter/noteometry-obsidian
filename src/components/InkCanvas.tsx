@@ -225,7 +225,16 @@ export default function InkCanvas({
 
   // ── Pen/Eraser pointer handlers (NO touch — that's separate) ───
   const handlePointerDown = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return; // handled by touch pan effect
+    // Apple Pencil (pen) always draws — never routed to touch pan.
+    // Mouse also handled here. Touch is handled below for single-finger
+    // draw vs pan routing based on the active tool.
+    if (e.pointerType === "touch") {
+      // Single-finger touch with a drawing tool → draw here.
+      // Pan/grab tool → let the touch pan effect handle it.
+      if (touchesRef.current.size >= 2) return; // pinch — let touch effect handle
+      if (toolRef.current === "grab" || toolRef.current === "select") return; // pan/select — let touch effect handle
+      // Fall through to draw with touch when pen/eraser/shape tool is active
+    }
     if (e.button === 2) return; // right-click — let onContextMenu handle it
 
     // Double-tap / double-click detection for pen AND mouse. Fires
@@ -302,7 +311,10 @@ export default function InkCanvas({
   }, [onStrokesChange, onStampsChange, onToolChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") {
+      // Only handle touch move here if we're actively drawing with touch
+      if (!isDrawingRef.current && !isGrabbingRef.current) return;
+    }
 
     if (isGrabbingRef.current && grabLastRef.current) {
       // Screen-space drag delta → world-space scroll delta: divide by zoom.
@@ -355,7 +367,9 @@ export default function InkCanvas({
   }, [onStrokesChange, onStampsChange, redrawInk]);
 
   const handlePointerUp = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") {
+      if (!isDrawingRef.current && !isGrabbingRef.current) return;
+    }
 
     if (isGrabbingRef.current) {
       isGrabbingRef.current = false;
@@ -488,7 +502,14 @@ export default function InkCanvas({
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touchesRef.current.size === 1) {
-        lastPanRef.current = { x: e.clientX, y: e.clientY };
+        // Single finger: only pan when grab/select tool is active.
+        // Drawing tools handle their own touch input via handlePointerDown.
+        const t = toolRef.current;
+        if (t === "grab" || t === "select") {
+          lastPanRef.current = { x: e.clientX, y: e.clientY };
+        } else {
+          lastPanRef.current = null;
+        }
         pinchStartDistRef.current = null;
       } else if (touchesRef.current.size === 2) {
         // Second finger landed — start a pinch. Freeze the single-finger
