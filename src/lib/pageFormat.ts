@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -65,7 +65,7 @@ export const EMPTY_PAGE: CanvasData = {
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.2.0";
+export const V3_SOURCE_TAG = "noteometry-1.3.0";
 
 export interface StrokeElementV3 {
   type: "stroke";
@@ -139,13 +139,54 @@ export interface PdfElementV3 {
   name?: string;
 }
 
+export interface ImageAnnotatorElementV3 {
+  type: "image-annotator";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  imagePath: string;
+  imageAspectRatio: number;
+  strokes: RelativeStroke[];
+  name?: string;
+}
+
+export interface FormulaCardElementV3 {
+  type: "formula-card";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  latex: string;
+  bgColor: string;
+  fontSize: number;
+  name?: string;
+}
+
+export interface UnitConverterElementV3 {
+  type: "unit-converter";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  activeCategory: string;
+  values: Record<string, number | null>;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
   | TextboxElementV3
   | TableElementV3
   | ImageElementV3
-  | PdfElementV3;
+  | PdfElementV3
+  | ImageAnnotatorElementV3
+  | FormulaCardElementV3
+  | UnitConverterElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -236,6 +277,35 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         page: obj.page,
         name: obj.name,
       });
+    } else if (obj.type === "image-annotator") {
+      elements.push({
+        type: "image-annotator",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        imagePath: obj.imagePath,
+        imageAspectRatio: obj.imageAspectRatio,
+        strokes: obj.strokes,
+        name: obj.name,
+      });
+    } else if (obj.type === "formula-card") {
+      elements.push({
+        type: "formula-card",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        latex: obj.latex,
+        bgColor: obj.bgColor,
+        fontSize: obj.fontSize,
+        name: obj.name,
+      });
+    } else if (obj.type === "unit-converter") {
+      elements.push({
+        type: "unit-converter",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        activeCategory: obj.activeCategory,
+        values: obj.values,
+        name: obj.name,
+      });
     }
   }
 
@@ -324,6 +394,38 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           fileRef: el.fileRef,
           page: el.page ?? 1,
+          name: el.name,
+        });
+        break;
+      case "image-annotator":
+        canvasObjects.push({
+          id: el.id,
+          type: "image-annotator",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          imagePath: el.imagePath,
+          imageAspectRatio: el.imageAspectRatio ?? 4 / 3,
+          strokes: el.strokes ?? [],
+          name: el.name,
+        });
+        break;
+      case "formula-card":
+        canvasObjects.push({
+          id: el.id,
+          type: "formula-card",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          latex: el.latex ?? "",
+          bgColor: el.bgColor ?? "#FFF9C4",
+          fontSize: el.fontSize ?? 18,
+          name: el.name,
+        });
+        break;
+      case "unit-converter":
+        canvasObjects.push({
+          id: el.id,
+          type: "unit-converter",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          activeCategory: el.activeCategory ?? "resistance",
+          values: el.values ?? {},
           name: el.name,
         });
         break;

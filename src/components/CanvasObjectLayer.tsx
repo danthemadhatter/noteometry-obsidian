@@ -8,6 +8,14 @@ import { useLongPress } from "../hooks/useLongPress";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
+import ImageAnnotator from "./dropins/ImageAnnotator";
+import FormulaCard from "./dropins/FormulaCard";
+import UnitConverter from "./dropins/UnitConverter";
+import type {
+  ImageAnnotatorObject,
+  FormulaCardObject,
+  UnitConverterObject,
+} from "../lib/canvasObjects";
 
 /** Editable title input at the top of every canvas object. Click to
  * edit, Enter/blur to commit, Escape to revert. The input also doubles
@@ -90,6 +98,9 @@ interface Props {
   /** Called when the user long-presses / right-clicks on an object.
    *  Parent builds the context menu items. */
   onObjectContextMenu?: (objId: string, clientX: number, clientY: number) => void;
+  /** Called when a drop-in (e.g. Image Annotator) wants to send a
+   *  vision snapshot to the AI pipeline. */
+  onSendToAI?: (dataUrl: string) => void;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -196,7 +207,7 @@ export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
   zoom = 1,
   tool, selectedObjectId, onSelectObject, plugin,
-  onObjectContextMenu,
+  onObjectContextMenu, onSendToAI,
 }: Props) {
   // Mirror zoom into a ref so the drag/resize handlers (which close over
   // stale values) always read the latest scale.
@@ -351,6 +362,38 @@ export default function CanvasObjectLayer({
                 onPageChange={(newPage) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id && o.type === "pdf" ? { ...o, page: newPage } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "image-annotator" && (
+              <ImageAnnotator
+                obj={obj as ImageAnnotatorObject}
+                plugin={plugin}
+                onSendToAI={onSendToAI}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "formula-card" && (
+              <FormulaCard
+                obj={obj as FormulaCardObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "unit-converter" && (
+              <UnitConverter
+                obj={obj as UnitConverterObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
                   ));
                 }}
               />

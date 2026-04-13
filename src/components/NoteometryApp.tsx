@@ -3,7 +3,7 @@ import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
+import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasObjectLayer from "./CanvasObjectLayer";
@@ -621,6 +621,27 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pdfInputRef.current?.click();
   }, []);
 
+  const handleInsertImageAnnotator = useCallback(() => {
+    const obj = createImageAnnotator(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
+  const handleInsertFormulaCard = useCallback(() => {
+    const obj = createFormulaCard(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
+  const handleInsertUnitConverter = useCallback(() => {
+    const obj = createUnitConverter(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -746,6 +767,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Text Box", onClick: handleInsertTextBox },
         { label: "Table", onClick: handleInsertTable },
         { label: "Image\u2026", onClick: handleInsertImage },
+        { label: "Image Annotator", onClick: handleInsertImageAnnotator },
+        { label: "Formula Card", onClick: handleInsertFormulaCard },
+        { label: "Unit Converter", onClick: handleInsertUnitConverter },
         { label: "PDF\u2026", onClick: handleInsertPdf },
         { label: "", separator: true },
       );
@@ -784,6 +808,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
+    handleInsertImageAnnotator, handleInsertFormulaCard, handleInsertUnitConverter,
   ]);
 
   /* ── Long-press hook for the canvas area ────────────────
@@ -1056,6 +1081,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
                 onObjectContextMenu={handleObjectContextMenu}
+                onSendToAI={processCrop}
               />
 
               {/* Lasso overlay — operates within the viewport */}
