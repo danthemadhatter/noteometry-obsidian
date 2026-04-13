@@ -11,10 +11,16 @@ import type NoteometryPlugin from "../main";
 import {
   listSections,
   listPages,
+  listWeeks,
+  listWeekPages,
   createSection,
   createPage,
+  createWeek,
+  createWeekPage,
   deletePage,
   deleteSection,
+  deleteWeek,
+  deleteWeekPage,
 } from "../lib/persistence";
 
 /** Small wrapper that applies useLongPress to a div rendered inside a map. */
@@ -44,41 +50,72 @@ interface Props {
   app?: App;
 }
 
+/** 3-level sidebar: Notebook > Week > Page
+ *
+ * The `section` prop passed to onSelect encodes the full path:
+ *   - For 3-level pages: "Notebook/Week"
+ *   - For 2-level compat (old pages at Section/Page.md): "Section"
+ *
+ * This way NoteometryApp doesn't need any changes to its page-loading logic. */
 export default function Sidebar({ plugin, currentSection, currentPage, onSelect, app }: Props) {
-  const [sections, setSections] = useState<string[]>([]);
+  const [notebooks, setNotebooks] = useState<string[]>([]);
+  const [weeksMap, setWeeksMap] = useState<Record<string, string[]>>({});
   const [pagesMap, setPagesMap] = useState<Record<string, string[]>>({});
-  const [expandedSection, setExpandedSection] = useState(currentSection);
+  // Top-level pages in a notebook (2-level compat)
+  const [topPagesMap, setTopPagesMap] = useState<Record<string, string[]>>({});
+  const [expandedNotebook, setExpandedNotebook] = useState("");
+  const [expandedWeek, setExpandedWeek] = useState("");
   const [open, setOpen] = useState(() => window.innerWidth >= 768);
-  const [addingSection, setAddingSection] = useState(false);
+  const [addingNotebook, setAddingNotebook] = useState(false);
   const [addingCourse, setAddingCourse] = useState(false);
+  const [addingWeek, setAddingWeek] = useState("");
   const [addingPage, setAddingPage] = useState("");
-  const [renamingItem, setRenamingItem] = useState<{ type: "section" | "page"; section: string; name: string } | null>(null);
+  const [renamingItem, setRenamingItem] = useState<{ type: "notebook" | "week" | "page"; notebook: string; week?: string; name: string } | null>(null);
   const [newName, setNewName] = useState("");
   const submitting = useRef(false);
   const [sidebarCtxMenu, setSidebarCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
-  const refreshSections = useCallback(async () => {
+  // Parse current section to get notebook/week
+  const currentNotebook = currentSection.includes("/") ? currentSection.split("/")[0]! : currentSection;
+  const currentWeek = currentSection.includes("/") ? currentSection.split("/").slice(1).join("/") : "";
+
+  const refreshNotebooks = useCallback(async () => {
     const s = await listSections(plugin);
-    setSections(s);
+    setNotebooks(s);
   }, [plugin]);
 
-  useEffect(() => { refreshSections(); }, [refreshSections]);
+  useEffect(() => { refreshNotebooks(); }, [refreshNotebooks]);
 
-  // Load pages for expanded section
+  // Load weeks + top-level pages when notebook expands
   useEffect(() => {
-    if (!expandedSection) return;
+    if (!expandedNotebook) return;
     (async () => {
-      const p = await listPages(plugin, expandedSection);
-      setPagesMap((prev) => ({ ...prev, [expandedSection]: p }));
+      const wks = await listWeeks(plugin, expandedNotebook);
+      setWeeksMap((prev) => ({ ...prev, [expandedNotebook]: wks }));
+      // Also load top-level pages for backwards compatibility
+      const tp = await listPages(plugin, expandedNotebook);
+      setTopPagesMap((prev) => ({ ...prev, [expandedNotebook]: tp }));
     })();
-  }, [plugin, expandedSection]);
+  }, [plugin, expandedNotebook]);
 
+  // Load pages when a week expands
   useEffect(() => {
-    if (currentSection) setExpandedSection(currentSection);
-  }, [currentSection]);
+    if (!expandedNotebook || !expandedWeek) return;
+    const key = `${expandedNotebook}/${expandedWeek}`;
+    (async () => {
+      const p = await listWeekPages(plugin, expandedNotebook, expandedWeek);
+      setPagesMap((prev) => ({ ...prev, [key]: p }));
+    })();
+  }, [plugin, expandedNotebook, expandedWeek]);
 
-  /* ── Add section ── */
-  const handleAddSection = async () => {
+  // Auto-expand to match current selection
+  useEffect(() => {
+    if (currentNotebook) setExpandedNotebook(currentNotebook);
+    if (currentWeek) setExpandedWeek(currentWeek);
+  }, [currentNotebook, currentWeek]);
+
+  /* ── Add notebook ── */
+  const handleAddNotebook = async () => {
     if (submitting.current) return;
     const name = newName.trim();
     if (!name) return;
@@ -86,17 +123,18 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     try {
       await createSection(plugin, name);
       setNewName("");
-      setAddingSection(false);
-      await refreshSections();
+      setAddingNotebook(false);
+      await refreshNotebooks();
+      // Create a default page at notebook level
       await createPage(plugin, name, "Page 1");
-      setExpandedSection(name);
-      const p = await listPages(plugin, name);
-      setPagesMap((prev) => ({ ...prev, [name]: p }));
+      setExpandedNotebook(name);
+      const tp = await listPages(plugin, name);
+      setTopPagesMap((prev) => ({ ...prev, [name]: tp }));
       onSelect(name, "Page 1");
     } finally { submitting.current = false; }
   };
 
-  /* ── Add course (section + 16 week pages) ── */
+  /* ── Add course (notebook + 16 week sub-folders with Notes.md) ── */
   const handleAddCourse = async () => {
     if (submitting.current) return;
     const name = newName.trim();
@@ -105,31 +143,68 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     try {
       await createSection(plugin, name);
       for (let i = 1; i <= 16; i++) {
-        await createPage(plugin, name, `Week ${i}`);
+        await createWeek(plugin, name, `Week ${i}`);
+        await createWeekPage(plugin, name, `Week ${i}`, "Notes");
       }
       setNewName("");
-      setAddingSection(false);
-      await refreshSections();
-      setExpandedSection(name);
-      const p = await listPages(plugin, name);
-      setPagesMap((prev) => ({ ...prev, [name]: p }));
-      onSelect(name, "Week 1");
+      setAddingCourse(false);
+      await refreshNotebooks();
+      setExpandedNotebook(name);
+      setExpandedWeek("Week 1");
+      const wks = await listWeeks(plugin, name);
+      setWeeksMap((prev) => ({ ...prev, [name]: wks }));
+      const p = await listWeekPages(plugin, name, "Week 1");
+      setPagesMap((prev) => ({ ...prev, [`${name}/Week 1`]: p }));
+      onSelect(`${name}/Week 1`, "Notes");
     } finally { submitting.current = false; }
   };
 
-  /* ── Add page ── */
-  const handleAddPage = async (section: string) => {
+  /* ── Add week ── */
+  const handleAddWeek = async (notebook: string) => {
     if (submitting.current) return;
     const name = newName.trim();
     if (!name) return;
     submitting.current = true;
     try {
-      await createPage(plugin, section, name);
+      await createWeek(plugin, notebook, name);
+      setNewName("");
+      setAddingWeek("");
+      const wks = await listWeeks(plugin, notebook);
+      setWeeksMap((prev) => ({ ...prev, [notebook]: wks }));
+      setExpandedWeek(name);
+    } finally { submitting.current = false; }
+  };
+
+  /* ── Add page (into a week) ── */
+  const handleAddPage = async (notebook: string, week: string) => {
+    if (submitting.current) return;
+    const name = newName.trim();
+    if (!name) return;
+    submitting.current = true;
+    try {
+      await createWeekPage(plugin, notebook, week, name);
       setNewName("");
       setAddingPage("");
-      const p = await listPages(plugin, section);
-      setPagesMap((prev) => ({ ...prev, [section]: p }));
-      onSelect(section, name);
+      const key = `${notebook}/${week}`;
+      const p = await listWeekPages(plugin, notebook, week);
+      setPagesMap((prev) => ({ ...prev, [key]: p }));
+      onSelect(key, name);
+    } finally { submitting.current = false; }
+  };
+
+  /* ── Add page at notebook level (2-level compat) ── */
+  const handleAddTopPage = async (notebook: string) => {
+    if (submitting.current) return;
+    const name = newName.trim();
+    if (!name) return;
+    submitting.current = true;
+    try {
+      await createPage(plugin, notebook, name);
+      setNewName("");
+      setAddingPage("");
+      const tp = await listPages(plugin, notebook);
+      setTopPagesMap((prev) => ({ ...prev, [notebook]: tp }));
+      onSelect(notebook, name);
     } finally { submitting.current = false; }
   };
 
@@ -142,33 +217,88 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     try {
       const adapter = plugin.app.vault.adapter;
       const root = plugin.settings.vaultFolder || "Noteometry";
-      if (renamingItem.type === "section") {
+      if (renamingItem.type === "notebook") {
         const oldPath = `${root}/${renamingItem.name}`;
         const newPath = `${root}/${name}`;
         if (await adapter.exists(oldPath)) {
+          // Recursively copy everything
           if (!(await adapter.exists(newPath))) await adapter.mkdir(newPath);
-          const pages = await listPages(plugin, renamingItem.name);
-          for (const p of pages) {
-            const data = await adapter.read(`${oldPath}/${p}.md`);
-            await adapter.write(`${newPath}/${p}.md`, data);
-            await adapter.remove(`${oldPath}/${p}.md`);
+          const listing = await adapter.list(oldPath);
+          // Copy sub-folders (weeks)
+          for (const folder of listing.folders) {
+            const folderName = folder.split("/").pop() ?? "";
+            if (!folderName) continue;
+            const destFolder = `${newPath}/${folderName}`;
+            if (!(await adapter.exists(destFolder))) await adapter.mkdir(destFolder);
+            const subListing = await adapter.list(folder);
+            for (const f of subListing.files) {
+              const fname = f.split("/").pop() ?? "";
+              const data = await adapter.read(f);
+              await adapter.write(`${destFolder}/${fname}`, data);
+              await adapter.remove(f);
+            }
+            try { await adapter.rmdir(folder, false); } catch { /* ignore */ }
           }
-          await adapter.rmdir(oldPath, false);
+          // Copy top-level files
+          for (const f of listing.files) {
+            const fname = f.split("/").pop() ?? "";
+            const data = await adapter.read(f);
+            await adapter.write(`${newPath}/${fname}`, data);
+            await adapter.remove(f);
+          }
+          try { await adapter.rmdir(oldPath, false); } catch { /* ignore */ }
         }
-        await refreshSections();
-        if (currentSection === renamingItem.name) onSelect(name, currentPage);
-      } else {
-        const sec = renamingItem.section;
-        const oldPath = `${root}/${sec}/${renamingItem.name}.md`;
-        const newPath = `${root}/${sec}/${name}.md`;
+        await refreshNotebooks();
+        if (currentNotebook === renamingItem.name) {
+          onSelect(currentWeek ? `${name}/${currentWeek}` : name, currentPage);
+        }
+      } else if (renamingItem.type === "week" && renamingItem.week) {
+        const notebook = renamingItem.notebook;
+        const oldPath = `${root}/${notebook}/${renamingItem.name}`;
+        const newPath = `${root}/${notebook}/${name}`;
         if (await adapter.exists(oldPath)) {
-          const data = await adapter.read(oldPath);
-          await adapter.write(newPath, data);
-          await adapter.remove(oldPath);
+          if (!(await adapter.exists(newPath))) await adapter.mkdir(newPath);
+          const listing = await adapter.list(oldPath);
+          for (const f of listing.files) {
+            const fname = f.split("/").pop() ?? "";
+            const data = await adapter.read(f);
+            await adapter.write(`${newPath}/${fname}`, data);
+            await adapter.remove(f);
+          }
+          try { await adapter.rmdir(oldPath, false); } catch { /* ignore */ }
         }
-        const p = await listPages(plugin, sec);
-        setPagesMap((prev) => ({ ...prev, [sec]: p }));
-        if (currentPage === renamingItem.name) onSelect(sec, name);
+        const wks = await listWeeks(plugin, notebook);
+        setWeeksMap((prev) => ({ ...prev, [notebook]: wks }));
+        if (currentWeek === renamingItem.name && currentNotebook === notebook) {
+          onSelect(`${notebook}/${name}`, currentPage);
+        }
+      } else if (renamingItem.type === "page") {
+        const notebook = renamingItem.notebook;
+        const week = renamingItem.week;
+        if (week) {
+          const oldPath = `${root}/${notebook}/${week}/${renamingItem.name}.md`;
+          const newPath = `${root}/${notebook}/${week}/${name}.md`;
+          if (await adapter.exists(oldPath)) {
+            const data = await adapter.read(oldPath);
+            await adapter.write(newPath, data);
+            await adapter.remove(oldPath);
+          }
+          const key = `${notebook}/${week}`;
+          const p = await listWeekPages(plugin, notebook, week);
+          setPagesMap((prev) => ({ ...prev, [key]: p }));
+          if (currentPage === renamingItem.name) onSelect(key, name);
+        } else {
+          const oldPath = `${root}/${notebook}/${renamingItem.name}.md`;
+          const newPath = `${root}/${notebook}/${name}.md`;
+          if (await adapter.exists(oldPath)) {
+            const data = await adapter.read(oldPath);
+            await adapter.write(newPath, data);
+            await adapter.remove(oldPath);
+          }
+          const tp = await listPages(plugin, notebook);
+          setTopPagesMap((prev) => ({ ...prev, [notebook]: tp }));
+          if (currentPage === renamingItem.name) onSelect(notebook, name);
+        }
       }
     } finally {
       submitting.current = false;
@@ -177,45 +307,69 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     }
   };
 
-  const handleDeleteSection = async (name: string) => {
-    if (!confirm(`Delete "${name}" and all its pages?`)) return;
+  const handleDeleteNotebook = async (name: string) => {
+    if (!confirm(`Delete "${name}" and all its weeks/pages?`)) return;
     try {
       await deleteSection(plugin, name);
-      new Notice(`Deleted section "${name}"`, 3000);
-      await refreshSections();
-      if (expandedSection === name) setExpandedSection("");
-      if (currentSection === name) onSelect("", "");
+      new Notice(`Deleted notebook "${name}"`, 3000);
+      await refreshNotebooks();
+      if (expandedNotebook === name) { setExpandedNotebook(""); setExpandedWeek(""); }
+      if (currentNotebook === name) onSelect("", "");
     } catch (err) {
-      console.error("[Noteometry] deleteSection failed:", err);
-      new Notice(`Failed to delete section "${name}"`, 8000);
+      console.error("[Noteometry] deleteNotebook failed:", err);
+      new Notice(`Failed to delete notebook "${name}"`, 8000);
     }
   };
 
-  const handleDeletePage = async (section: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+  const handleDeleteWeek = async (notebook: string, week: string) => {
+    if (!confirm(`Delete "${week}" and all its pages?`)) return;
     try {
-      await deletePage(plugin, section, name);
-      new Notice(`Deleted page "${name}"`, 3000);
-      const updated = await listPages(plugin, section);
-      setPagesMap((prev) => ({ ...prev, [section]: updated }));
-      if (currentPage === name) onSelect(section, updated[0] ?? "");
+      await deleteWeek(plugin, notebook, week);
+      new Notice(`Deleted week "${week}"`, 3000);
+      const wks = await listWeeks(plugin, notebook);
+      setWeeksMap((prev) => ({ ...prev, [notebook]: wks }));
+      if (expandedWeek === week) setExpandedWeek("");
+      if (currentWeek === week && currentNotebook === notebook) onSelect(notebook, "");
+    } catch (err) {
+      console.error("[Noteometry] deleteWeek failed:", err);
+      new Notice(`Failed to delete week "${week}"`, 8000);
+    }
+  };
+
+  const handleDeletePage = async (notebook: string, week: string | undefined, page: string) => {
+    if (!confirm(`Delete "${page}"?`)) return;
+    try {
+      if (week) {
+        await deleteWeekPage(plugin, notebook, week, page);
+        new Notice(`Deleted page "${page}"`, 3000);
+        const key = `${notebook}/${week}`;
+        const updated = await listWeekPages(plugin, notebook, week);
+        setPagesMap((prev) => ({ ...prev, [key]: updated }));
+        if (currentPage === page) onSelect(key, updated[0] ?? "");
+      } else {
+        await deletePage(plugin, notebook, page);
+        new Notice(`Deleted page "${page}"`, 3000);
+        const updated = await listPages(plugin, notebook);
+        setTopPagesMap((prev) => ({ ...prev, [notebook]: updated }));
+        if (currentPage === page) onSelect(notebook, updated[0] ?? "");
+      }
     } catch (err) {
       console.error("[Noteometry] deletePage failed:", err);
-      new Notice(`Failed to delete page "${name}"`, 8000);
+      new Notice(`Failed to delete page "${page}"`, 8000);
     }
   };
 
-  /* ── Duplicate section as template ── */
-  const handleDuplicateAsTemplate = async (sectionName: string) => {
+  /* ── Duplicate notebook as template ── */
+  const handleDuplicateAsTemplate = async (notebookName: string) => {
     try {
       const adapter = plugin.app.vault.adapter;
       const root = plugin.settings.vaultFolder || "Noteometry";
-      const sourcePath = `${root}/${sectionName}`;
+      const sourcePath = `${root}/${notebookName}`;
 
-      let copyName = `${sectionName} (Copy)`;
+      let copyName = `${notebookName} (Copy)`;
       let counter = 2;
       while (await adapter.exists(`${root}/${copyName}`)) {
-        copyName = `${sectionName} (Copy ${counter})`;
+        copyName = `${notebookName} (Copy ${counter})`;
         counter++;
       }
 
@@ -245,10 +399,8 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
       await duplicateDir(sourcePath, `${root}/${copyName}`);
 
       new Notice(`Template created: ${copyName}`);
-      await refreshSections();
-      setExpandedSection(copyName);
-      const p = await listPages(plugin, copyName);
-      setPagesMap((prev) => ({ ...prev, [copyName]: p }));
+      await refreshNotebooks();
+      setExpandedNotebook(copyName);
     } catch (err) {
       console.error("[Noteometry] Duplicate as template failed:", err);
       new Notice("Failed to duplicate as template", 8000);
@@ -256,21 +408,32 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
   };
 
   /* ── Long-press context menus ── */
-  const openSectionCtxMenu = useCallback((section: string, x: number, y: number) => {
+  const openNotebookCtxMenu = useCallback((notebook: string, x: number, y: number) => {
     const items: ContextMenuItem[] = [
-      { label: "Rename", onClick: () => { startRename("section", section, section); setSidebarCtxMenu(null); } },
-      { label: "Duplicate as Template", onClick: () => { handleDuplicateAsTemplate(section); setSidebarCtxMenu(null); } },
+      { label: "Rename", onClick: () => { startRename("notebook", notebook, undefined, notebook); setSidebarCtxMenu(null); } },
+      { label: "Add Week", onClick: () => { setAddingWeek(notebook); setNewName(""); setSidebarCtxMenu(null); } },
+      { label: "Duplicate as Template", onClick: () => { handleDuplicateAsTemplate(notebook); setSidebarCtxMenu(null); } },
       { label: "", separator: true },
-      { label: "Delete", danger: true, onClick: () => { handleDeleteSection(section); setSidebarCtxMenu(null); } },
+      { label: "Delete", danger: true, onClick: () => { handleDeleteNotebook(notebook); setSidebarCtxMenu(null); } },
     ];
     setSidebarCtxMenu({ x, y, items });
-  }, [handleDuplicateAsTemplate, handleDeleteSection]);
+  }, [handleDuplicateAsTemplate, handleDeleteNotebook]);
 
-  const openPageCtxMenu = useCallback((section: string, page: string, x: number, y: number) => {
+  const openWeekCtxMenu = useCallback((notebook: string, week: string, x: number, y: number) => {
     const items: ContextMenuItem[] = [
-      { label: "Rename", onClick: () => { startRename("page", section, page); setSidebarCtxMenu(null); } },
+      { label: "Rename", onClick: () => { startRename("week", notebook, week, week); setSidebarCtxMenu(null); } },
+      { label: "Add Page", onClick: () => { setAddingPage(`${notebook}/${week}`); setNewName(""); setSidebarCtxMenu(null); } },
       { label: "", separator: true },
-      { label: "Delete", danger: true, onClick: () => { handleDeletePage(section, page); setSidebarCtxMenu(null); } },
+      { label: "Delete", danger: true, onClick: () => { handleDeleteWeek(notebook, week); setSidebarCtxMenu(null); } },
+    ];
+    setSidebarCtxMenu({ x, y, items });
+  }, [handleDeleteWeek]);
+
+  const openPageCtxMenu = useCallback((notebook: string, week: string | undefined, page: string, x: number, y: number) => {
+    const items: ContextMenuItem[] = [
+      { label: "Rename", onClick: () => { startRename("page", notebook, week, page); setSidebarCtxMenu(null); } },
+      { label: "", separator: true },
+      { label: "Delete", danger: true, onClick: () => { handleDeletePage(notebook, week, page); setSidebarCtxMenu(null); } },
     ];
     setSidebarCtxMenu({ x, y, items });
   }, [handleDeletePage]);
@@ -289,7 +452,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
         onChange={(e) => setNewName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); onSubmit(); }
-          if (e.key === "Escape") { setAddingPage(""); setAddingSection(false); setAddingCourse(false); setRenamingItem(null); setNewName(""); }
+          if (e.key === "Escape") { setAddingPage(""); setAddingWeek(""); setAddingNotebook(false); setAddingCourse(false); setRenamingItem(null); setNewName(""); }
         }}
         autoFocus
         placeholder="Name..."
@@ -300,11 +463,12 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     </div>
   );
 
-  const startRename = (type: "section" | "page", section: string, name: string) => {
-    setRenamingItem({ type, section, name });
+  const startRename = (type: "notebook" | "week" | "page", notebook: string, week: string | undefined, name: string) => {
+    setRenamingItem({ type, notebook, week, name });
     setNewName(name);
-    setAddingSection(false);
+    setAddingNotebook(false);
     setAddingPage("");
+    setAddingWeek("");
   };
 
   /* ── Toggle button ── */
@@ -326,16 +490,14 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
     );
   }
 
-  const sectionPages = expandedSection ? (pagesMap[expandedSection] ?? []) : [];
-  const showPageColumn = !!expandedSection;
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const weeks = expandedNotebook ? (weeksMap[expandedNotebook] ?? []) : [];
+  const topPages = expandedNotebook ? (topPagesMap[expandedNotebook] ?? []) : [];
 
   return (
     <>
       <div className="noteometry-sidebar-backdrop" onClick={() => setOpen(false)} />
-      <div className={`noteometry-sidebar noteometry-sidebar-open ${showPageColumn ? "nm-sidebar-two-col" : ""}`}>
-        {/* ── Column 1: Sections ── */}
-        <div className={`nm-sidebar-col nm-sidebar-sections-col ${showPageColumn && isMobile ? "nm-sidebar-col-hidden" : ""}`}>
+      <div className="noteometry-sidebar noteometry-sidebar-open">
+        <div className="nm-sidebar-col">
           <div className="noteometry-sidebar-hdr">
             {toggleBtn}
             <span className="noteometry-sidebar-title">Notebooks</span>
@@ -347,93 +509,148 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect,
             : (
               <button
                 className="noteometry-sidebar-add noteometry-sidebar-add-course"
-                onClick={() => { setAddingCourse(true); setAddingSection(false); setAddingPage(""); setRenamingItem(null); setNewName("APUS"); }}
+                onClick={() => { setAddingCourse(true); setAddingNotebook(false); setAddingPage(""); setAddingWeek(""); setRenamingItem(null); setNewName("APUS"); }}
               >
                 <IconBook /> New Course
               </button>
             )}
 
-          <div className="noteometry-sidebar-list">
-            {sections.map((s) => {
-              const isRenamingSection = renamingItem?.type === "section" && renamingItem.name === s;
+          <div className="noteometry-sidebar-list" style={{ overflow: "auto", flex: 1 }}>
+            {notebooks.map((nb) => {
+              const isRenamingNb = renamingItem?.type === "notebook" && renamingItem.name === nb;
+              const isExpanded = nb === expandedNotebook;
+              const nbWeeks = weeksMap[nb] ?? [];
+              const nbTopPages = topPagesMap[nb] ?? [];
+
               return (
-                <div key={s} className="noteometry-sidebar-section">
-                  {isRenamingSection ? inlineInput(handleRename) : (
+                <div key={nb} className="noteometry-sidebar-section">
+                  {isRenamingNb ? inlineInput(handleRename) : (
                     <LongPressDiv
-                      className={`noteometry-sidebar-item noteometry-sidebar-section-item ${s === expandedSection ? "active" : ""}`}
-                      onClick={() => {
-                        setExpandedSection(s === expandedSection ? "" : s);
-                      }}
-                      onLongPress={(pos) => openSectionCtxMenu(s, pos.x, pos.y)}
+                      className={`noteometry-sidebar-item noteometry-sidebar-section-item ${isExpanded ? "active" : ""}`}
+                      style={{ fontWeight: 700, minHeight: 28 }}
+                      onClick={() => setExpandedNotebook(isExpanded ? "" : nb)}
+                      onLongPress={(pos) => openNotebookCtxMenu(nb, pos.x, pos.y)}
                     >
-                      <IconFolder />
-                      <span className="noteometry-sidebar-item-name">{s}</span>
-                      <IconChevRight />
+                      <span style={{ fontSize: 12, marginRight: 4, transition: "transform 0.15s", display: "inline-block", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                      <span style={{ marginRight: 4 }}>&#128193;</span>
+                      <span className="noteometry-sidebar-item-name">{nb}</span>
                     </LongPressDiv>
+                  )}
+
+                  {/* Expanded notebook content */}
+                  {isExpanded && (
+                    <div style={{ paddingLeft: 12 }}>
+                      {/* Weeks */}
+                      {nbWeeks.map((wk) => {
+                        const isRenamingWeek = renamingItem?.type === "week" && renamingItem.notebook === nb && renamingItem.name === wk;
+                        const isWeekExpanded = expandedWeek === wk;
+                        const weekKey = `${nb}/${wk}`;
+                        const weekPages = pagesMap[weekKey] ?? [];
+
+                        return (
+                          <div key={wk}>
+                            {isRenamingWeek ? inlineInput(handleRename) : (
+                              <LongPressDiv
+                                className={`noteometry-sidebar-item ${isWeekExpanded ? "active" : ""}`}
+                                style={{ minHeight: 26 }}
+                                onClick={() => {
+                                  setExpandedWeek(isWeekExpanded ? "" : wk);
+                                }}
+                                onLongPress={(pos) => openWeekCtxMenu(nb, wk, pos.x, pos.y)}
+                              >
+                                <span style={{ fontSize: 10, marginRight: 4, transition: "transform 0.15s", display: "inline-block", transform: isWeekExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                                <span style={{ marginRight: 4 }}>&#128193;</span>
+                                <span className="noteometry-sidebar-item-name">{wk}</span>
+                              </LongPressDiv>
+                            )}
+
+                            {/* Pages inside the week */}
+                            {isWeekExpanded && (
+                              <div style={{ paddingLeft: 12 }}>
+                                {weekPages.map((pg) => {
+                                  const isRenamingPage = renamingItem?.type === "page" && renamingItem.notebook === nb && renamingItem.week === wk && renamingItem.name === pg;
+                                  const isActive = currentSection === weekKey && pg === currentPage;
+                                  return isRenamingPage ? (
+                                    <div key={pg}>{inlineInput(handleRename)}</div>
+                                  ) : (
+                                    <LongPressDiv
+                                      key={pg}
+                                      className={`noteometry-sidebar-item noteometry-sidebar-page-item ${isActive ? "active" : ""}`}
+                                      style={{ minHeight: 24 }}
+                                      onClick={() => selectPage(weekKey, pg)}
+                                      onLongPress={(pos) => openPageCtxMenu(nb, wk, pg, pos.x, pos.y)}
+                                    >
+                                      <span style={{ marginRight: 4 }}>&#128196;</span>
+                                      <span className="noteometry-sidebar-item-name">{pg}</span>
+                                    </LongPressDiv>
+                                  );
+                                })}
+                                {addingPage === weekKey
+                                  ? inlineInput(() => handleAddPage(nb, wk))
+                                  : (
+                                    <button
+                                      className="noteometry-sidebar-add noteometry-sidebar-add-page"
+                                      onClick={() => { setAddingPage(weekKey); setAddingNotebook(false); setAddingWeek(""); setRenamingItem(null); setNewName(""); }}
+                                    >
+                                      <IconPlus /> New page
+                                    </button>
+                                  )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Top-level pages (2-level compat) */}
+                      {nbTopPages.map((pg) => {
+                        const isRenamingPage = renamingItem?.type === "page" && renamingItem.notebook === nb && !renamingItem.week && renamingItem.name === pg;
+                        const isActive = currentSection === nb && pg === currentPage;
+                        return isRenamingPage ? (
+                          <div key={pg}>{inlineInput(handleRename)}</div>
+                        ) : (
+                          <LongPressDiv
+                            key={pg}
+                            className={`noteometry-sidebar-item noteometry-sidebar-page-item ${isActive ? "active" : ""}`}
+                            style={{ minHeight: 24 }}
+                            onClick={() => selectPage(nb, pg)}
+                            onLongPress={(pos) => openPageCtxMenu(nb, undefined, pg, pos.x, pos.y)}
+                          >
+                            <span style={{ marginRight: 4 }}>&#128196;</span>
+                            <span className="noteometry-sidebar-item-name">{pg}</span>
+                          </LongPressDiv>
+                        );
+                      })}
+
+                      {/* Add Week button */}
+                      {addingWeek === nb
+                        ? inlineInput(() => handleAddWeek(nb))
+                        : (
+                          <button
+                            className="noteometry-sidebar-add"
+                            style={{ fontSize: 12 }}
+                            onClick={() => { setAddingWeek(nb); setAddingNotebook(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+                          >
+                            <IconPlus /> New week
+                          </button>
+                        )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
 
-          {addingSection
-            ? inlineInput(handleAddSection)
+          {addingNotebook
+            ? inlineInput(handleAddNotebook)
             : (
               <button
                 className="noteometry-sidebar-add"
-                onClick={() => { setAddingSection(true); setAddingCourse(false); setAddingPage(""); setRenamingItem(null); setNewName(""); }}
+                onClick={() => { setAddingNotebook(true); setAddingCourse(false); setAddingPage(""); setAddingWeek(""); setRenamingItem(null); setNewName(""); }}
               >
-                <IconPlus /> New section
+                <IconPlus /> New notebook
               </button>
             )}
         </div>
-
-        {/* ── Column 2: Pages (slides in from right) ── */}
-        {showPageColumn && (
-          <div className="nm-sidebar-col nm-sidebar-pages-col">
-            <div className="nm-sidebar-pages-hdr">
-              {isMobile && (
-                <button
-                  className="noteometry-sidebar-toggle"
-                  onClick={() => setExpandedSection("")}
-                  title="Back"
-                  style={{ transform: "rotate(180deg)" }}
-                >
-                  <IconChevRight />
-                </button>
-              )}
-              <span className="noteometry-sidebar-title">{expandedSection}</span>
-            </div>
-            <div className="noteometry-sidebar-list">
-              {sectionPages.map((p) => {
-                const isRenamingPage = renamingItem?.type === "page" && renamingItem.section === expandedSection && renamingItem.name === p;
-                return isRenamingPage ? (
-                  <div key={p}>{inlineInput(handleRename)}</div>
-                ) : (
-                  <LongPressDiv
-                    key={p}
-                    className={`noteometry-sidebar-item noteometry-sidebar-page-item ${expandedSection === currentSection && p === currentPage ? "active" : ""}`}
-                    onClick={() => selectPage(expandedSection, p)}
-                    onLongPress={(pos) => openPageCtxMenu(expandedSection, p, pos.x, pos.y)}
-                  >
-                    <IconFile />
-                    <span className="noteometry-sidebar-item-name">{p}</span>
-                  </LongPressDiv>
-                );
-              })}
-              {addingPage === expandedSection
-                ? inlineInput(() => handleAddPage(expandedSection))
-                : (
-                  <button
-                    className="noteometry-sidebar-add noteometry-sidebar-add-page"
-                    onClick={() => { setAddingPage(expandedSection); setAddingSection(false); setRenamingItem(null); setNewName(""); }}
-                  >
-                    <IconPlus /> New page
-                  </button>
-                )}
-            </div>
-          </div>
-        )}
       </div>
       {sidebarCtxMenu && (
         <ContextMenu

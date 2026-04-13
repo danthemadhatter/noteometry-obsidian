@@ -478,75 +478,67 @@ export default function InkCanvas({
 
   // ── Touch panning + pinch-zoom — ALWAYS active, on the container ─
   //
-  // Single-finger drag → pan (existing behavior).
-  // Two-finger pinch → zoom, driven by the ratio between the current
-  // and initial distance between the two fingers. We update zoomRef
-  // and redraw synchronously for smooth feedback, then call
-  // onZoomChange() so the parent state catches up on the next render.
+  // Uses native DOM TouchEvent listeners (NOT React synthetic events)
+  // with { passive: false } so we can preventDefault and block the OS
+  // from stealing two-finger gestures (double-tap zoom, rubber-band
+  // scroll, etc.).
   //
-  // touch-action: none on .noteometry-ink-layer plus the preventTouch
-  // handler below keeps the OS from eating our gestures (double-tap
-  // zoom, rubber-band scroll, etc.). All canvas gestures are ours.
+  // Single-finger drag → pan (when grab/select tool active).
+  // Two-finger pinch → zoom, driven by ratio of current/last distance.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const el = containerRef.current;
+    if (!el) return;
 
-    const getPinchDist = (): number => {
-      const vals = Array.from(touchesRef.current.values());
-      if (vals.length < 2) return 0;
-      const [a, b] = vals;
-      return Math.hypot(b!.x - a!.x, b!.y - a!.y);
-    };
+    const activeTouches = new Map<number, { x: number; y: number }>();
+    let lastPinchDist = 0;
 
-    const onDown = (e: PointerEvent) => {
-      if (e.pointerType !== "touch") return;
-      touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (touchesRef.current.size === 1) {
-        // Single finger: only pan when grab/select tool is active.
-        // Drawing tools handle their own touch input via handlePointerDown.
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      for (const t of Array.from(e.changedTouches)) {
+        activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      if (activeTouches.size === 1) {
         const t = toolRef.current;
         if (t === "grab" || t === "select") {
-          lastPanRef.current = { x: e.clientX, y: e.clientY };
+          const first = activeTouches.values().next().value;
+          if (first) lastPanRef.current = { x: first.x, y: first.y };
         } else {
           lastPanRef.current = null;
         }
-        pinchStartDistRef.current = null;
-      } else if (touchesRef.current.size === 2) {
-        // Second finger landed — start a pinch. Freeze the single-finger
-        // pan so pinch and pan don't fight for the same scroll delta.
-        pinchStartDistRef.current = getPinchDist();
-        pinchStartZoomRef.current = zoomRef.current;
+        lastPinchDist = 0;
+      } else if (activeTouches.size === 2) {
+        const [a, b] = Array.from(activeTouches.values());
+        lastPinchDist = Math.hypot(b!.x - a!.x, b!.y - a!.y);
         lastPanRef.current = null;
       }
     };
 
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== "touch") return;
-      touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      // Pinch-zoom path (2 fingers)
-      if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      for (const t of Array.from(e.changedTouches)) {
+        activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      if (activeTouches.size >= 2) {
         if (zoomLockedRef.current) return;
-        const currentDist = getPinchDist();
-        if (currentDist <= 0) return;
-        const ratio = currentDist / pinchStartDistRef.current;
-        // Clamp to [0.5, 4] matching the Cmd+wheel limits in NoteometryApp.
-        const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
-        if (Math.abs(newZoom - zoomRef.current) < 0.001) return;
-        // Update ref + redraw synchronously so the canvas tracks fingers
-        // without waiting for a React re-render round-trip.
-        zoomRef.current = newZoom;
-        redrawGrid();
-        redrawInk();
-        // Tell the parent so object layer, zoom percent readout, and
-        // everything else that mirrors the state stays in sync.
-        onZoomChangeRef.current?.(newZoom);
+        const [a, b] = Array.from(activeTouches.values());
+        const dist = Math.hypot(b!.x - a!.x, b!.y - a!.y);
+        if (lastPinchDist > 0) {
+          const scale = dist / lastPinchDist;
+          const newZoom = Math.max(0.25, Math.min(4.0, zoomRef.current * scale));
+          if (Math.abs(newZoom - zoomRef.current) > 0.001) {
+            zoomRef.current = newZoom;
+            redrawGrid();
+            redrawInk();
+            onZoomChangeRef.current?.(newZoom);
+          }
+        }
+        lastPinchDist = dist;
         return;
       }
 
       // Single-finger pan path
-      if (lastPanRef.current) {
-        const touch = touchesRef.current.values().next().value;
+      if (lastPanRef.current && activeTouches.size === 1) {
+        const touch = activeTouches.values().next().value;
         if (touch) {
           const z = zoomRef.current;
           const dx = (touch.x - lastPanRef.current.x) / z;
@@ -562,32 +554,28 @@ export default function InkCanvas({
       }
     };
 
-    const onUp = (e: PointerEvent) => {
-      if (e.pointerType !== "touch") return;
-      touchesRef.current.delete(e.pointerId);
-      if (touchesRef.current.size === 0) {
+    const handleTouchEnd = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) {
+        activeTouches.delete(t.identifier);
+      }
+      if (activeTouches.size < 2) lastPinchDist = 0;
+      if (activeTouches.size === 0) {
         lastPanRef.current = null;
-        pinchStartDistRef.current = null;
-      } else if (touchesRef.current.size === 1) {
-        // One finger remains after a pinch — resume pan from where
-        // that finger currently is, not from its stale pre-pinch spot.
-        pinchStartDistRef.current = null;
-        const r = touchesRef.current.values().next().value;
+      } else if (activeTouches.size === 1) {
+        const r = activeTouches.values().next().value;
         if (r) lastPanRef.current = { x: r.x, y: r.y };
       }
     };
 
-    container.addEventListener("pointerdown", onDown);
-    container.addEventListener("pointermove", onMove);
-    container.addEventListener("pointerup", onUp);
-    container.addEventListener("pointercancel", onUp);
+    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: false });
     return () => {
-      container.removeEventListener("pointerdown", onDown);
-      container.removeEventListener("pointermove", onMove);
-      container.removeEventListener("pointerup", onUp);
-      container.removeEventListener("pointercancel", onUp);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [onViewportChange, redrawGrid, redrawInk]);
+  }, []); // empty deps — refs keep values stable
 
   // Tool cycling is handled by a toolbar button (works on all devices)
 

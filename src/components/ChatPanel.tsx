@@ -79,7 +79,6 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [slashChatToast, setSlashChatToast] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,20 +122,7 @@ export default function ChatPanel({
 
   const send = () => {
     if (!input.trim() && !attachments.length) return;
-    let text = input;
-    // /? shortcut: one-shot switch to Plain Chat
-    if (text.startsWith("/?") && onPresetChange) {
-      const prevPresetId = activePreset?.id;
-      onPresetChange("plainChat");
-      text = text.slice(2).trim();
-      setSlashChatToast(true);
-      setTimeout(() => {
-        setSlashChatToast(false);
-        // Revert to previous preset after send
-        if (prevPresetId) onPresetChange(prevPresetId);
-      }, 2000);
-    }
-    onSend(text, [...attachments]);
+    onSend(input, [...attachments]);
     setInput("");
     setAttachments([]);
   };
@@ -167,26 +153,27 @@ export default function ChatPanel({
         )}
       </div>
 
-      {/* P1-6: Prompt preset strip */}
-      {presets && presets.length > 0 && (
-        <div className="nm-preset-strip">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              className={`nm-preset-btn ${activePreset?.id === p.id ? "nm-preset-active" : ""}`}
-              onClick={() => onPresetChange?.(p.id)}
-              title={p.description}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* /? toast */}
-      {slashChatToast && (
-        <div className="nm-slash-toast">Switched to Plain Chat</div>
-      )}
+      {/* Mode selector: Solve / Chat */}
+      <div style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--nm-border, #ddd)' }}>
+        <button onClick={() => onPresetChange?.('solve')} style={{
+          background: activePreset?.id === 'solve' ? 'var(--nm-active, #e8f0fe)' : 'transparent',
+          border: '1px solid var(--nm-border, #ccc)', borderRadius: 6,
+          padding: '4px 14px', fontSize: 13, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: 16 }}>{'\u2211'}</span> Solve
+        </button>
+        <button onClick={() => onPresetChange?.('chat')} style={{
+          background: activePreset?.id === 'chat' ? 'var(--nm-active, #e8f0fe)' : 'transparent',
+          border: '1px solid var(--nm-border, #ccc)', borderRadius: 6,
+          padding: '4px 14px', fontSize: 13, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg> Chat
+        </button>
+      </div>
 
       {/* Messages */}
       <div className="noteometry-chat-messages">

@@ -89,12 +89,105 @@ export async function deleteSection(plugin: NoteometryPlugin, name: string): Pro
   const path = sectionPath(plugin, name);
   const adapter = plugin.app.vault.adapter;
   if (await adapter.exists(path)) {
+    // Delete weeks (sub-folders) and their pages first
+    const weeks = await listWeeks(plugin, name);
+    for (const wk of weeks) {
+      await deleteWeek(plugin, name, wk);
+    }
+    // Delete any top-level pages (2-level compat)
     const pages = await listPages(plugin, name);
     for (const p of pages) {
       await deletePage(plugin, name, p);
     }
     await adapter.rmdir(path, false);
   }
+}
+
+/* ── Weeks (sub-folders inside a notebook/section) ───── */
+
+export async function listWeeks(plugin: NoteometryPlugin, notebook: string): Promise<string[]> {
+  const path = sectionPath(plugin, notebook);
+  const adapter = plugin.app.vault.adapter;
+  try {
+    if (!(await adapter.exists(path))) return [];
+    const listing = await adapter.list(path);
+    return listing.folders
+      .map((f) => f.split("/").pop() ?? "")
+      .filter((n) => n.length > 0 && n !== "attachments")
+      .sort(naturalCompare);
+  } catch {
+    return [];
+  }
+}
+
+export async function createWeek(plugin: NoteometryPlugin, notebook: string, week: string): Promise<void> {
+  const path = `${sectionPath(plugin, notebook)}/${week}`;
+  const adapter = plugin.app.vault.adapter;
+  if (!(await adapter.exists(path))) {
+    await adapter.mkdir(path);
+  }
+}
+
+export async function deleteWeek(plugin: NoteometryPlugin, notebook: string, week: string): Promise<void> {
+  const path = `${sectionPath(plugin, notebook)}/${week}`;
+  const adapter = plugin.app.vault.adapter;
+  if (await adapter.exists(path)) {
+    const pages = await listWeekPages(plugin, notebook, week);
+    for (const p of pages) {
+      await deleteWeekPage(plugin, notebook, week, p);
+    }
+    try { await adapter.rmdir(path, false); } catch { /* ignore */ }
+  }
+}
+
+/* ── Week pages (files inside a week sub-folder) ────── */
+
+export function weekPagePath(plugin: NoteometryPlugin, notebook: string, week: string, page: string): string {
+  return `${rootDir(plugin)}/${notebook}/${week}/${page}.md`;
+}
+
+export async function listWeekPages(plugin: NoteometryPlugin, notebook: string, week: string): Promise<string[]> {
+  const path = `${sectionPath(plugin, notebook)}/${week}`;
+  const adapter = plugin.app.vault.adapter;
+  try {
+    if (!(await adapter.exists(path))) return [];
+    const listing = await adapter.list(path);
+    return listing.files
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => {
+        const name = f.split("/").pop() ?? "";
+        return name.replace(/\.md$/, "");
+      })
+      .sort(naturalCompare);
+  } catch {
+    return [];
+  }
+}
+
+export async function createWeekPage(plugin: NoteometryPlugin, notebook: string, week: string, page: string): Promise<void> {
+  const path = weekPagePath(plugin, notebook, week, page);
+  const adapter = plugin.app.vault.adapter;
+  if (!(await adapter.exists(path))) {
+    const empty: CanvasData = { ...EMPTY_PAGE, lastSaved: new Date().toISOString() };
+    const v3 = packToV3(empty);
+    await adapter.write(path, JSON.stringify(v3, null, 0));
+  }
+}
+
+export async function deleteWeekPage(plugin: NoteometryPlugin, notebook: string, week: string, page: string): Promise<void> {
+  const path = weekPagePath(plugin, notebook, week, page);
+  const adapter = plugin.app.vault.adapter;
+  if (await adapter.exists(path)) {
+    await adapter.remove(path);
+  }
+}
+
+export async function loadWeekPage(plugin: NoteometryPlugin, notebook: string, week: string, page: string): Promise<CanvasData> {
+  return loadPage(plugin, `${notebook}/${week}`, page);
+}
+
+export async function saveWeekPage(plugin: NoteometryPlugin, notebook: string, week: string, page: string, data: CanvasData): Promise<void> {
+  return savePage(plugin, `${notebook}/${week}`, page, data);
 }
 
 /* ── Pages (files) ───────────────────────────────────── */

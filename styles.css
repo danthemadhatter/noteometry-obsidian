@@ -1949,10 +1949,6 @@
     background: var(--nm-ink-muted);
     opacity: 0.3;
   }
-  /* Hide resize handle on mobile — bottom sheet uses height */
-  .nm-fp-resize-left {
-    display: none;
-  }
   .nm-fp-show-btn {
     position: fixed;
     bottom: 8px;
@@ -2396,32 +2392,6 @@
   display: flex;
   min-height: 0;
   position: relative;
-}
-.nm-fp-resize-left {
-  position: absolute;
-  left: -4px;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  cursor: ew-resize;
-  z-index: 10;
-  touch-action: none;
-}
-.nm-fp-resize-left::after {
-  content: '';
-  position: absolute;
-  left: 5px;
-  top: 30%;
-  bottom: 30%;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--nm-ink-muted);
-  opacity: 0.3;
-  transition: opacity 0.15s;
-}
-.nm-fp-resize-left:hover::after,
-.nm-fp-resize-left:active::after {
-  opacity: 0.7;
 }
 .nm-fp-resize-br {
   position: absolute;

@@ -211,21 +211,49 @@ export default function CanvasObjectLayer({
   tool, selectedObjectId, onSelectObject, plugin,
   onObjectContextMenu, onSendToAI,
 }: Props) {
-  // Mirror zoom into a ref so the drag/resize handlers (which close over
-  // stale values) always read the latest scale.
+  // Mirror zoom and objects into refs so drag/resize handlers always
+  // read the latest values without stale closures.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const objectsRef = useRef(objects);
+  objectsRef.current = objects;
+  const onObjectsChangeRef = useRef(onObjectsChange);
+  onObjectsChangeRef.current = onObjectsChange;
+
   const dragState = useRef<{
     id: string;
     startX: number; startY: number;
     objStartX: number; objStartY: number;
   } | null>(null);
 
-  const resizeState = useRef<{
-    id: string;
-    startX: number; startY: number;
-    objStartW: number; objStartH: number;
-  } | null>(null);
+  // Resize state — uses React state to drive a useEffect that attaches
+  // document-level listeners, avoiding stale closures when pages change.
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef<{ id: string; x: number; y: number; w: number; h: number }>({ id: "", x: 0, y: 0, w: 0, h: 0 });
+
+  // Document-level resize listeners — re-attached when isResizing changes,
+  // always reads fresh state via refs.
+  useEffect(() => {
+    if (!isResizing) return;
+    const onMove = (e: PointerEvent) => {
+      const z = zoomRef.current;
+      const dx = (e.clientX - resizeStartRef.current.x) / z;
+      const dy = (e.clientY - resizeStartRef.current.y) / z;
+      const id = resizeStartRef.current.id;
+      const newW = Math.max(150, resizeStartRef.current.w + dx);
+      const newH = Math.max(100, resizeStartRef.current.h + dy);
+      onObjectsChangeRef.current(objectsRef.current.map(o =>
+        o.id === id ? { ...o, w: newW, h: newH } : o
+      ));
+    };
+    const onUp = () => setIsResizing(false);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    return () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+  }, [isResizing]);
 
   const handleDragStart = useCallback((e: React.PointerEvent, obj: CanvasObject) => {
     e.preventDefault();
@@ -241,8 +269,6 @@ export default function CanvasObjectLayer({
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
     // Screen-space delta → world-space delta: divide by zoom.
-    // This makes a 100px screen drag at 2x zoom move the object by
-    // 50 world units (which visually is 100 screen pixels).
     const z = zoomRef.current;
     if (dragState.current) {
       const dx = (e.clientX - dragState.current.startX) / z;
@@ -252,34 +278,17 @@ export default function CanvasObjectLayer({
         o.id === id ? { ...o, x: dragState.current!.objStartX + dx, y: dragState.current!.objStartY + dy } : o
       ));
     }
-    if (resizeState.current) {
-      const dx = (e.clientX - resizeState.current.startX) / z;
-      const dy = (e.clientY - resizeState.current.startY) / z;
-      const id = resizeState.current.id;
-      onObjectsChange(objects.map(o =>
-        o.id === id ? {
-          ...o,
-          w: Math.max(150, resizeState.current!.objStartW + dx),
-          h: Math.max(100, resizeState.current!.objStartH + dy),
-        } : o
-      ));
-    }
   }, [objects, onObjectsChange]);
 
   const handleDragEnd = useCallback(() => {
     dragState.current = null;
-    resizeState.current = null;
   }, []);
 
   const handleResizeStart = useCallback((e: React.PointerEvent, obj: CanvasObject) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    resizeState.current = {
-      id: obj.id,
-      startX: e.clientX, startY: e.clientY,
-      objStartW: obj.w, objStartH: obj.h,
-    };
+    resizeStartRef.current = { id: obj.id, x: e.clientX, y: e.clientY, w: obj.w, h: obj.h };
+    setIsResizing(true);
   }, []);
 
   const handleObjectClick = useCallback((e: React.MouseEvent, id: string) => {
@@ -414,12 +423,19 @@ export default function CanvasObjectLayer({
             )}
           </div>
 
-          {/* Resize handle */}
+          {/* Resize handle — position:absolute to avoid layout shift */}
           <div
-            className="noteometry-object-resize-handle"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              width: 16,
+              height: 16,
+              cursor: 'nwse-resize',
+              zIndex: 10,
+              background: 'linear-gradient(135deg, transparent 50%, var(--nm-border, #ccc) 50%)',
+            }}
             onPointerDown={(e) => handleResizeStart(e, obj)}
-            onPointerMove={handleDragMove}
-            onPointerUp={handleDragEnd}
           />
         </ObjectLongPressWrapper>
       ))}

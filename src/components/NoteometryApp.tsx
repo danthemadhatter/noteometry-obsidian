@@ -110,7 +110,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const [fpPos, setFpPos] = useState({ x: plugin.settings.floatingPanelX, y: plugin.settings.floatingPanelY });
   const [fpSize, setFpSize] = useState({ w: plugin.settings.floatingPanelWidth, h: plugin.settings.floatingPanelHeight });
   const fpDragRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(null);
-  const fpResizeRef = useRef<{ startX: number; startW: number } | null>(null);
   const fpResizeBRRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
   // viewportRef = the drawing surface inside the canvas area.
   // Lasso, rasterization, and zoom wheel events all key off this.
@@ -1199,30 +1198,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
             </div>
             {!fpMinimized && (
               <div className="nm-fp-body">
-                {/* Resize handle on left edge */}
-                <div
-                  className="nm-fp-resize-left"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    fpResizeRef.current = { startX: e.clientX, startW: fpSize.w };
-                    const onMove = (ev: PointerEvent) => {
-                      ev.preventDefault();
-                      if (!fpResizeRef.current) return;
-                      const dx = fpResizeRef.current.startX - ev.clientX;
-                      const nw = Math.max(280, Math.min(600, fpResizeRef.current.startW + dx));
-                      setFpSize((prev) => ({ ...prev, w: nw }));
-                    };
-                    const onUp = () => {
-                      fpResizeRef.current = null;
-                      document.removeEventListener("pointermove", onMove);
-                      document.removeEventListener("pointerup", onUp);
-                      // Persist width to settings
-                      plugin.saveSettings();
-                    };
-                    document.addEventListener("pointermove", onMove, { passive: false } as EventListenerOptions);
-                    document.addEventListener("pointerup", onUp);
-                  }}
-                />
                 <div className="nm-fp-content">
                   <Panel
                     inputCode={inputCode}
