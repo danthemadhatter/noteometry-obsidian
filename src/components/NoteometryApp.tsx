@@ -3,7 +3,7 @@ import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, strokeFullyInsidePolygon, stampIntersectsPolygon, stampBBox, newStampId, groupStrokes } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper } from "../lib/canvasObjects";
+import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper, createGraphPlotter, createUnitCircle, createOscilloscope } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasObjectLayer, { DropinIcon } from "./CanvasObjectLayer";
@@ -672,6 +672,27 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedObjectId(obj.id);
   }, [scrollX, scrollY]);
 
+  const handleInsertGraphPlotter = useCallback(() => {
+    const obj = createGraphPlotter(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
+  const handleInsertUnitCircle = useCallback(() => {
+    const obj = createUnitCircle(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
+  const handleInsertOscilloscope = useCallback(() => {
+    const obj = createOscilloscope(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -803,6 +824,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Circuit Sniper", icon: <DropinIcon type="circuit-sniper" />, onClick: handleInsertCircuitSniper },
         { label: "PDF\u2026", icon: <DropinIcon type="pdf" />, onClick: handleInsertPdf },
         { label: "", separator: true },
+        { label: "\u2500\u2500 Math Tools \u2500\u2500", disabled: true },
+        { label: "Graph Plotter", icon: <DropinIcon type="graph-plotter" />, onClick: handleInsertGraphPlotter },
+        { label: "Unit Circle", icon: <DropinIcon type="unit-circle" />, onClick: handleInsertUnitCircle },
+        { label: "Oscilloscope", icon: <DropinIcon type="oscilloscope" />, onClick: handleInsertOscilloscope },
+        { label: "", separator: true },
       );
 
       // ── Canvas ──
@@ -874,6 +900,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
     handleInsertImageAnnotator, handleInsertFormulaCard, handleInsertUnitConverter, handleInsertCircuitSniper,
+    handleInsertGraphPlotter, handleInsertUnitCircle, handleInsertOscilloscope,
   ]);
 
   /* ── Long-press hook for the canvas area ────────────────

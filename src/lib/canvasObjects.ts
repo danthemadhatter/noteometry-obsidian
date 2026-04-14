@@ -97,6 +97,41 @@ export interface CircuitSniperObject extends CanvasObjectBase {
   elements: CircuitElement[];
 }
 
+/* ── New math drop-in types (v1.4.0) ───────────────── */
+
+export interface GraphPlotterObject extends CanvasObjectBase {
+  type: "graph-plotter";
+  functions: { expr: string; color: string; enabled: boolean }[];
+  xMin: number;
+  xMax: number;
+  yMin: number | null;
+  yMax: number | null;
+}
+
+export interface UnitCircleObject extends CanvasObjectBase {
+  type: "unit-circle";
+  angleDeg: number;
+}
+
+export interface ChannelConfig {
+  waveform: "sine" | "square" | "sawtooth" | "triangle" | "pulse" | "dc" | "off";
+  frequency: number;
+  amplitude: number;
+  phase: number;
+  dcOffset: number;
+  voltsDivIndex: number;
+  visible: boolean;
+  yOffset: number;
+}
+
+export interface OscilloscopeObject extends CanvasObjectBase {
+  type: "oscilloscope";
+  channelA: ChannelConfig;
+  channelB: ChannelConfig;
+  timeDivIndex: number;
+  running: boolean;
+}
+
 export type CanvasObject =
   | TextBoxObject
   | TableObject
@@ -105,7 +140,10 @@ export type CanvasObject =
   | ImageAnnotatorObject
   | FormulaCardObject
   | UnitConverterObject
-  | CircuitSniperObject;
+  | CircuitSniperObject
+  | GraphPlotterObject
+  | UnitCircleObject
+  | OscilloscopeObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -182,6 +220,54 @@ export function createCircuitSniper(
   };
 }
 
+const DEFAULT_CHANNEL: ChannelConfig = {
+  waveform: "sine",
+  frequency: 1000,
+  amplitude: 1.0,
+  phase: 0,
+  dcOffset: 0,
+  voltsDivIndex: 3, // 1V/div
+  visible: true,
+  yOffset: 0,
+};
+
+export function createGraphPlotter(
+  x: number, y: number,
+  name: string = "Graph Plotter"
+): GraphPlotterObject {
+  return {
+    id: newObjectId(), type: "graph-plotter", x, y,
+    w: 480, h: 380, name,
+    functions: [{ expr: "sin(x)", color: "#4A90D9", enabled: true }],
+    xMin: -10, xMax: 10, yMin: null, yMax: null,
+  };
+}
+
+export function createUnitCircle(
+  x: number, y: number,
+  name: string = "Unit Circle"
+): UnitCircleObject {
+  return {
+    id: newObjectId(), type: "unit-circle", x, y,
+    w: 380, h: 320, name,
+    angleDeg: 45,
+  };
+}
+
+export function createOscilloscope(
+  x: number, y: number,
+  name: string = "Oscilloscope"
+): OscilloscopeObject {
+  return {
+    id: newObjectId(), type: "oscilloscope", x, y,
+    w: 520, h: 420, name,
+    channelA: { ...DEFAULT_CHANNEL },
+    channelB: { ...DEFAULT_CHANNEL, waveform: "off", visible: false },
+    timeDivIndex: 4, // 1ms/div
+    running: true,
+  };
+}
+
 /** Default display name when an object has none set (old pages). */
 export function defaultObjectName(obj: CanvasObject): string {
   if (obj.name && obj.name.trim()) return obj.name;
@@ -194,5 +280,8 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "formula-card": return "Formula";
     case "unit-converter": return "Unit Converter";
     case "circuit-sniper": return "Circuit Sniper";
+    case "graph-plotter": return "Graph Plotter";
+    case "unit-circle": return "Unit Circle";
+    case "oscilloscope": return "Oscilloscope";
   }
 }

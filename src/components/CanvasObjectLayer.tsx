@@ -12,11 +12,17 @@ import ImageAnnotator from "./dropins/ImageAnnotator";
 import FormulaCard from "./dropins/FormulaCard";
 import UnitConverter from "./dropins/UnitConverter";
 import CircuitSniper from "./dropins/CircuitSniper";
+import GraphPlotter from "./dropins/GraphPlotter";
+import UnitCircle from "./dropins/UnitCircle";
+import Oscilloscope from "./dropins/Oscilloscope";
 import type {
   ImageAnnotatorObject,
   FormulaCardObject,
   UnitConverterObject,
   CircuitSniperObject,
+  GraphPlotterObject,
+  UnitCircleObject,
+  OscilloscopeObject,
 } from "../lib/canvasObjects";
 
 /* ── Drop-in SVG icons (14×14, stroke=currentColor, fill=none) ─── */
@@ -41,6 +47,12 @@ export function DropinIcon({ type }: { type: string }) {
       return <svg {...iconProps}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="8" y="17" fontSize="6" fontWeight="700" fill="currentColor" stroke="none" fontFamily="sans-serif">PDF</text></svg>;
     case "circuit-sniper":
       return <svg {...iconProps}><path d="M2 12h4l2-5 2 10 2-10 2 5h4"/><circle cx="20" cy="12" r="2"/></svg>;
+    case "graph-plotter":
+      return <svg {...iconProps}><polyline points="3 20 3 4"/><polyline points="3 20 21 20"/><path d="M6 17 C9 6, 14 6, 18 10" strokeWidth="2"/></svg>;
+    case "unit-circle":
+      return <svg {...iconProps}><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/><circle cx="17" cy="8" r="2" fill="currentColor"/></svg>;
+    case "oscilloscope":
+      return <svg {...iconProps}><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M5 12 C7 6, 9 6, 11 12 C13 18, 15 18, 17 12" strokeWidth="2"/></svg>;
     default:
       return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>;
   }
@@ -456,6 +468,38 @@ export default function CanvasObjectLayer({
               <CircuitSniper
                 obj={obj as CircuitSniperObject}
                 plugin={plugin}
+                onSendToAI={onSendToAI}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "graph-plotter" && (
+              <GraphPlotter
+                obj={obj as GraphPlotterObject}
+                onSendToAI={onSendToAI}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "unit-circle" && (
+              <UnitCircle
+                obj={obj as UnitCircleObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "oscilloscope" && (
+              <Oscilloscope
+                obj={obj as OscilloscopeObject}
                 onSendToAI={onSendToAI}
                 onChange={(patch) => {
                   onObjectsChange(objects.map(o =>

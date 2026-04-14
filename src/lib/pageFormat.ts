@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject, RelativeStroke, CircuitElement } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -188,6 +188,46 @@ export interface CircuitSniperElementV3 {
   name?: string;
 }
 
+export interface GraphPlotterElementV3 {
+  type: "graph-plotter";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  functions: { expr: string; color: string; enabled: boolean }[];
+  xMin: number;
+  xMax: number;
+  yMin: number | null;
+  yMax: number | null;
+  name?: string;
+}
+
+export interface UnitCircleElementV3 {
+  type: "unit-circle";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angleDeg: number;
+  name?: string;
+}
+
+export interface OscilloscopeElementV3 {
+  type: "oscilloscope";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  channelA: ChannelConfig;
+  channelB: ChannelConfig;
+  timeDivIndex: number;
+  running: boolean;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
@@ -198,7 +238,10 @@ export type PageElementV3 =
   | ImageAnnotatorElementV3
   | FormulaCardElementV3
   | UnitConverterElementV3
-  | CircuitSniperElementV3;
+  | CircuitSniperElementV3
+  | GraphPlotterElementV3
+  | UnitCircleElementV3
+  | OscilloscopeElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -324,6 +367,35 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         elements: obj.elements,
+        name: obj.name,
+      });
+    } else if (obj.type === "graph-plotter") {
+      elements.push({
+        type: "graph-plotter",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        functions: obj.functions,
+        xMin: obj.xMin, xMax: obj.xMax,
+        yMin: obj.yMin, yMax: obj.yMax,
+        name: obj.name,
+      });
+    } else if (obj.type === "unit-circle") {
+      elements.push({
+        type: "unit-circle",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        angleDeg: obj.angleDeg,
+        name: obj.name,
+      });
+    } else if (obj.type === "oscilloscope") {
+      elements.push({
+        type: "oscilloscope",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        channelA: obj.channelA,
+        channelB: obj.channelB,
+        timeDivIndex: obj.timeDivIndex,
+        running: obj.running,
         name: obj.name,
       });
     }
@@ -458,6 +530,46 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           name: el.name,
         });
         break;
+      case "graph-plotter":
+        canvasObjects.push({
+          id: el.id,
+          type: "graph-plotter",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          functions: el.functions ?? [{ expr: "sin(x)", color: "#4A90D9", enabled: true }],
+          xMin: el.xMin ?? -10,
+          xMax: el.xMax ?? 10,
+          yMin: el.yMin ?? null,
+          yMax: el.yMax ?? null,
+          name: el.name,
+        });
+        break;
+      case "unit-circle":
+        canvasObjects.push({
+          id: el.id,
+          type: "unit-circle",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          angleDeg: el.angleDeg ?? 45,
+          name: el.name,
+        });
+        break;
+      case "oscilloscope": {
+        const defaultCh = {
+          waveform: "sine" as const,
+          frequency: 1000, amplitude: 1.0, phase: 0, dcOffset: 0,
+          voltsDivIndex: 3, visible: true, yOffset: 0,
+        };
+        canvasObjects.push({
+          id: el.id,
+          type: "oscilloscope",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          channelA: el.channelA ?? { ...defaultCh },
+          channelB: el.channelB ?? { ...defaultCh, waveform: "off", visible: false },
+          timeDivIndex: el.timeDivIndex ?? 4,
+          running: el.running ?? true,
+          name: el.name,
+        });
+        break;
+      }
     }
   }
 
