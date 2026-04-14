@@ -129,7 +129,8 @@ const COMP_KEYS = Object.keys(COMP_LIB);
 
 /* ── Geometry helpers ───────────────────────────────── */
 
-const snap = (val: number) => Math.round(val / 15) * 15;
+const GRID = 15;
+const snap = (val: number) => Math.round(val / GRID) * GRID;
 
 const getSnap45 = (sx: number, sy: number, cx: number, cy: number) => {
   const dx = cx - sx;
@@ -149,6 +150,51 @@ const getPinCoords = (el: CircuitElement, pin: PinDef) => {
   const rx = dx * Math.cos(angle) - dy * Math.sin(angle);
   const ry = dx * Math.sin(angle) + dy * Math.cos(angle);
   return { x: el.x + cx + rx, y: el.y + cy + ry };
+};
+
+/**
+ * Snap a component so its pins land on grid intersections.
+ * For each pin, compute how far off-grid it would be, then pick
+ * the pin whose snap displacement is smallest and derive the
+ * component position from that snapped pin.
+ */
+const snapComponentByPin = (
+  rawX: number, rawY: number, rotation: number, compType: string,
+): { x: number; y: number } => {
+  const compDef = COMP_LIB[compType];
+  if (!compDef || compDef.pins.length === 0) return { x: snap(rawX), y: snap(rawY) };
+
+  const angle = (rotation || 0) * (Math.PI / 180);
+  const cx = 30, cy = 30; // component center in local coords
+
+  let bestX = rawX;
+  let bestY = rawY;
+  let bestErr = Infinity;
+
+  for (const pin of compDef.pins) {
+    const dx = pin.x - cx;
+    const dy = pin.y - cy;
+    const rx = dx * Math.cos(angle) - dy * Math.sin(angle);
+    const ry = dx * Math.sin(angle) + dy * Math.cos(angle);
+    // Pin absolute position with raw component position
+    const pinAbsX = rawX + cx + rx;
+    const pinAbsY = rawY + cy + ry;
+    // Snap the pin to grid
+    const snappedPinX = snap(pinAbsX);
+    const snappedPinY = snap(pinAbsY);
+    // Back-calculate component position from snapped pin
+    const candidateX = snappedPinX - cx - rx;
+    const candidateY = snappedPinY - cy - ry;
+    // Error: how far did we have to move the component?
+    const err = Math.hypot(candidateX - rawX, candidateY - rawY);
+    if (err < bestErr) {
+      bestErr = err;
+      bestX = candidateX;
+      bestY = candidateY;
+    }
+  }
+
+  return { x: bestX, y: bestY };
 };
 
 interface Endpoint {
@@ -461,7 +507,15 @@ export default function CircuitSniper({ obj, onChange, plugin, onSendToAI }: Pro
     if (dragNode) {
       const dist = Math.hypot(e.clientX - dragNode.startX, e.clientY - dragNode.startY);
       if (!dragNode.isDragging && dist > 5) setDragNode(prev => prev ? { ...prev, isDragging: true } : null);
-      if (dragNode.isDragging) setDragNode(prev => prev ? { ...prev, x: snap(mouseX + prev.offsetX), y: snap(mouseY + prev.offsetY) } : null);
+      if (dragNode.isDragging) {
+        const el = elements.find(e => e.id === dragNode.id);
+        const rawX = mouseX + dragNode.offsetX;
+        const rawY = mouseY + dragNode.offsetY;
+        const snapped = el
+          ? snapComponentByPin(rawX, rawY, el.rotation || 0, el.type)
+          : { x: snap(rawX), y: snap(rawY) };
+        setDragNode(prev => prev ? { ...prev, x: snapped.x, y: snapped.y } : null);
+      }
     } else if (drawWire) {
       // Check for nearby pin first — snap directly to pin, bypassing angle snap.
       // This fixes NPN collector/emitter pins at 45-degree angles.
@@ -580,15 +634,22 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
       const newComponents = JSON.parse(jsonString);
       if (!Array.isArray(newComponents)) throw new Error("Model did not return a valid JSON array.");
 
-      const validated: CircuitElement[] = newComponents.map((c: Record<string, unknown>) => ({
-        id: (c.id as string) || crypto.randomUUID(),
-        type: (c.type as string) || "Resistor",
-        x: snap((c.x as number) || 120),
-        y: snap((c.y as number) || 120),
-        rotation: (c.rotation as number) || 0,
-        label: (c.label as string) || "",
-        value: (c.value as string) || "",
-      }));
+      const validated: CircuitElement[] = newComponents.map((c: Record<string, unknown>) => {
+        const compType = (c.type as string) || "Resistor";
+        const rot = (c.rotation as number) || 0;
+        const rawX = (c.x as number) || 120;
+        const rawY = (c.y as number) || 120;
+        const snapped = snapComponentByPin(rawX, rawY, rot, compType);
+        return {
+          id: (c.id as string) || crypto.randomUUID(),
+          type: compType,
+          x: snapped.x,
+          y: snapped.y,
+          rotation: rot,
+          label: (c.label as string) || "",
+          value: (c.value as string) || "",
+        };
+      });
 
       dispatch({ type: "SET_FULL_STATE", payload: validated });
       setLlmResponse("Scan complete. Components imported.");
@@ -899,7 +960,12 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                    updateElement(el.id, "rotation", ((el.rotation || 0) + 45) % 360);
+                    const newRot = ((el.rotation || 0) + 45) % 360;
+                    const snapped = snapComponentByPin(el.x, el.y, newRot, el.type);
+                    dispatch({
+                      type: "PUSH",
+                      payload: elements.map(e2 => e2.id === el.id ? { ...e2, rotation: newRot, x: snapped.x, y: snapped.y } : e2),
+                    });
                   }}
                   title="Rotate 45 deg"
                 >
@@ -1009,7 +1075,14 @@ Analyze the image and return ONLY raw JSON. No markdown, no explanations.
                   />
                   <select
                     value={el.rotation}
-                    onChange={(e) => updateElement(el.id, "rotation", parseInt(e.target.value))}
+                    onChange={(ev) => {
+                      const newRot = parseInt(ev.target.value);
+                      const snapped = snapComponentByPin(el.x, el.y, newRot, el.type);
+                      dispatch({
+                        type: "PUSH",
+                        payload: elements.map(e2 => e2.id === el.id ? { ...e2, rotation: newRot, x: snapped.x, y: snapped.y } : e2),
+                      });
+                    }}
                     onPointerDown={(e) => e.stopPropagation()}
                     style={{ ...S.input, width: "50px", fontSize: "10px", minHeight: "36px" }}
                   >
