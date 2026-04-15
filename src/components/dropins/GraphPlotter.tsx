@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { compile } from "mathjs";
 import type { GraphPlotterObject } from "../../lib/canvasObjects";
+import { getSignalBus } from "../../services/SignalBus";
+import type { SignalState, WaveformType } from "../../services/SignalBus";
 
 interface FuncEntry {
   expr: string;
@@ -37,6 +39,19 @@ function evalExprWithStep(exprStr: string, x: number): number | null {
   return evalExpr(replaced, x);
 }
 
+/** Build the expression string for a signal bus waveform. */
+function signalExpr(waveform: WaveformType, freq: number, amp: number): string {
+  switch (waveform) {
+    case "sine": return `${amp} * sin(${freq} * x)`;
+    case "square": return `${amp} * (sin(${freq} * x) >= 0 ? 1 : -1)`;
+    case "sawtooth": return `${amp} * (2 * ((${freq} * x / (2*pi)) % 1) - 1)`;
+    case "triangle": return `${amp} * (4 * abs((${freq} * x / (2*pi)) % 1 - 0.5) - 1)`;
+    case "pulse": return `${amp} * ((${freq} * x / (2*pi)) % 1 < 0.1 ? 1 : 0)`;
+    case "dc": return `${amp}`;
+    default: return `${amp} * sin(${freq} * x)`;
+  }
+}
+
 export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +59,11 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
   // Pan state
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ mx: number; my: number; xMin: number; xMax: number; yMin: number | null; yMax: number | null }>({ mx: 0, my: 0, xMin: -10, xMax: 10, yMin: null, yMax: null });
+
+  // Signal bus state
+  const [busSignal, setBusSignal] = useState<{ freq: number; amp: number; waveform: WaveformType } | null>(null);
+  const [busTheta, setBusTheta] = useState<number | null>(null);
+  const linked = !!obj.signalLinked;
 
   const funcs = obj.functions;
   const xMin = obj.xMin;
@@ -63,6 +83,25 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
   const removeFunc = useCallback((index: number) => {
     onChange({ functions: funcs.filter((_, i) => i !== index) });
   }, [funcs, onChange]);
+
+  /* ── Signal Bus: subscribe when linked ── */
+  useEffect(() => {
+    if (!linked) {
+      setBusSignal(null);
+      setBusTheta(null);
+      return;
+    }
+    const bus = getSignalBus();
+    const unsub = bus.subscribe(obj.id, (state: SignalState) => {
+      setBusSignal({ freq: state.frequency, amp: state.amplitude, waveform: state.waveformType });
+      setBusTheta(state.theta);
+    });
+    // Seed from current bus state
+    const s = bus.getState();
+    setBusSignal({ freq: s.frequency, amp: s.amplitude, waveform: s.waveformType });
+    setBusTheta(s.theta);
+    return unsub;
+  }, [linked, obj.id]);
 
   // Draw the plot
   const drawPlot = useCallback(() => {
@@ -93,15 +132,22 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
     let yMinVal = obj.yMin;
     let yMaxVal = obj.yMax;
 
+    // Build the bus signal expression string (if linked)
+    const busExpr = linked && busSignal ? signalExpr(busSignal.waveform, busSignal.freq, busSignal.amp) : null;
+
     if (yMinVal === null || yMaxVal === null) {
       // Auto-scale: compute y range from all function values
       let autoMin = Infinity;
       let autoMax = -Infinity;
+      const allExprs: string[] = [];
       for (const f of funcs) {
-        if (!f.enabled || !f.expr.trim()) continue;
+        if (f.enabled && f.expr.trim()) allExprs.push(f.expr);
+      }
+      if (busExpr) allExprs.push(busExpr);
+      for (const expr of allExprs) {
         for (let i = 0; i <= SAMPLES; i++) {
           const x = xMin + (i / SAMPLES) * xRange;
-          const y = evalExprWithStep(f.expr, x);
+          const y = evalExprWithStep(expr, x);
           if (y !== null) {
             if (y < autoMin) autoMin = y;
             if (y > autoMax) autoMax = y;
@@ -189,7 +235,7 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
       ctx.fillText(label, Math.min(width - 4, Math.max(30, toScreenX(0) - 6)), sy + 3);
     }
 
-    // Plot functions
+    // Plot user functions
     for (const f of funcs) {
       if (!f.enabled || !f.expr.trim()) continue;
       ctx.strokeStyle = f.color;
@@ -222,7 +268,43 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
       }
       ctx.stroke();
     }
-  }, [funcs, xMin, xMax, obj.yMin, obj.yMax]);
+
+    // Plot linked signal trace (distinct magenta color)
+    if (busExpr) {
+      ctx.strokeStyle = "#9C27B0";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      let penDown = false;
+      let prevY: number | null = null;
+      for (let i = 0; i <= SAMPLES; i++) {
+        const x = xMin + (i / SAMPLES) * xRange;
+        const y = evalExprWithStep(busExpr, x);
+        if (y === null) { penDown = false; prevY = null; continue; }
+        if (prevY !== null && Math.abs(y - prevY) > 10 * yRange) { penDown = false; }
+        const sx = toScreenX(x);
+        const sy = toScreenY(y);
+        if (!penDown) { ctx.moveTo(sx, sy); penDown = true; }
+        else ctx.lineTo(sx, sy);
+        prevY = y;
+      }
+      ctx.stroke();
+    }
+
+    // Draw theta cursor (vertical dashed line)
+    if (linked && busTheta !== null) {
+      const thetaScreenX = toScreenX(busTheta);
+      if (thetaScreenX >= 0 && thetaScreenX <= width) {
+        ctx.strokeStyle = "#4A90D9";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(thetaScreenX, 0);
+        ctx.lineTo(thetaScreenX, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }, [funcs, xMin, xMax, obj.yMin, obj.yMax, linked, busSignal, busTheta]);
 
   // Redraw on changes
   useEffect(() => { drawPlot(); }, [drawPlot]);
@@ -291,11 +373,30 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
     onChange({ xMin: newXMin, xMax: newXMax });
   }, [xMin, xMax, onChange]);
 
+  const panClickRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const handlePanStart = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
+    panClickRef.current = { x: e.clientX, y: e.clientY };
     panStartRef.current = { mx: e.clientX, my: e.clientY, xMin, xMax, yMin: obj.yMin, yMax: obj.yMax };
     setIsPanning(true);
   }, [xMin, xMax, obj.yMin, obj.yMax]);
+
+  /** Click on plot area publishes theta when linked (only if not dragged). */
+  const handlePlotClick = useCallback((e: React.MouseEvent) => {
+    if (!linked) return;
+    // Only treat as click if pointer didn't move significantly (not a pan)
+    const dx = e.clientX - panClickRef.current.x;
+    const dy = e.clientY - panClickRef.current.y;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) / rect.width;
+    const xRange = xMax - xMin;
+    const theta = xMin + mx * xRange;
+    getSignalBus().update({ theta }, obj.id);
+  }, [linked, xMin, xMax, obj.id]);
 
   const handleReset = useCallback(() => {
     onChange({ xMin: -10, xMax: 10, yMin: null, yMax: null });
@@ -388,8 +489,9 @@ export default function GraphPlotter({ obj, onChange, onSendToAI }: Props) {
       {/* Plot canvas */}
       <div
         ref={containerRef}
-        style={{ flex: 1, position: "relative", cursor: isPanning ? "grabbing" : "grab", minHeight: 0 }}
+        style={{ flex: 1, position: "relative", cursor: isPanning ? "grabbing" : (linked ? "crosshair" : "grab"), minHeight: 0 }}
         onPointerDown={handlePanStart}
+        onClick={handlePlotClick}
         onWheel={handleWheel}
       >
         <canvas

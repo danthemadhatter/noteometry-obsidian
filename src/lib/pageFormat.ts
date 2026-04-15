@@ -201,6 +201,7 @@ export interface GraphPlotterElementV3 {
   yMin: number | null;
   yMax: number | null;
   name?: string;
+  signalLinked?: boolean;
 }
 
 export interface UnitCircleElementV3 {
@@ -212,6 +213,7 @@ export interface UnitCircleElementV3 {
   h: number;
   angleDeg: number;
   name?: string;
+  signalLinked?: boolean;
 }
 
 export interface OscilloscopeElementV3 {
@@ -226,6 +228,7 @@ export interface OscilloscopeElementV3 {
   timeDivIndex: number;
   running: boolean;
   name?: string;
+  signalLinked?: boolean;
 }
 
 export type PageElementV3 =
@@ -378,6 +381,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         xMin: obj.xMin, xMax: obj.xMax,
         yMin: obj.yMin, yMax: obj.yMax,
         name: obj.name,
+        ...(obj.signalLinked ? { signalLinked: true } : {}),
       });
     } else if (obj.type === "unit-circle") {
       elements.push({
@@ -386,6 +390,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         angleDeg: obj.angleDeg,
         name: obj.name,
+        ...(obj.signalLinked ? { signalLinked: true } : {}),
       });
     } else if (obj.type === "oscilloscope") {
       elements.push({
@@ -397,6 +402,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         timeDivIndex: obj.timeDivIndex,
         running: obj.running,
         name: obj.name,
+        ...(obj.signalLinked ? { signalLinked: true } : {}),
       });
     }
   }
@@ -541,6 +547,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           yMin: el.yMin ?? null,
           yMax: el.yMax ?? null,
           name: el.name,
+          signalLinked: el.signalLinked ?? false,
         });
         break;
       case "unit-circle":
@@ -550,6 +557,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           angleDeg: el.angleDeg ?? 45,
           name: el.name,
+          signalLinked: el.signalLinked ?? false,
         });
         break;
       case "oscilloscope": {
@@ -567,6 +575,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           timeDivIndex: el.timeDivIndex ?? 4,
           running: el.running ?? true,
           name: el.name,
+          signalLinked: el.signalLinked ?? false,
         });
         break;
       }

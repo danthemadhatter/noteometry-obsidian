@@ -25,6 +25,31 @@ import type {
   OscilloscopeObject,
 } from "../lib/canvasObjects";
 
+/* ── Signal Bus link helpers ──────────────────────────────────── */
+
+const SIGNAL_LINKABLE_TYPES = new Set(["graph-plotter", "unit-circle", "oscilloscope"]);
+
+function isSignalLinkable(obj: CanvasObject): obj is GraphPlotterObject | UnitCircleObject | OscilloscopeObject {
+  return SIGNAL_LINKABLE_TYPES.has(obj.type);
+}
+
+/** Inline SVG chain-link icon (16×16, stroke-only, no external imports). */
+function ChainLinkIcon({ linked }: { linked: boolean }) {
+  return (
+    <svg
+      width={16} height={16} viewBox="0 0 24 24"
+      fill="none"
+      stroke={linked ? "var(--nm-accent, #4A90D9)" : "#666666"}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
 /* ── Drop-in SVG icons (14×14, stroke=currentColor, fill=none) ─── */
 
 const iconProps = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -67,11 +92,13 @@ function EditableObjectTitle({
   onChange,
   onDragStart,
   icon,
+  linkButton,
 }: {
   value: string;
   onChange: (next: string) => void;
   onDragStart: (e: React.PointerEvent) => void;
   icon?: React.ReactNode;
+  linkButton?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -123,6 +150,7 @@ function EditableObjectTitle({
           if (editing) e.stopPropagation();
         }}
       />
+      {linkButton}
     </div>
   );
 }
@@ -399,6 +427,21 @@ export default function CanvasObjectLayer({
             }}
             onDragStart={(e) => handleDragStart(e, obj)}
             icon={<DropinIcon type={obj.type} />}
+            linkButton={isSignalLinkable(obj) ? (
+              <button
+                className={`noteometry-signal-link-btn${obj.signalLinked ? " noteometry-signal-linked" : ""}`}
+                title={obj.signalLinked ? "Unlink from signal bus" : "Link to signal bus"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, signalLinked: !(o as GraphPlotterObject | UnitCircleObject | OscilloscopeObject).signalLinked } : o
+                  ));
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <ChainLinkIcon linked={!!obj.signalLinked} />
+              </button>
+            ) : undefined}
           />
 
           {/* Content — stop propagation so drag handler doesn't steal focus */}

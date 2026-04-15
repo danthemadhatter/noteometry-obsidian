@@ -1557,6 +1557,8 @@
 /* Title bar — flush editable text input that doubles as drag handle.
  * No background/border until hover or focus for a minimal look. */
 .noteometry-object-title-bar {
+  display: flex;
+  align-items: center;
   cursor: grab;
   user-select: none;
   padding: 0;
@@ -1565,7 +1567,8 @@
 
 .noteometry-object-title-input {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 10px;
@@ -1589,6 +1592,40 @@
   background: var(--nm-faceplate-light);
   border-color: var(--nm-accent);
   cursor: text;
+}
+
+/* ── Signal Bus link button ───────────────────────────── */
+.noteometry-signal-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;          /* Apple HIG min touch target */
+  min-width: 44px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: var(--nm-radius-sm);
+  transition: background 0.15s ease;
+}
+.noteometry-signal-link-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.noteometry-signal-link-btn.noteometry-signal-linked {
+  background: var(--nm-accent-light);
+}
+.noteometry-signal-link-btn.noteometry-signal-linked svg {
+  filter: drop-shadow(0 0 3px var(--nm-accent, #4A90D9));
+}
+
+/* Pulse animation on the title bar when receiving signal bus updates */
+@keyframes nm-signal-pulse {
+  0%   { border-color: transparent; }
+  50%  { border-color: var(--nm-accent, #4A90D9); }
+  100% { border-color: transparent; }
 }
 
 /* ── Right-click context menu ─────────────────────────── */

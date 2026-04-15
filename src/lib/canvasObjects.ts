@@ -106,11 +106,15 @@ export interface GraphPlotterObject extends CanvasObjectBase {
   xMax: number;
   yMin: number | null;
   yMax: number | null;
+  /** When true this drop-in is linked to the shared signal bus. */
+  signalLinked?: boolean;
 }
 
 export interface UnitCircleObject extends CanvasObjectBase {
   type: "unit-circle";
   angleDeg: number;
+  /** When true this drop-in is linked to the shared signal bus. */
+  signalLinked?: boolean;
 }
 
 export interface ChannelConfig {
@@ -130,6 +134,8 @@ export interface OscilloscopeObject extends CanvasObjectBase {
   channelB: ChannelConfig;
   timeDivIndex: number;
   running: boolean;
+  /** When true this drop-in is linked to the shared signal bus. */
+  signalLinked?: boolean;
 }
 
 export type CanvasObject =

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { OscilloscopeObject, ChannelConfig } from "../../lib/canvasObjects";
+import { getSignalBus } from "../../services/SignalBus";
+import type { SignalState, WaveformType } from "../../services/SignalBus";
 
 const TIME_DIVS = [10e-6, 50e-6, 100e-6, 500e-6, 1e-3, 5e-3, 10e-3, 50e-3, 100e-3];
 const TIME_DIV_LABELS = ["10\u00B5s", "50\u00B5s", "100\u00B5s", "500\u00B5s", "1ms", "5ms", "10ms", "50ms", "100ms"];
@@ -50,20 +52,97 @@ export default function Oscilloscope({ obj, onChange, onSendToAI }: Props) {
   const animRef = useRef<number>(0);
   const timeOffsetRef = useRef(0);
   const lastFrameRef = useRef(0);
+  /** Suppresses bus subscription callbacks when we are the publisher. */
+  const suppressBusRef = useRef(false);
 
   const timeDiv = TIME_DIVS[obj.timeDivIndex] ?? 1e-3;
   const totalTime = GRID_X * timeDiv;
 
   const chA = obj.channelA;
   const chB = obj.channelB;
+  const linked = !!obj.signalLinked;
 
   const updateChA = useCallback((patch: Partial<ChannelConfig>) => {
     onChange({ channelA: { ...chA, ...patch } });
-  }, [chA, onChange]);
+    // Publish relevant fields to signal bus when linked
+    if (linked) {
+      const busPatch: Partial<SignalState> = {};
+      if (patch.frequency !== undefined) busPatch.frequency = patch.frequency;
+      if (patch.amplitude !== undefined) busPatch.amplitude = patch.amplitude;
+      if (patch.phase !== undefined) busPatch.phase = patch.phase * Math.PI / 180; // deg→rad
+      if (patch.waveform !== undefined && patch.waveform !== "off") busPatch.waveformType = patch.waveform as WaveformType;
+      if (Object.keys(busPatch).length > 0) {
+        getSignalBus().update(busPatch, obj.id);
+      }
+    }
+  }, [chA, onChange, linked, obj.id]);
 
   const updateChB = useCallback((patch: Partial<ChannelConfig>) => {
     onChange({ channelB: { ...chB, ...patch } });
   }, [chB, onChange]);
+
+  /* ── Signal Bus: publish isPlaying when Run/Stop is toggled ── */
+  const handleRunStop = useCallback(() => {
+    const next = !obj.running;
+    onChange({ running: next });
+    if (linked) {
+      getSignalBus().update({ isPlaying: next }, obj.id);
+    }
+  }, [obj.running, onChange, linked, obj.id]);
+
+  /* ── Signal Bus: subscribe when linked ── */
+  useEffect(() => {
+    if (!linked) return;
+    const bus = getSignalBus();
+    // Seed bus with current oscilloscope state
+    bus.update({
+      frequency: chA.frequency,
+      amplitude: chA.amplitude,
+      phase: chA.phase * Math.PI / 180,
+      waveformType: (chA.waveform !== "off" ? chA.waveform : "sine") as WaveformType,
+      isPlaying: obj.running,
+      theta: timeOffsetRef.current * 2 * Math.PI * chA.frequency,
+    }, obj.id);
+
+    const unsub = bus.subscribe(obj.id, (state: SignalState) => {
+      if (suppressBusRef.current) return;
+      // External theta: if we are playing, pause and snap
+      const patch: Partial<OscilloscopeObject> = {};
+      let chAPatch: Partial<ChannelConfig> | null = null;
+
+      if (state.frequency !== chA.frequency) {
+        chAPatch = { ...(chAPatch ?? {}), frequency: state.frequency };
+      }
+      if (state.amplitude !== chA.amplitude) {
+        chAPatch = { ...(chAPatch ?? {}), amplitude: state.amplitude };
+      }
+      const busPhase = state.phase * 180 / Math.PI;
+      if (Math.abs(busPhase - chA.phase) > 0.01) {
+        chAPatch = { ...(chAPatch ?? {}), phase: busPhase };
+      }
+      if (state.waveformType !== chA.waveform && chA.waveform !== "off") {
+        chAPatch = { ...(chAPatch ?? {}), waveform: state.waveformType };
+      }
+      if (chAPatch) {
+        patch.channelA = { ...chA, ...chAPatch };
+      }
+
+      // Theta → time offset: θ = 2πft → t = θ/(2πf)
+      const f = state.frequency || 1;
+      const newTimeOffset = state.theta / (2 * Math.PI * f);
+      timeOffsetRef.current = newTimeOffset;
+
+      // If receiving external theta while playing, pause
+      if (obj.running && !state.isPlaying) {
+        patch.running = false;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        onChange(patch);
+      }
+    });
+    return unsub;
+  }, [linked, obj.id]); // intentionally light deps — refs handle rest
 
   // Draw a frame
   const drawFrame = useCallback((timestamp?: number) => {
@@ -162,16 +241,22 @@ export default function Oscilloscope({ obj, onChange, onSendToAI }: Props) {
       return;
     }
     lastFrameRef.current = performance.now();
+    let frameCount = 0;
     const animate = (timestamp: number) => {
       const dt = (timestamp - lastFrameRef.current) / 1000;
       lastFrameRef.current = timestamp;
       timeOffsetRef.current += dt * 0.1; // slow scroll
       drawFrame(timestamp);
+      // Publish theta to signal bus at ~30fps (every other rAF at 60fps)
+      if (linked && (frameCount++ % 2 === 0)) {
+        const theta = timeOffsetRef.current * 2 * Math.PI * (chA.frequency || 1);
+        getSignalBus().update({ theta, isPlaying: true }, obj.id);
+      }
       animRef.current = requestAnimationFrame(animate);
     };
     animRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animRef.current);
-  }, [obj.running, drawFrame]);
+  }, [obj.running, drawFrame, linked, obj.id, chA.frequency]);
 
   // ResizeObserver
   useEffect(() => {
@@ -235,7 +320,7 @@ export default function Oscilloscope({ obj, onChange, onSendToAI }: Props) {
           ))}
         </select>
         <button
-          onClick={() => onChange({ running: !obj.running })}
+          onClick={handleRunStop}
           style={{
             padding: "3px 8px", fontSize: "11px", fontWeight: 600,
             background: obj.running ? "#E53935" : "#43A047",

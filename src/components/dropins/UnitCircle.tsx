@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { UnitCircleObject } from "../../lib/canvasObjects";
+import { getSignalBus } from "../../services/SignalBus";
+import type { SignalState } from "../../services/SignalBus";
 
 const COMMON_ANGLES = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
 const SNAP_THRESHOLD = 3; // degrees
@@ -36,11 +38,13 @@ export default function UnitCircle({ obj, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSnapped, setIsSnapped] = useState(false);
+  const [busFrequency, setBusFrequency] = useState<number | null>(null);
 
   const angleDeg = obj.angleDeg;
   const angleRad = angleDeg * DEG_TO_RAD;
   const cosVal = Math.cos(angleRad);
   const sinVal = Math.sin(angleRad);
+  const linked = !!obj.signalLinked;
 
   /** Snap to common angle if within threshold. */
   const snapAngle = useCallback((deg: number): { deg: number; snapped: boolean } => {
@@ -51,6 +55,23 @@ export default function UnitCircle({ obj, onChange }: Props) {
     }
     return { deg, snapped: false };
   }, []);
+
+  /* ── Signal Bus: subscribe when linked ── */
+  useEffect(() => {
+    if (!linked) { setBusFrequency(null); return; }
+    const bus = getSignalBus();
+    // Seed bus with our current theta
+    bus.update({ theta: angleDeg * DEG_TO_RAD }, obj.id);
+    const unsub = bus.subscribe(obj.id, (state: SignalState) => {
+      // Move our point to match incoming theta
+      let deg = (state.theta * (180 / Math.PI)) % 360;
+      if (deg < 0) deg += 360;
+      onChange({ angleDeg: deg });
+      // Track frequency from bus for display
+      setBusFrequency(state.frequency);
+    });
+    return unsub;
+  }, [linked, obj.id]); // light deps — onChange is stable via parent
 
   // Draw the unit circle
   const draw = useCallback(() => {
@@ -255,6 +276,10 @@ export default function UnitCircle({ obj, onChange }: Props) {
       const { deg: snappedDeg, snapped } = snapAngle(deg);
       setIsSnapped(snapped);
       onChange({ angleDeg: snappedDeg });
+      // Publish theta to signal bus when linked
+      if (linked) {
+        getSignalBus().update({ theta: snappedDeg * DEG_TO_RAD }, obj.id);
+      }
     };
     const onUp = () => {
       setIsDragging(false);
@@ -304,6 +329,12 @@ export default function UnitCircle({ obj, onChange }: Props) {
         <ValueRow label="z" value={`${cosVal.toFixed(3)}+j\u00B7${sinVal.toFixed(3)}`} />
         <ValueRow label="|z|" value="1.000" />
         <ValueRow label="\u2220z" value={`${angleDeg.toFixed(1)}\u00B0`} />
+        {linked && busFrequency !== null && (
+          <>
+            <div style={{ height: 4 }} />
+            <ValueRow label="f" value={`${busFrequency.toFixed(1)} Hz`} color="#4A90D9" />
+          </>
+        )}
 
         {/* Quadrant presets */}
         <div style={{ display: "flex", gap: "4px", marginTop: "auto", paddingTop: "6px", flexWrap: "wrap" }}>
@@ -315,7 +346,11 @@ export default function UnitCircle({ obj, onChange }: Props) {
           ].map((q) => (
             <button
               key={q.label}
-              onClick={() => { onChange({ angleDeg: q.deg }); setIsSnapped(true); }}
+              onClick={() => {
+                onChange({ angleDeg: q.deg });
+                setIsSnapped(true);
+                if (linked) getSignalBus().update({ theta: q.deg * DEG_TO_RAD }, obj.id);
+              }}
               style={{
                 flex: 1, minWidth: 0, padding: "4px", fontSize: "11px",
                 fontWeight: 600, background: "none",
