@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig, ComputeCell } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -231,6 +231,18 @@ export interface OscilloscopeElementV3 {
   signalLinked?: boolean;
 }
 
+export interface ComputeElementV3 {
+  type: "compute";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cells: ComputeCell[];
+  variables: Record<string, string>;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
@@ -244,7 +256,8 @@ export type PageElementV3 =
   | CircuitSniperElementV3
   | GraphPlotterElementV3
   | UnitCircleElementV3
-  | OscilloscopeElementV3;
+  | OscilloscopeElementV3
+  | ComputeElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -403,6 +416,15 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         running: obj.running,
         name: obj.name,
         ...(obj.signalLinked ? { signalLinked: true } : {}),
+      });
+    } else if (obj.type === "compute") {
+      elements.push({
+        type: "compute",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        cells: obj.cells,
+        variables: obj.variables,
+        name: obj.name,
       });
     }
   }
@@ -579,6 +601,16 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
         });
         break;
       }
+      case "compute":
+        canvasObjects.push({
+          id: el.id,
+          type: "compute",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          cells: el.cells ?? [],
+          variables: el.variables ?? {},
+          name: el.name,
+        });
+        break;
     }
   }
 

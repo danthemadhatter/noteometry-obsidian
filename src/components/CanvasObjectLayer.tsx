@@ -15,6 +15,7 @@ import CircuitSniper from "./dropins/CircuitSniper";
 import GraphPlotter from "./dropins/GraphPlotter";
 import UnitCircle from "./dropins/UnitCircle";
 import Oscilloscope from "./dropins/Oscilloscope";
+import Compute from "./dropins/Compute";
 import type {
   ImageAnnotatorObject,
   FormulaCardObject,
@@ -23,6 +24,7 @@ import type {
   GraphPlotterObject,
   UnitCircleObject,
   OscilloscopeObject,
+  ComputeObject,
 } from "../lib/canvasObjects";
 
 /* ── Signal Bus link helpers ──────────────────────────────────── */
@@ -78,6 +80,8 @@ export function DropinIcon({ type }: { type: string }) {
       return <svg {...iconProps}><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/><circle cx="17" cy="8" r="2" fill="currentColor"/></svg>;
     case "oscilloscope":
       return <svg {...iconProps}><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M5 12 C7 6, 9 6, 11 12 C13 18, 15 18, 17 12" strokeWidth="2"/></svg>;
+    case "compute":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><text x="12" y="15" fontSize="10" fontWeight="700" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="monospace">fx</text></svg>;
     default:
       return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>;
   }
@@ -544,6 +548,16 @@ export default function CanvasObjectLayer({
               <Oscilloscope
                 obj={obj as OscilloscopeObject}
                 onSendToAI={onSendToAI}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "compute" && (
+              <Compute
+                obj={obj as ComputeObject}
                 onChange={(patch) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
