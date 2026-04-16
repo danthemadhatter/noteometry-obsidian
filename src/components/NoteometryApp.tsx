@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
-import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
+import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import {
   createTextBox, createTable, createImageObject, createPdfObject,
@@ -646,21 +646,21 @@ export default function NoteometryApp({ plugin, app }: Props) {
       // ── Drawing ──
       items.push(
         { label: "\u2500\u2500 Drawing \u2500\u2500", disabled: true },
-        { label: "Pen", shortcut: tool === "pen" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("pen"); setLassoActive(false); }},
-        { label: "Eraser", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
-        { label: `Color: \u25CF ${colorEntry.label}`, onClick: nextColor },
-        { label: `Width: \u2500\u2500 ${widthEntry.label}`, onClick: nextWidth },
+        { label: "Pen", icon: "✏️", shortcut: tool === "pen" && !lassoActive ? "\u2713" : "", onClick: () => { setTool("pen"); setLassoActive(false); }},
+        { label: "Eraser", icon: "🧹", shortcut: tool === "eraser" ? "\u2713" : "", onClick: () => { setTool("eraser"); setLassoActive(false); }},
+        { label: `Color: ${colorEntry.label}`, icon: "\u25CF", shortcut: "", onClick: nextColor },
+        { label: `Width: ${widthEntry.label}`, icon: "〰️", onClick: nextWidth },
         { label: "", separator: true },
       );
 
       // ── Select ──
       items.push(
         { label: "\u2500\u2500 Select \u2500\u2500", disabled: true },
-        { label: "Freehand Lasso", shortcut: lassoActive && lassoMode === "freehand" ? "\u2713" : "", onClick: () => {
+        { label: "Freehand Lasso", icon: "✂️", shortcut: lassoActive && lassoMode === "freehand" ? "\u2713" : "", onClick: () => {
           if (!lassoActive) setTool("pen");
           toggleLasso("freehand");
         }},
-        { label: "Rectangle Lasso", shortcut: lassoActive && lassoMode === "rect" ? "\u2713" : "", onClick: () => {
+        { label: "Rectangle Lasso", icon: "⬜", shortcut: lassoActive && lassoMode === "rect" ? "\u2713" : "", onClick: () => {
           if (!lassoActive) setTool("pen");
           toggleLasso("rect");
         }},
@@ -669,60 +669,55 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
       // ── Select (Pointer) ──
       items.push(
-        { label: "Select (Pointer)", shortcut: tool === "select" ? "\u2713" : "", onClick: () => { setTool("select"); setLassoActive(false); }},
+        { label: "Select (Pointer)", icon: "👆", shortcut: tool === "select" ? "\u2713" : "", onClick: () => { setTool("select"); setLassoActive(false); }},
         { label: "", separator: true },
       );
 
       // ── Insert ──
       items.push(
         { label: "\u2500\u2500 Insert \u2500\u2500", disabled: true },
-        { label: "Text Box", onClick: handleInsertTextBox },
-        { label: "Table", onClick: handleInsertTable },
-        { label: "Image\u2026", onClick: handleInsertImage },
-        { label: "PDF\u2026", onClick: handleInsertPdf },
+        { label: "Text Box", icon: "📝", onClick: handleInsertTextBox },
+        { label: "Table", icon: "📊", onClick: handleInsertTable },
+        { label: "Image", icon: "🖼️", onClick: handleInsertImage },
+        { label: "PDF", icon: "📄", onClick: handleInsertPdf },
         { label: "", separator: true },
       );
 
       // ── Engineering ──
       items.push(
         { label: "\u2500\u2500 Engineering \u2500\u2500", disabled: true },
-        { label: "Circuit Sniper", onClick: handleInsertCircuitSniper },
-        { label: "Unit Converter", onClick: handleInsertUnitConverter },
-        { label: "Multimeter", onClick: handleInsertMultimeter },
+        { label: "Circuit Sniper", icon: "⚡", onClick: handleInsertCircuitSniper },
+        { label: "Unit Converter", icon: "🔄", onClick: handleInsertUnitConverter },
+        { label: "Multimeter", icon: "🔌", onClick: handleInsertMultimeter },
         { label: "", separator: true },
       );
 
       // ── Math Tools ──
       items.push(
         { label: "\u2500\u2500 Math Tools \u2500\u2500", disabled: true },
-        { label: "Math Palette", shortcut: mathPaletteOpen ? "\u2713" : "", onClick: () => setMathPaletteOpen(p => !p) },
-        { label: "Graph Plotter", onClick: handleInsertGraphPlotter },
-        { label: "Unit Circle", onClick: handleInsertUnitCircle },
-        { label: "Oscilloscope", onClick: handleInsertOscilloscope },
-        { label: "Compute", onClick: handleInsertCompute },
-        { label: "Animation Canvas", onClick: handleInsertAnimationCanvas },
+        { label: "Math Palette", icon: "🧮", shortcut: mathPaletteOpen ? "\u2713" : "", onClick: () => setMathPaletteOpen(p => !p) },
+        { label: "Graph Plotter", icon: "📈", onClick: handleInsertGraphPlotter },
+        { label: "Unit Circle", icon: "🔘", onClick: handleInsertUnitCircle },
+        { label: "Oscilloscope", icon: "📟", onClick: handleInsertOscilloscope },
+        { label: "Compute", icon: "🧮", onClick: handleInsertCompute },
+        { label: "Animation Canvas", icon: "🎬", onClick: handleInsertAnimationCanvas },
         { label: "", separator: true },
       );
 
       // ── Study ──
       items.push(
         { label: "\u2500\u2500 Study \u2500\u2500", disabled: true },
-        { label: "Study Gantt", onClick: handleInsertStudyGantt },
+        { label: "Study Gantt", icon: "📅", onClick: handleInsertStudyGantt },
         { label: "", separator: true },
       );
 
-      // ── AI ──
-      items.push(
-        { label: "\u2500\u2500 AI \u2500\u2500", disabled: true },
-        { label: "AI Drop-in", onClick: handleInsertAIDropin },
-        { label: "", separator: true },
-      );
+      // AI Drop-in removed from menu — Preview + Input remain in the right panel
 
       // ── Canvas ──
       items.push(
         { label: "\u2500\u2500 Canvas \u2500\u2500", disabled: true },
-        { label: "Undo", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
-        { label: "Redo", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
+        { label: "Undo", icon: "↩️", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
+        { label: "Redo", icon: "↪️", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
         { label: "", separator: true },
         { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
         { label: "Zoom Out", onClick: zoomOut },
@@ -1041,6 +1036,44 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />
+
+              {/* ── Stamp size toggle (visible when a stamp is selected) ── */}
+              {selectedStampId && (() => {
+                const sel = stamps.find(s => s.id === selectedStampId);
+                if (!sel) return null;
+                const curSize: StampSize = sel.size ?? "normal";
+                const sizes: StampSize[] = ["small", "normal", "large"];
+                return (
+                  <div style={{
+                    position: "absolute", zIndex: 200,
+                    left: (sel.x - scrollX) * zoom - 10,
+                    top: (sel.y - scrollY) * zoom - 44,
+                    display: "flex", gap: "2px",
+                    background: "var(--nm-faceplate, #F5F5F5)",
+                    border: "1px solid var(--nm-paper-border, #E0E0E0)",
+                    borderRadius: "6px", padding: "2px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  }}>
+                    {sizes.map(sz => (
+                      <button key={sz} onClick={() => {
+                        setStamps(prev => prev.map(s =>
+                          s.id === selectedStampId
+                            ? { ...s, size: sz, fontSize: STAMP_SIZES[sz] }
+                            : s
+                        ));
+                      }} style={{
+                        padding: "3px 8px", fontSize: sz === "small" ? "10px" : sz === "normal" ? "13px" : "16px",
+                        fontWeight: curSize === sz ? 700 : 400, border: "none", borderRadius: "4px",
+                        cursor: "pointer",
+                        background: curSize === sz ? "var(--nm-accent, #4A90D9)" : "transparent",
+                        color: curSize === sz ? "#fff" : "var(--nm-ink, #1A1A2E)",
+                      }}>
+                        {sz === "small" ? "S" : sz === "normal" ? "M" : "L"}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* ── Floating undo/redo + zoom widget ── */}
               <div className="nm-zoom-widget" style={{

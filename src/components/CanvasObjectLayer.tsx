@@ -248,9 +248,12 @@ export default function CanvasObjectLayer({
     objStartX: number; objStartY: number;
   } | null>(null);
 
+  type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
   const resizeState = useRef<{
     id: string;
+    edge: ResizeEdge;
     startX: number; startY: number;
+    objStartX: number; objStartY: number;
     objStartW: number; objStartH: number;
   } | null>(null);
 
@@ -280,16 +283,21 @@ export default function CanvasObjectLayer({
       ));
     }
     if (resizeState.current) {
-      const dx = (e.clientX - resizeState.current.startX) / z;
-      const dy = (e.clientY - resizeState.current.startY) / z;
-      const id = resizeState.current.id;
-      onObjectsChange(objects.map(o =>
-        o.id === id ? {
-          ...o,
-          w: Math.max(150, resizeState.current!.objStartW + dx),
-          h: Math.max(100, resizeState.current!.objStartH + dy),
-        } : o
-      ));
+      const rs = resizeState.current;
+      const dx = (e.clientX - rs.startX) / z;
+      const dy = (e.clientY - rs.startY) / z;
+      const edge = rs.edge;
+      onObjectsChange(objects.map(o => {
+        if (o.id !== rs.id) return o;
+        let { x, y, w, h } = { x: rs.objStartX, y: rs.objStartY, w: rs.objStartW, h: rs.objStartH };
+        // Horizontal
+        if (edge.includes("e")) w = Math.max(120, w + dx);
+        if (edge.includes("w")) { x = x + dx; w = Math.max(120, w - dx); }
+        // Vertical
+        if (edge.includes("s")) h = Math.max(80, h + dy);
+        if (edge === "n" || edge === "ne" || edge === "nw") { y = y + dy; h = Math.max(80, h - dy); }
+        return { ...o, x, y, w, h };
+      }));
     }
   }, [objects, onObjectsChange]);
 
@@ -298,13 +306,15 @@ export default function CanvasObjectLayer({
     resizeState.current = null;
   }, []);
 
-  const handleResizeStart = useCallback((e: React.PointerEvent, obj: CanvasObject) => {
+  const handleResizeStart = useCallback((e: React.PointerEvent, obj: CanvasObject, edge: ResizeEdge = "se") => {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     resizeState.current = {
       id: obj.id,
+      edge,
       startX: e.clientX, startY: e.clientY,
+      objStartX: obj.x, objStartY: obj.y,
       objStartW: obj.w, objStartH: obj.h,
     };
   }, []);
@@ -517,13 +527,32 @@ export default function CanvasObjectLayer({
             )}
           </div>
 
-          {/* Resize handle */}
-          <div
-            className="noteometry-object-resize-handle"
-            onPointerDown={(e) => handleResizeStart(e, obj)}
-            onPointerMove={handleDragMove}
-            onPointerUp={handleDragEnd}
-          />
+          {/* Resize handles — all 4 edges + 4 corners */}
+          {(["n","s","e","w","ne","nw","se","sw"] as ResizeEdge[]).map(edge => {
+            const isCorner = edge.length === 2;
+            const cursor = ({n:"ns",s:"ns",e:"ew",w:"ew",ne:"nesw",nw:"nwse",se:"nwse",sw:"nesw"} as Record<string,string>)[edge] + "-resize";
+            const pos: React.CSSProperties = {};
+            if (edge.includes("n")) { pos.top = -3; pos.height = 6; }
+            if (edge.includes("s")) { pos.bottom = -3; pos.height = 6; }
+            if (edge.includes("e")) { pos.right = -3; pos.width = 6; }
+            if (edge.includes("w")) { pos.left = -3; pos.width = 6; }
+            if (edge === "n" || edge === "s") { pos.left = 6; pos.right = 6; }
+            if (edge === "e" || edge === "w") { pos.top = 6; pos.bottom = 6; }
+            if (isCorner) { pos.width = 10; pos.height = 10; }
+            return (
+              <div key={edge} style={{
+                position: "absolute", ...pos,
+                cursor, zIndex: 60,
+                background: isCorner ? "var(--nm-accent, #4A90D9)" : "transparent",
+                borderRadius: isCorner ? "2px" : 0,
+                opacity: isCorner ? 0.6 : 0,
+              }}
+                onPointerDown={(e) => handleResizeStart(e, obj, edge)}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+              />
+            );
+          })}
         </div>
       ))}
     </div>
