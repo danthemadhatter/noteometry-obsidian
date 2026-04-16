@@ -138,6 +138,42 @@ export interface OscilloscopeObject extends CanvasObjectBase {
   signalLinked?: boolean;
 }
 
+/* ── New drop-in types (v1.5.0) ──────────────────────── */
+
+export interface AnimationPath {
+  points: { x: number; y: number }[];
+  color: string;
+  width: number;
+}
+
+export interface AnimationFrame {
+  id: string;
+  paths: AnimationPath[];
+}
+
+export interface AnimationCanvasObject extends CanvasObjectBase {
+  type: "animation-canvas";
+  frames: AnimationFrame[];
+  currentFrame: number;
+  fps: number;
+  playing: boolean;
+}
+
+export interface GanttTask {
+  id: string;
+  label: string;
+  startDate: string; // ISO date string YYYY-MM-DD
+  endDate: string;
+  color: string;
+  progress: number; // 0–100
+}
+
+export interface StudyGanttObject extends CanvasObjectBase {
+  type: "study-gantt";
+  tasks: GanttTask[];
+  startDate: string; // ISO date string — left edge of chart
+}
+
 export type CanvasObject =
   | TextBoxObject
   | TableObject
@@ -149,7 +185,9 @@ export type CanvasObject =
   | CircuitSniperObject
   | GraphPlotterObject
   | UnitCircleObject
-  | OscilloscopeObject;
+  | OscilloscopeObject
+  | AnimationCanvasObject
+  | StudyGanttObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -274,6 +312,32 @@ export function createOscilloscope(
   };
 }
 
+export function createAnimationCanvas(
+  x: number, y: number,
+  name: string = "Animation Canvas"
+): AnimationCanvasObject {
+  return {
+    id: newObjectId(), type: "animation-canvas", x, y,
+    w: 400, h: 320, name,
+    frames: [{ id: crypto.randomUUID(), paths: [] }],
+    currentFrame: 0,
+    fps: 12,
+    playing: false,
+  };
+}
+
+export function createStudyGantt(
+  x: number, y: number,
+  name: string = "Study Gantt"
+): StudyGanttObject {
+  return {
+    id: newObjectId(), type: "study-gantt", x, y,
+    w: 500, h: 280, name,
+    tasks: [],
+    startDate: new Date().toISOString().slice(0, 10),
+  };
+}
+
 /** Default display name when an object has none set (old pages). */
 export function defaultObjectName(obj: CanvasObject): string {
   if (obj.name && obj.name.trim()) return obj.name;
@@ -289,5 +353,7 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "graph-plotter": return "Graph Plotter";
     case "unit-circle": return "Unit Circle";
     case "oscilloscope": return "Oscilloscope";
+    case "animation-canvas": return "Animation Canvas";
+    case "study-gantt": return "Study Gantt";
   }
 }

@@ -3,7 +3,7 @@ import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, strokeFullyInsidePolygon, stampIntersectsPolygon, stampBBox, newStampId, groupStrokes } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper, createGraphPlotter, createUnitCircle, createOscilloscope } from "../lib/canvasObjects";
+import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper, createGraphPlotter, createUnitCircle, createOscilloscope, createAnimationCanvas, createStudyGantt } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasObjectLayer, { DropinIcon } from "./CanvasObjectLayer";
@@ -693,6 +693,20 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedObjectId(obj.id);
   }, [scrollX, scrollY]);
 
+  const handleInsertAnimationCanvas = useCallback(() => {
+    const obj = createAnimationCanvas(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
+  const handleInsertStudyGantt = useCallback(() => {
+    const obj = createStudyGantt(scrollX + 150, scrollY + 150);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY]);
+
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -829,6 +843,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Unit Circle", icon: <DropinIcon type="unit-circle" />, onClick: handleInsertUnitCircle },
         { label: "Oscilloscope", icon: <DropinIcon type="oscilloscope" />, onClick: handleInsertOscilloscope },
         { label: "", separator: true },
+        { label: "\u2500\u2500 Creative \u2500\u2500", disabled: true },
+        { label: "Animation Canvas", icon: <DropinIcon type="animation-canvas" />, onClick: handleInsertAnimationCanvas },
+        { label: "Study Gantt", icon: <DropinIcon type="study-gantt" />, onClick: handleInsertStudyGantt },
+        { label: "", separator: true },
       );
 
       // ── Canvas ──
@@ -901,6 +919,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
     handleInsertImageAnnotator, handleInsertFormulaCard, handleInsertUnitConverter, handleInsertCircuitSniper,
     handleInsertGraphPlotter, handleInsertUnitCircle, handleInsertOscilloscope,
+    handleInsertAnimationCanvas, handleInsertStudyGantt,
   ]);
 
   /* ── Long-press hook for the canvas area ────────────────
