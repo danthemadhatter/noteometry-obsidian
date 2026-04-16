@@ -15,6 +15,8 @@ import CircuitSniper from "./dropins/CircuitSniper";
 import GraphPlotter from "./dropins/GraphPlotter";
 import UnitCircle from "./dropins/UnitCircle";
 import Oscilloscope from "./dropins/Oscilloscope";
+import AnimationCanvas from "./dropins/AnimationCanvas";
+import StudyGantt from "./dropins/StudyGantt";
 import type {
   ImageAnnotatorObject,
   FormulaCardObject,
@@ -23,6 +25,8 @@ import type {
   GraphPlotterObject,
   UnitCircleObject,
   OscilloscopeObject,
+  AnimationCanvasObject,
+  StudyGanttObject,
 } from "../lib/canvasObjects";
 
 /* ── Signal Bus link helpers ──────────────────────────────────── */
@@ -78,6 +82,10 @@ export function DropinIcon({ type }: { type: string }) {
       return <svg {...iconProps}><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/><circle cx="17" cy="8" r="2" fill="currentColor"/></svg>;
     case "oscilloscope":
       return <svg {...iconProps}><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M5 12 C7 6, 9 6, 11 12 C13 18, 15 18, 17 12" strokeWidth="2"/></svg>;
+    case "animation-canvas":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><polygon points="10 8 10 16 16 12" fill="currentColor" stroke="none"/></svg>;
+    case "study-gantt":
+      return <svg {...iconProps}><rect x="3" y="4" width="10" height="3" rx="1"/><rect x="7" y="10" width="12" height="3" rx="1"/><rect x="5" y="16" width="8" height="3" rx="1"/></svg>;
     default:
       return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>;
   }
@@ -544,6 +552,26 @@ export default function CanvasObjectLayer({
               <Oscilloscope
                 obj={obj as OscilloscopeObject}
                 onSendToAI={onSendToAI}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "animation-canvas" && (
+              <AnimationCanvas
+                obj={obj as AnimationCanvasObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "study-gantt" && (
+              <StudyGantt
+                obj={obj as StudyGanttObject}
                 onChange={(patch) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id ? { ...o, ...patch } as CanvasObject : o

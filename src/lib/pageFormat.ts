@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig, AnimationFrame, GanttTask } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -231,6 +231,32 @@ export interface OscilloscopeElementV3 {
   signalLinked?: boolean;
 }
 
+export interface AnimationCanvasElementV3 {
+  type: "animation-canvas";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  frames: AnimationFrame[];
+  currentFrame: number;
+  fps: number;
+  playing: boolean;
+  name?: string;
+}
+
+export interface StudyGanttElementV3 {
+  type: "study-gantt";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tasks: GanttTask[];
+  startDate: string;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
@@ -244,7 +270,9 @@ export type PageElementV3 =
   | CircuitSniperElementV3
   | GraphPlotterElementV3
   | UnitCircleElementV3
-  | OscilloscopeElementV3;
+  | OscilloscopeElementV3
+  | AnimationCanvasElementV3
+  | StudyGanttElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -403,6 +431,26 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         running: obj.running,
         name: obj.name,
         ...(obj.signalLinked ? { signalLinked: true } : {}),
+      });
+    } else if (obj.type === "animation-canvas") {
+      elements.push({
+        type: "animation-canvas",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        frames: obj.frames,
+        currentFrame: obj.currentFrame,
+        fps: obj.fps,
+        playing: obj.playing,
+        name: obj.name,
+      });
+    } else if (obj.type === "study-gantt") {
+      elements.push({
+        type: "study-gantt",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        tasks: obj.tasks,
+        startDate: obj.startDate,
+        name: obj.name,
       });
     }
   }
@@ -579,6 +627,28 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
         });
         break;
       }
+      case "animation-canvas":
+        canvasObjects.push({
+          id: el.id,
+          type: "animation-canvas",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          frames: el.frames ?? [{ id: crypto.randomUUID(), paths: [] }],
+          currentFrame: el.currentFrame ?? 0,
+          fps: el.fps ?? 12,
+          playing: el.playing ?? false,
+          name: el.name,
+        });
+        break;
+      case "study-gantt":
+        canvasObjects.push({
+          id: el.id,
+          type: "study-gantt",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          tasks: el.tasks ?? [],
+          startDate: el.startDate ?? new Date().toISOString().slice(0, 10),
+          name: el.name,
+        });
+        break;
     }
   }
 
