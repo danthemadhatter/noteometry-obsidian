@@ -65,7 +65,7 @@ export const EMPTY_PAGE: CanvasData = {
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.3.0";
+export const V3_SOURCE_TAG = "noteometry-1.5.0";
 
 export interface StrokeElementV3 {
   type: "stroke";

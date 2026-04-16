@@ -33,7 +33,7 @@ export default function StudyGantt({ obj, onChange }: Props) {
       label: `Task ${tasks.length + 1}`,
       startDate: today,
       endDate: end,
-      color: COLORS[tasks.length % COLORS.length],
+      color: COLORS[tasks.length % COLORS.length] ?? "#4A90D9",
       progress: 0,
     };
     onChange({ tasks: [...tasks, newTask] });

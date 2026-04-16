@@ -49,9 +49,9 @@ export default function AnimationCanvas({ obj, onChange }: Props) {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.beginPath();
-      ctx.moveTo(path.points[0].x * w, path.points[0].y * h);
+      ctx.moveTo(path.points[0]!.x * w, path.points[0]!.y * h);
       for (let i = 1; i < path.points.length; i++) {
-        ctx.lineTo(path.points[i].x * w, path.points[i].y * h);
+        ctx.lineTo(path.points[i]!.x * w, path.points[i]!.y * h);
       }
       ctx.stroke();
     }
