@@ -3,7 +3,13 @@ import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject, createPdfObject } from "../lib/canvasObjects";
+import {
+  createTextBox, createTable, createImageObject, createPdfObject,
+  createCircuitSniper, createUnitConverter, createGraphPlotter,
+  createUnitCircle, createOscilloscope, createCompute,
+  createAnimationCanvas, createStudyGantt, createAIDropin,
+  createMultimeter,
+} from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 // CanvasToolbar removed — all tools now live in the right-click context menu
@@ -15,6 +21,7 @@ import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
+import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
@@ -252,6 +259,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Panel state ──────────────────────────────────────── */
   const [panelOpen, setPanelOpen] = useState(true);
+  const [mathPaletteOpen, setMathPaletteOpen] = useState(false);
 
   /* ── Persistence coordination ─────────────────────────── */
   const saveTimer = useRef<number>(0);
@@ -503,6 +511,25 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pdfInputRef.current?.click();
   }, []);
 
+  /* ── v1.2+ drop-in insert handlers ────────────────────── */
+  const insertDropin = useCallback((factory: (x: number, y: number) => CanvasObject) => {
+    const obj = factory(scrollX + 100, scrollY + 100);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setTool("select");
+    setSelectedObjectId(obj.id);
+  }, [scrollX, scrollY, setCanvasObjects, setSelectedObjectId]);
+
+  const handleInsertCircuitSniper = useCallback(() => insertDropin(createCircuitSniper), [insertDropin]);
+  const handleInsertUnitConverter = useCallback(() => insertDropin(createUnitConverter), [insertDropin]);
+  const handleInsertGraphPlotter = useCallback(() => insertDropin(createGraphPlotter), [insertDropin]);
+  const handleInsertUnitCircle = useCallback(() => insertDropin(createUnitCircle), [insertDropin]);
+  const handleInsertOscilloscope = useCallback(() => insertDropin(createOscilloscope), [insertDropin]);
+  const handleInsertCompute = useCallback(() => insertDropin(createCompute), [insertDropin]);
+  const handleInsertAnimationCanvas = useCallback(() => insertDropin(createAnimationCanvas), [insertDropin]);
+  const handleInsertStudyGantt = useCallback(() => insertDropin(createStudyGantt), [insertDropin]);
+  const handleInsertAIDropin = useCallback(() => insertDropin(createAIDropin), [insertDropin]);
+  const handleInsertMultimeter = useCallback(() => insertDropin(createMultimeter), [insertDropin]);
+
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -640,6 +667,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "", separator: true },
       );
 
+      // ── Select (Pointer) ──
+      items.push(
+        { label: "Select (Pointer)", shortcut: tool === "select" ? "\u2713" : "", onClick: () => { setTool("select"); setLassoActive(false); }},
+        { label: "", separator: true },
+      );
+
       // ── Insert ──
       items.push(
         { label: "\u2500\u2500 Insert \u2500\u2500", disabled: true },
@@ -647,6 +680,41 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Table", onClick: handleInsertTable },
         { label: "Image\u2026", onClick: handleInsertImage },
         { label: "PDF\u2026", onClick: handleInsertPdf },
+        { label: "", separator: true },
+      );
+
+      // ── Engineering ──
+      items.push(
+        { label: "\u2500\u2500 Engineering \u2500\u2500", disabled: true },
+        { label: "Circuit Sniper", onClick: handleInsertCircuitSniper },
+        { label: "Unit Converter", onClick: handleInsertUnitConverter },
+        { label: "Multimeter", onClick: handleInsertMultimeter },
+        { label: "", separator: true },
+      );
+
+      // ── Math Tools ──
+      items.push(
+        { label: "\u2500\u2500 Math Tools \u2500\u2500", disabled: true },
+        { label: "Math Palette", shortcut: mathPaletteOpen ? "\u2713" : "", onClick: () => setMathPaletteOpen(p => !p) },
+        { label: "Graph Plotter", onClick: handleInsertGraphPlotter },
+        { label: "Unit Circle", onClick: handleInsertUnitCircle },
+        { label: "Oscilloscope", onClick: handleInsertOscilloscope },
+        { label: "Compute", onClick: handleInsertCompute },
+        { label: "Animation Canvas", onClick: handleInsertAnimationCanvas },
+        { label: "", separator: true },
+      );
+
+      // ── Study ──
+      items.push(
+        { label: "\u2500\u2500 Study \u2500\u2500", disabled: true },
+        { label: "Study Gantt", onClick: handleInsertStudyGantt },
+        { label: "", separator: true },
+      );
+
+      // ── AI ──
+      items.push(
+        { label: "\u2500\u2500 AI \u2500\u2500", disabled: true },
+        { label: "AI Drop-in", onClick: handleInsertAIDropin },
         { label: "", separator: true },
       );
 
@@ -685,6 +753,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
+    handleInsertCircuitSniper, handleInsertUnitConverter, handleInsertGraphPlotter,
+    handleInsertUnitCircle, handleInsertOscilloscope, handleInsertCompute,
+    handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertAIDropin, handleInsertMultimeter,
+    mathPaletteOpen,
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -969,6 +1041,28 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />
+
+              {/* ── Floating undo/redo + zoom widget ── */}
+              <div className="nm-zoom-widget" style={{
+                position: "absolute", bottom: "12px", right: "12px", zIndex: 200,
+                display: "flex", gap: "4px", alignItems: "center",
+                background: "var(--nm-faceplate, #F5F5F5)",
+                border: "1px solid var(--nm-paper-border, #E0E0E0)",
+                borderRadius: "8px", padding: "2px 4px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                userSelect: "none",
+              }}>
+                <button className="nm-zoom-btn" onClick={handleUndoWrapped} disabled={!canUndo}
+                  title="Undo" style={{ opacity: canUndo ? 1 : 0.3 }}>↩</button>
+                <button className="nm-zoom-btn" onClick={handleRedoWrapped} disabled={!canRedo}
+                  title="Redo" style={{ opacity: canRedo ? 1 : 0.3 }}>↪</button>
+                <span style={{ width: "1px", height: "16px", background: "#D0D0D0", margin: "0 2px" }} />
+                <button className="nm-zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
+                <button className="nm-zoom-pct" onClick={resetZoom} title="Reset zoom">
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button className="nm-zoom-btn" onClick={zoomIn} title="Zoom in">+</button>
+              </div>
             </div>
           </div>
 
@@ -1032,6 +1126,45 @@ export default function NoteometryApp({ plugin, app }: Props) {
           items={ctxMenu.items}
           onClose={() => setCtxMenu(null)}
         />
+      )}
+      {/* ── Floating Math Palette ── */}
+      {mathPaletteOpen && (
+        <div style={{
+          position: "fixed", bottom: "60px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 600, background: "var(--nm-faceplate, #F5F5F5)",
+          border: "1px solid var(--nm-paper-border, #E0E0E0)",
+          borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          maxWidth: "460px", width: "90vw", overflow: "hidden",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "4px 8px", borderBottom: "1px solid var(--nm-paper-border, #E0E0E0)",
+            fontSize: "11px", fontWeight: 600, color: "var(--nm-ink, #1A1A2E)",
+          }}>
+            <span>Math Palette</span>
+            <button
+              onClick={() => setMathPaletteOpen(false)}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: "14px", color: "var(--nm-ink-muted, #6B7280)", padding: "2px 6px",
+              }}
+            >x</button>
+          </div>
+          <MathPalette
+            onInsert={handleInsertSymbol}
+            onDragStart={(sym) => setPendingSymbol(sym)}
+            onDropStamp={(display, screenX, screenY) => {
+              const rect = canvasAreaRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              const x = (screenX - rect.left) / zoom + scrollX;
+              const y = (screenY - rect.top) / zoom + scrollY;
+              setStamps(prev => [...prev, {
+                id: newStampId(), x, y,
+                text: display, fontSize: 96, color: activeColor,
+              }]);
+            }}
+          />
+        </div>
       )}
     </div>
   );

@@ -99,7 +99,9 @@ export function drawGrid(
   ctx.stroke();
 }
 
-/** Draw a single stroke — uniform width, no pressure sensitivity */
+/** Draw a single stroke with pressure-sensitive width variation.
+ *  Pen strokes use stored pressure (0.3 = 30% width, 1.0 = full).
+ *  Mouse/trackpad strokes have pressure=0 and render at full width. */
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
   stroke: Stroke,
@@ -108,7 +110,6 @@ export function drawStroke(
 ): void {
   const pts = stroke.points;
   if (pts.length < 2) {
-    // Single point — draw a dot
     if (pts.length === 1) {
       const p = pts[0]!;
       ctx.fillStyle = stroke.color;
@@ -119,28 +120,43 @@ export function drawStroke(
     return;
   }
 
+  // Check if stroke has meaningful pressure data
+  const hasPressure = pts.some(p => p.pressure > 0 && p.pressure < 1);
+
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.strokeStyle = stroke.color;
-  ctx.lineWidth = stroke.width;
 
-  // Draw as a single smooth path
-  ctx.beginPath();
-  const p0 = pts[0]!;
-  ctx.moveTo(p0.x - scrollX, p0.y - scrollY);
-
-  for (let i = 1; i < pts.length - 1; i++) {
-    const a = pts[i]!;
-    const b = pts[i + 1]!;
-    const midX = (a.x + b.x) / 2;
-    const midY = (a.y + b.y) / 2;
-    ctx.quadraticCurveTo(a.x - scrollX, a.y - scrollY, midX - scrollX, midY - scrollY);
+  if (!hasPressure) {
+    // Uniform width — fast path (mouse/trackpad)
+    ctx.lineWidth = stroke.width;
+    ctx.beginPath();
+    const p0 = pts[0]!;
+    ctx.moveTo(p0.x - scrollX, p0.y - scrollY);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      ctx.quadraticCurveTo(a.x - scrollX, a.y - scrollY, midX - scrollX, midY - scrollY);
+    }
+    const last = pts[pts.length - 1]!;
+    ctx.lineTo(last.x - scrollX, last.y - scrollY);
+    ctx.stroke();
+  } else {
+    // Variable width — draw segment by segment (Apple Pencil)
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      // Pressure-to-width: 0.3 min, 1.0 max
+      const p = Math.max(0.3, (a.pressure + b.pressure) / 2);
+      ctx.lineWidth = stroke.width * p;
+      ctx.beginPath();
+      ctx.moveTo(a.x - scrollX, a.y - scrollY);
+      ctx.lineTo(b.x - scrollX, b.y - scrollY);
+      ctx.stroke();
+    }
   }
-
-  // Final segment
-  const last = pts[pts.length - 1]!;
-  ctx.lineTo(last.x - scrollX, last.y - scrollY);
-  ctx.stroke();
 }
 
 /** Draw all strokes */

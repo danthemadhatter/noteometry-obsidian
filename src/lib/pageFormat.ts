@@ -9,7 +9,9 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject } from "./canvasObjects";
+import type {
+  CanvasObject, OscilloscopeChannel,
+} from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -22,7 +24,7 @@ export interface CanvasData {
   strokes: Stroke[];
   stamps: Stamp[];
   canvasObjects: CanvasObject[];
-  viewport: { scrollX: number; scrollY: number };
+  viewport: { scrollX: number; scrollY: number; zoom?: number };
   panelInput: string;
   chatMessages: ChatMessage[];
   tableData: Record<string, string[][]>;
@@ -65,7 +67,7 @@ export const EMPTY_PAGE: CanvasData = {
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.0.2";
+export const V3_SOURCE_TAG = "noteometry-1.5.0";
 
 export interface StrokeElementV3 {
   type: "stroke";
@@ -137,13 +139,110 @@ export interface PdfElementV3 {
   name?: string;
 }
 
+/* ── v1.2+ element types ─────────────────────────────────── */
+
+export interface CircuitSniperElementV3 {
+  type: "circuit-sniper";
+  id: string; x: number; y: number; w: number; h: number;
+  circuitData: string;
+  name?: string;
+}
+
+export interface UnitConverterElementV3 {
+  type: "unit-converter";
+  id: string; x: number; y: number; w: number; h: number;
+  category: string;
+  inputValue: string;
+  name?: string;
+}
+
+export interface GraphPlotterElementV3 {
+  type: "graph-plotter";
+  id: string; x: number; y: number; w: number; h: number;
+  functions: Array<{ expr: string; color: string; enabled: boolean }>;
+  viewX: number; viewY: number; viewW: number; viewH: number;
+  signalLinked?: boolean;
+  name?: string;
+}
+
+export interface UnitCircleElementV3 {
+  type: "unit-circle";
+  id: string; x: number; y: number; w: number; h: number;
+  angleDeg: number;
+  signalLinked?: boolean;
+  name?: string;
+}
+
+export interface OscilloscopeElementV3 {
+  type: "oscilloscope";
+  id: string; x: number; y: number; w: number; h: number;
+  channelA: OscilloscopeChannel;
+  channelB: OscilloscopeChannel;
+  timeDiv: number;
+  signalLinked?: boolean;
+  name?: string;
+}
+
+export interface ComputeElementV3 {
+  type: "compute";
+  id: string; x: number; y: number; w: number; h: number;
+  cells: Array<{ name: string; expr: string; value: string }>;
+  resultExpr: string;
+  name?: string;
+}
+
+export interface AnimationCanvasElementV3 {
+  type: "animation-canvas";
+  id: string; x: number; y: number; w: number; h: number;
+  frames: string[];
+  currentFrame: number;
+  fps: number;
+  name?: string;
+}
+
+export interface StudyGanttElementV3 {
+  type: "study-gantt";
+  id: string; x: number; y: number; w: number; h: number;
+  startDate: string;
+  tasks: Array<{
+    id: string; title: string; startDay: number; duration: number;
+    color: string; progress: number;
+  }>;
+  name?: string;
+}
+
+export interface AIDropinElementV3 {
+  type: "ai-dropin";
+  id: string; x: number; y: number; w: number; h: number;
+  mode: "chat" | "solve";
+  name?: string;
+}
+
+export interface MultimeterElementV3 {
+  type: "multimeter";
+  id: string; x: number; y: number; w: number; h: number;
+  meterMode: string;
+  inputValue: string;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
   | TextboxElementV3
   | TableElementV3
   | ImageElementV3
-  | PdfElementV3;
+  | PdfElementV3
+  | CircuitSniperElementV3
+  | UnitConverterElementV3
+  | GraphPlotterElementV3
+  | UnitCircleElementV3
+  | OscilloscopeElementV3
+  | ComputeElementV3
+  | AnimationCanvasElementV3
+  | StudyGanttElementV3
+  | AIDropinElementV3
+  | MultimeterElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -229,6 +328,69 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         page: obj.page,
         name: obj.name,
       });
+    } else if (obj.type === "circuit-sniper") {
+      elements.push({
+        type: "circuit-sniper", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        circuitData: obj.circuitData, name: obj.name,
+      });
+    } else if (obj.type === "unit-converter") {
+      elements.push({
+        type: "unit-converter", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        category: obj.category, inputValue: obj.inputValue, name: obj.name,
+      });
+    } else if (obj.type === "graph-plotter") {
+      elements.push({
+        type: "graph-plotter", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        functions: obj.functions,
+        viewX: obj.viewX, viewY: obj.viewY, viewW: obj.viewW, viewH: obj.viewH,
+        signalLinked: obj.signalLinked, name: obj.name,
+      });
+    } else if (obj.type === "unit-circle") {
+      elements.push({
+        type: "unit-circle", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        angleDeg: obj.angleDeg, signalLinked: obj.signalLinked, name: obj.name,
+      });
+    } else if (obj.type === "oscilloscope") {
+      elements.push({
+        type: "oscilloscope", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        channelA: obj.channelA, channelB: obj.channelB,
+        timeDiv: obj.timeDiv, signalLinked: obj.signalLinked, name: obj.name,
+      });
+    } else if (obj.type === "compute") {
+      elements.push({
+        type: "compute", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        cells: obj.cells, resultExpr: obj.resultExpr, name: obj.name,
+      });
+    } else if (obj.type === "animation-canvas") {
+      elements.push({
+        type: "animation-canvas", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        frames: obj.frames, currentFrame: obj.currentFrame, fps: obj.fps, name: obj.name,
+      });
+    } else if (obj.type === "study-gantt") {
+      elements.push({
+        type: "study-gantt", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        startDate: obj.startDate, tasks: obj.tasks, name: obj.name,
+      });
+    } else if (obj.type === "ai-dropin") {
+      elements.push({
+        type: "ai-dropin", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        mode: obj.mode, name: obj.name,
+      });
+    } else if (obj.type === "multimeter") {
+      elements.push({
+        type: "multimeter", id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        meterMode: obj.meterMode, inputValue: obj.inputValue, name: obj.name,
+      });
     }
   }
 
@@ -240,7 +402,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
     viewport: {
       scrollX: data.viewport?.scrollX ?? 0,
       scrollY: data.viewport?.scrollY ?? 0,
-      zoom: 1.0,
+      zoom: (data.viewport as { zoom?: number }).zoom ?? 1.0,
     },
     pipeline: {
       panelInput: data.panelInput ?? "",
@@ -310,14 +472,87 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
         break;
       case "pdf":
         canvasObjects.push({
-          id: el.id,
-          type: "pdf",
+          id: el.id, type: "pdf",
           x: el.x, y: el.y, w: el.w, h: el.h,
-          fileRef: el.fileRef,
-          page: el.page ?? 1,
+          fileRef: el.fileRef, page: el.page ?? 1, name: el.name,
+        });
+        break;
+      case "circuit-sniper":
+        canvasObjects.push({
+          id: el.id, type: "circuit-sniper",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          circuitData: el.circuitData, name: el.name,
+        });
+        break;
+      case "unit-converter":
+        canvasObjects.push({
+          id: el.id, type: "unit-converter",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          category: el.category, inputValue: el.inputValue, name: el.name,
+        });
+        break;
+      case "graph-plotter":
+        canvasObjects.push({
+          id: el.id, type: "graph-plotter",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          functions: el.functions,
+          viewX: el.viewX, viewY: el.viewY, viewW: el.viewW, viewH: el.viewH,
+          signalLinked: el.signalLinked, name: el.name,
+        });
+        break;
+      case "unit-circle":
+        canvasObjects.push({
+          id: el.id, type: "unit-circle",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          angleDeg: el.angleDeg, signalLinked: el.signalLinked, name: el.name,
+        });
+        break;
+      case "oscilloscope":
+        canvasObjects.push({
+          id: el.id, type: "oscilloscope",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          channelA: el.channelA, channelB: el.channelB,
+          timeDiv: el.timeDiv, signalLinked: el.signalLinked, name: el.name,
+        });
+        break;
+      case "compute":
+        canvasObjects.push({
+          id: el.id, type: "compute",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          cells: el.cells, resultExpr: el.resultExpr, name: el.name,
+        });
+        break;
+      case "animation-canvas":
+        canvasObjects.push({
+          id: el.id, type: "animation-canvas",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          frames: el.frames, currentFrame: el.currentFrame, fps: el.fps, name: el.name,
+        });
+        break;
+      case "study-gantt":
+        canvasObjects.push({
+          id: el.id, type: "study-gantt",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          startDate: el.startDate, tasks: el.tasks, name: el.name,
+        });
+        break;
+      case "ai-dropin":
+        canvasObjects.push({
+          id: el.id, type: "ai-dropin",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          mode: el.mode ?? "solve", name: el.name,
+        });
+        break;
+      case "multimeter":
+        canvasObjects.push({
+          id: el.id, type: "multimeter",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          meterMode: ((el as MultimeterElementV3).meterMode ?? "DCV") as "DCV",
+          inputValue: (el as MultimeterElementV3).inputValue ?? "0",
           name: el.name,
         });
         break;
+      // Unknown element types silently skipped for forward compat
     }
   }
 
@@ -328,6 +563,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
     viewport: {
       scrollX: v3.viewport?.scrollX ?? 0,
       scrollY: v3.viewport?.scrollY ?? 0,
+      zoom: v3.viewport?.zoom ?? 1.0,
     },
     panelInput: v3.pipeline?.panelInput ?? "",
     chatMessages: v3.pipeline?.chatMessages ?? [],

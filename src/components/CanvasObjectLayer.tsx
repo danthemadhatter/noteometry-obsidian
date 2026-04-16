@@ -7,19 +7,73 @@ import { loadImageFromVault } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
+import UnitConverterDropin from "./dropins/UnitConverterDropin";
+import GraphPlotterDropin from "./dropins/GraphPlotterDropin";
+import UnitCircleDropin from "./dropins/UnitCircleDropin";
+import OscilloscopeDropin from "./dropins/OscilloscopeDropin";
+import ComputeDropin from "./dropins/ComputeDropin";
+import AnimationCanvasDropin from "./dropins/AnimationCanvasDropin";
+import StudyGanttDropin from "./dropins/StudyGanttDropin";
+import CircuitSniperDropin from "./dropins/CircuitSniperDropin";
+import AIDropin from "./dropins/AIDropin";
+import MultimeterDropin from "./dropins/MultimeterDropin";
 
 /** Editable title input at the top of every canvas object. Click to
  * edit, Enter/blur to commit, Escape to revert. The input also doubles
  * as the drag handle — onPointerDown on the wrapper starts the drag
  * unless the input is focused for editing. */
+/** Snapshot a DOM element to clipboard using html2canvas.
+ *  Uses the same import that the lasso rasterizer uses. */
+let _html2canvas: typeof import("html2canvas").default | null = null;
+function getHtml2Canvas() {
+  if (!_html2canvas) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _html2canvas = (require("html2canvas") as { default?: unknown }).default as typeof _html2canvas
+      ?? require("html2canvas") as typeof _html2canvas;
+  }
+  return _html2canvas!;
+}
+
+async function snapshotElement(el: HTMLElement): Promise<void> {
+  try {
+    const html2canvas = getHtml2Canvas();
+    const canvas = await html2canvas(el, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      logging: false,
+      useCORS: true,
+    });
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+      } catch {
+        // Fallback: download as file
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "snapshot.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    }, "image/png");
+  } catch (e) {
+    console.error("[Noteometry] Snapshot failed:", e);
+  }
+}
+
 function EditableObjectTitle({
   value,
   onChange,
   onDragStart,
+  onSnapshot,
 }: {
   value: string;
   onChange: (next: string) => void;
   onDragStart: (e: React.PointerEvent) => void;
+  onSnapshot: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -70,6 +124,20 @@ function EditableObjectTitle({
           if (editing) e.stopPropagation();
         }}
       />
+      <button
+        className="noteometry-canvas-action-btn"
+        title="Snapshot to clipboard"
+        onClick={(e) => { e.stopPropagation(); onSnapshot(); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: "20px", height: "20px", padding: 0, margin: "0 2px",
+          background: "none", border: "none", cursor: "pointer",
+          fontSize: "13px", opacity: 0.5, flexShrink: 0,
+        }}
+      >
+        📷
+      </button>
     </div>
   );
 }
@@ -283,7 +351,7 @@ export default function CanvasObjectLayer({
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
-          {/* Title bar — editable name that doubles as drag handle */}
+          {/* Title bar — editable name that doubles as drag handle + snapshot */}
           <EditableObjectTitle
             value={defaultObjectName(obj)}
             onChange={(next) => {
@@ -292,11 +360,16 @@ export default function CanvasObjectLayer({
               ));
             }}
             onDragStart={(e) => handleDragStart(e, obj)}
+            onSnapshot={() => {
+              const el = document.querySelector(`[data-dropin-id="${obj.id}"]`) as HTMLElement | null;
+              if (el) snapshotElement(el);
+            }}
           />
 
           {/* Content — stop propagation so drag handler doesn't steal focus */}
           <div
             className="noteometry-object-content"
+            data-dropin-id={obj.id}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -321,6 +394,123 @@ export default function CanvasObjectLayer({
                 onPageChange={(newPage) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id && o.type === "pdf" ? { ...o, page: newPage } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "circuit-sniper" && (
+              <CircuitSniperDropin
+                circuitData={obj.circuitData}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "circuit-sniper" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "unit-converter" && (
+              <UnitConverterDropin
+                category={obj.category}
+                inputValue={obj.inputValue}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "unit-converter" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "graph-plotter" && (
+              <GraphPlotterDropin
+                id={obj.id}
+                functions={obj.functions}
+                viewX={obj.viewX} viewY={obj.viewY} viewW={obj.viewW} viewH={obj.viewH}
+                signalLinked={obj.signalLinked ?? false}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "graph-plotter" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "unit-circle" && (
+              <UnitCircleDropin
+                id={obj.id}
+                angleDeg={obj.angleDeg}
+                signalLinked={obj.signalLinked ?? false}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "unit-circle" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "oscilloscope" && (
+              <OscilloscopeDropin
+                id={obj.id}
+                channelA={obj.channelA}
+                channelB={obj.channelB}
+                timeDiv={obj.timeDiv}
+                signalLinked={obj.signalLinked ?? false}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "oscilloscope" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "compute" && (
+              <ComputeDropin
+                cells={obj.cells}
+                resultExpr={obj.resultExpr}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "compute" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "animation-canvas" && (
+              <AnimationCanvasDropin
+                frames={obj.frames}
+                currentFrame={obj.currentFrame}
+                fps={obj.fps}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "animation-canvas" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "study-gantt" && (
+              <StudyGanttDropin
+                startDate={obj.startDate}
+                tasks={obj.tasks}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "study-gantt" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "ai-dropin" && (
+              <AIDropin
+                mode={obj.mode}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "ai-dropin" ? { ...o, ...u } : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "multimeter" && (
+              <MultimeterDropin
+                mode={obj.meterMode as "DCV"}
+                inputValue={obj.inputValue}
+                onChange={(u) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id && o.type === "multimeter"
+                      ? { ...o, meterMode: u.mode ?? obj.meterMode, inputValue: u.inputValue ?? obj.inputValue }
+                      : o
                   ));
                 }}
               />

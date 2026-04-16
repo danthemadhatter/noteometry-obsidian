@@ -122,7 +122,7 @@ export default function Panel({
           onChange={(e) => setInputCode(e.target.value)}
           placeholder="Type or paste LaTeX, or use READ INK..."
         />
-        <MathPalette onInsert={onInsertSymbol} onDragStart={onStampSymbol} onDropStamp={onDropStamp} />
+        {/* MathPalette removed — now available as floating popup via right-click > Math Tools > Math Palette */}
       </div>
     </div>
   );

@@ -16,6 +16,14 @@ export interface Stroke {
   width: number; // base width, modulated by pressure
 }
 
+/** Stamp size presets — small for subscript, normal for body, large for display. */
+export type StampSize = "small" | "normal" | "large";
+export const STAMP_SIZES: Record<StampSize, number> = {
+  small: 48,
+  normal: 96,
+  large: 144,
+};
+
 /** A "stamp" — a math symbol dropped onto the canvas from the palette.
  *  Rendered as crisp text on the canvas, captured by lasso just like ink. */
 export interface Stamp {
@@ -25,6 +33,8 @@ export interface Stamp {
   text: string;     // display character (e.g., "∫", "3", "α")
   fontSize: number;
   color: string;
+  /** Optional size preset. If set, fontSize is derived from this. */
+  size?: StampSize;
 }
 
 export function newStampId(): string {

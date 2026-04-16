@@ -8,82 +8,90 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry palette v8 — clean, professional, works with black text
-   *
-   * Direction: masculine and fun. Warm white/paper surfaces, dark
-   * charcoal-slate chassis, steel blue accent. All text is black.
+   * Noteometry v1.2 — Document-style color scheme
+   * White canvas, light gray chrome, clean and professional.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Primary surface — warm white/paper (not cream, cleaner) */
-  --nm-canvas-bg: #f5f3ee;
-  --nm-faceplate: #eae7df;
-  --nm-faceplate-light: #f0ede5;
-  --nm-faceplate-alt: #e2dfd6;
-  --nm-faceplate-recessed: #d8d4ca;
+  /* Canvas surface */
+  --nm-canvas-bg: #FFFFFF;
+  --nm-grid-color: #E8E8E8;
+  --nm-grid-major-color: #D0D0D0;
 
-  /* Chassis — dark charcoal-slate, not blue */
-  --nm-chassis: #2c3038;
-  --nm-chassis-light: #3a3f4a;
-  --nm-chassis-dark: #22262d;
-  --nm-chassis-deep: #181b20;
-  --nm-chassis-fg: #e8e5dd;        /* kept for backwards compat */
+  /* UI Chrome — light gray surfaces */
+  --nm-faceplate: #F5F5F5;
+  --nm-faceplate-light: #FAFAFA;
+  --nm-faceplate-alt: #F0F0F0;
+  --nm-faceplate-recessed: #E8E8E8;
 
-  /* Text — always dark */
-  --nm-ink: #1a1d24;
-  --nm-ink-muted: #5a5d66;
-  --nm-paper-ink: var(--nm-ink);
+  /* Sidebar and panels */
+  --nm-sidebar-bg: #F5F5F5;
 
-  /* Accent — steel blue (professional, not "pride") */
-  --nm-accent: #4a7c9b;
-  --nm-accent-light: rgba(74, 124, 155, 0.12);
-  --nm-accent-hover: #5a8fae;
+  /* Chassis — kept as aliases for backward compatibility */
+  --nm-chassis: #F5F5F5;
+  --nm-chassis-light: #FAFAFA;
+  --nm-chassis-dark: #E8E8E8;
+  --nm-chassis-deep: #E0E0E0;
+  --nm-chassis-fg: #1A1A2E;
 
-  /* Active/selected — warm amber (kept, works well as indicator) */
-  --nm-phosphor: #e8a838;
-  --nm-phosphor-light: rgba(232, 168, 56, 0.2);
+  /* Text — always dark navy */
+  --nm-ink: #1A1A2E;
+  --nm-ink-muted: #6B7280;
+  --nm-paper-ink: #1A1A2E;
+
+  /* Accent — steel blue */
+  --nm-accent: #4A90D9;
+  --nm-accent-light: rgba(74, 144, 217, 0.12);
+  --nm-accent-hover: #5A9DE6;
+
+  /* Active/selected — amber */
+  --nm-phosphor: #F5A623;
+  --nm-phosphor-light: rgba(245, 166, 35, 0.2);
 
   /* Semantic */
-  --nm-danger: #c44a3c;
-  --nm-success: #5a8a42;
+  --nm-danger: #DC2626;
+  --nm-success: #16A34A;
 
-  /* Borders — dark hairlines on light surfaces */
-  --nm-paper-border: rgba(26, 29, 36, 0.18);
-  --nm-warm-border: rgba(26, 29, 36, 0.10);
-  --nm-warm-border-strong: rgba(26, 29, 36, 0.22);
+  /* Borders — subtle on light surfaces */
+  --nm-paper-border: #E0E0E0;
+  --nm-warm-border: rgba(0, 0, 0, 0.08);
+  --nm-warm-border-strong: rgba(0, 0, 0, 0.15);
 
-  /* Canvas edge (used by some bg gradients) */
-  --nm-canvas-bg-edge: #ebe8e0;
+  /* Drop-in chrome */
+  --nm-dropin-border: #E0E0E0;
+  --nm-dropin-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 
-  /* Cabinet aliases — backwards compat with older rules */
+  /* Canvas edge */
+  --nm-canvas-bg-edge: #F5F5F5;
+
+  /* Cabinet aliases — backward compat */
   --nm-cabinet: var(--nm-chassis);
   --nm-cabinet-light: var(--nm-chassis-light);
   --nm-cabinet-dark: var(--nm-chassis-dark);
   --nm-cabinet-deep: var(--nm-chassis-deep);
 
-  /* Gunmetal — reserved for very dark borders */
-  --nm-gunmetal: #2a3038;
-  --nm-gunmetal-light: #4a5060;
-  --nm-gunmetal-dark: #14181e;
+  /* Gunmetal — now lighter */
+  --nm-gunmetal: #D0D0D0;
+  --nm-gunmetal-light: #E0E0E0;
+  --nm-gunmetal-dark: #C0C0C0;
 
   /* Section selection */
-  --nm-section-active: var(--nm-chassis-light);
+  --nm-section-active: var(--nm-accent-light);
 
-  /* Legacy aliases — kept for rules that still reference them */
-  --nm-warm-bg: var(--nm-chassis);              /* primary = dark */
-  --nm-warm-bg-alt: var(--nm-chassis-dark);     /* darker nested */
-  --nm-paper: var(--nm-faceplate);              /* paper inserts */
+  /* Legacy aliases */
+  --nm-warm-bg: var(--nm-faceplate);
+  --nm-warm-bg-alt: var(--nm-faceplate-alt);
+  --nm-paper: var(--nm-faceplate);
   --nm-paper-muted: var(--nm-ink-muted);
 
-  /* Geometry — machined, not extruded */
-  --nm-radius: 4px;
-  --nm-radius-sm: 3px;
+  /* Geometry */
+  --nm-radius: 6px;
+  --nm-radius-sm: 4px;
 
-  /* Shadows — softer, less heavy. Was "warm workshop lighting" in v5,
-   * now "clean iPad app elevation". Lower alphas, cooler tones. */
-  --nm-shadow-soft: 0 1px 2px rgba(35, 40, 58, 0.08), 0 0 1px rgba(35, 40, 58, 0.12);
-  --nm-shadow-toolbar: 0 2px 8px rgba(35, 40, 58, 0.10), 0 0 1px rgba(35, 40, 58, 0.16);
+  /* Shadows — soft elevation */
+  --nm-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
+  --nm-shadow-toolbar: 0 2px 10px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.10);
 
-  /* Typography — IBM Plex family if installed, graceful system fallback */
+  /* Typography */
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
@@ -141,11 +149,12 @@
 .noteometry-sidebar-hdr,
 .noteometry-sidebar-title,
 .noteometry-sidebar-item,
-.noteometry-sidebar-section-item,
 .noteometry-sidebar-page-item,
-.noteometry-sidebar-add-page,
-.noteometry-sidebar-add {
+.nm-sidebar-tab,
+.nm-sidebar-action-btn,
+.nm-sidebar-empty {
   color: var(--nm-paper-ink);
+  font-family: var(--nm-font);
 }
 
 /* Belt-and-suspenders: force every inline SVG inside the plugin to use
@@ -176,16 +185,12 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-  /* Battleship gray Tek 545A cabinet — the metal body behind the
-   * cream faceplate panels. Where panels don't cover the full surface
-   * (borders, seams, padding), the cabinet shows through. */
-  background: var(--nm-cabinet);
+  background: var(--nm-faceplate-alt);
   color: var(--text-normal);
   font-family: var(--nm-font);
-  /* Thin cabinet bezel around the whole plugin view */
-  padding: 2px;
+  padding: 0;
   box-sizing: border-box;
-  gap: 2px;
+  gap: 0;
 }
 
 /* Give the main (canvas + toolbar) area its own explicit gap so the
@@ -195,13 +200,9 @@
   gap: 0;
 }
 
-/* Visible battleship-gray trim strips between panels (replaces the
- * old thin borders so the cabinet reads as a real metal seam). */
+/* Clean single border between panels — no double borders. */
 .noteometry-sidebar {
-  border-right: 2px solid var(--nm-cabinet-dark);
-}
-.noteometry-right {
-  border-left: 2px solid var(--nm-cabinet-dark);
+  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-main {
@@ -211,7 +212,7 @@
   flex-direction: column;
 }
 
-/* ── Sidebar — single-column, overlay on mobile ─────────── */
+/* ── Sidebar — tabbed layout ─────────────────────────── */
 
 .noteometry-sidebar {
   flex-shrink: 0;
@@ -225,29 +226,29 @@
   align-items: flex-start;
   padding-top: 6px;
   background: var(--nm-faceplate-alt);
-  border-right: 1px solid var(--nm-paper-border);
 }
 
 .noteometry-sidebar-open {
-  width: 180px;
   display: flex;
   flex-direction: column;
   background: var(--nm-faceplate-alt);
-  border-right: 1px solid var(--nm-paper-border);
+  width: 200px;
+  transition: width 0.15s ease;
 }
 
 .noteometry-sidebar-backdrop {
   display: none;
 }
 
-/* Mobile: sidebar overlays canvas */
+/* ── Mobile overlay ── */
 @media (max-width: 768px) {
   .noteometry-sidebar-open {
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 280px;
+    width: 200px;
+    max-width: 220px;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   }
   .noteometry-sidebar-backdrop {
@@ -257,7 +258,13 @@
     z-index: 499;
     background: rgba(0, 0, 0, 0.3);
   }
+  .noteometry-sidebar-item-del,
+  .nm-sidebar-tab-del {
+    opacity: 0.4 !important;
+  }
 }
+
+/* ── Header ── */
 
 .noteometry-sidebar-toggle {
   display: flex;
@@ -266,7 +273,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-faint);
+  color: var(--nm-ink);
   padding: 4px;
   border-radius: var(--nm-radius-sm);
   transition: all 0.15s;
@@ -280,57 +287,142 @@
 .noteometry-sidebar-hdr {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 12px 10px;
+  gap: 6px;
+  padding: 8px 10px 6px;
   border-bottom: 1px solid var(--nm-paper-border);
   flex-shrink: 0;
 }
 
 .noteometry-sidebar-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-normal, #1e1e1e);
-  letter-spacing: -0.2px;
+  color: var(--nm-ink);
+  letter-spacing: -0.1px;
 }
 
-.noteometry-sidebar-section {
+/* ── Section tab bar (horizontal, scrollable) ── */
+
+.nm-sidebar-tab-bar {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
   border-bottom: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate-alt);
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.nm-sidebar-tab-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
-.noteometry-sidebar-pages {
-  background: rgba(0, 0, 0, 0.02);
+.nm-sidebar-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--nm-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.noteometry-sidebar-list {
+.nm-sidebar-tab:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.nm-sidebar-tab.active {
+  border-bottom-color: var(--nm-accent);
+  color: var(--nm-accent);
+}
+
+.nm-sidebar-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
+
+/* Delete button on tab — hidden until hover */
+.nm-sidebar-tab-del {
+  opacity: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--nm-ink-muted);
+  flex-shrink: 0;
+  transition: opacity 0.12s;
+  border-radius: 3px;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 0;
+}
+.nm-sidebar-tab-del svg {
+  width: 10px !important;
+  height: 10px !important;
+}
+.nm-sidebar-tab:hover .nm-sidebar-tab-del {
+  opacity: 0.5;
+}
+.nm-sidebar-tab-del:hover {
+  opacity: 1 !important;
+  color: var(--nm-danger);
+  background: rgba(226, 85, 85, 0.08);
+}
+
+/* Show delete on touch devices (no hover) */
+@media (pointer: coarse) {
+  .nm-sidebar-tab-del {
+    opacity: 0.4;
+  }
+}
+
+/* ── Page list ── */
+
+.nm-sidebar-page-list {
   flex: 1;
   overflow-y: auto;
+  background: var(--nm-faceplate-light);
   padding: 2px 0;
 }
 
-.noteometry-sidebar-section-item {
-  font-weight: 600;
-  color: var(--text-normal, #1e1e1e);
+.nm-sidebar-empty {
+  padding: 16px 10px;
+  font-size: 11px;
+  color: var(--nm-ink-muted);
+  text-align: center;
 }
+
 .noteometry-sidebar-page-item {
-  padding-left: 28px !important;
-  font-size: 13px;
-}
-.noteometry-sidebar-add-page {
-  padding-left: 28px !important;
   font-size: 12px;
+  padding-left: 10px !important;
 }
 
 .noteometry-sidebar-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 4px 10px;
+  height: 32px;
+  min-height: 32px;
   font-size: 12px;
   cursor: pointer;
-  color: var(--text-normal);
+  color: var(--nm-ink);
   border-left: 3px solid transparent;
   transition: all 0.12s;
   border-radius: 0;
+  box-sizing: border-box;
 }
 
 .noteometry-sidebar-item:hover {
@@ -351,43 +443,94 @@
   flex: 1;
 }
 
-.noteometry-sidebar-item-action,
+/* Delete button on page items — hidden until hover */
 .noteometry-sidebar-item-del {
   opacity: 0;
   background: none;
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: var(--text-faint);
+  color: var(--nm-ink-muted);
   flex-shrink: 0;
   transition: all 0.12s;
   border-radius: 4px;
   -webkit-tap-highlight-color: transparent;
 }
-.noteometry-sidebar-item-action svg,
 .noteometry-sidebar-item-del svg {
   width: 12px !important;
   height: 12px !important;
 }
-
-.noteometry-sidebar-item:hover .noteometry-sidebar-item-action,
-.noteometry-sidebar-item:hover .noteometry-sidebar-item-del,
-.noteometry-sidebar-item:active .noteometry-sidebar-item-action,
-.noteometry-sidebar-item:active .noteometry-sidebar-item-del {
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-del {
   opacity: 0.5;
 }
-
 .noteometry-sidebar-item-del:hover {
   opacity: 1 !important;
   color: var(--nm-danger);
   background: rgba(226, 85, 85, 0.08);
 }
-.noteometry-sidebar-item-action:hover {
-  opacity: 1 !important;
-  color: var(--nm-accent);
+
+/* Show delete on touch devices (no hover) */
+@media (pointer: coarse) {
+  .noteometry-sidebar-item-del {
+    opacity: 0.4;
+  }
 }
 
-/* Inline input OK button */
+/* ── Bottom action bar ── */
+
+.nm-sidebar-bottom-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate-alt);
+}
+
+.nm-sidebar-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.nm-sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--nm-font);
+  color: var(--nm-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nm-sidebar-action-btn:hover {
+  background: var(--nm-accent-light);
+}
+
+.nm-sidebar-action-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.nm-sidebar-action-course {
+  color: var(--nm-accent);
+  font-weight: 600;
+}
+
+/* ── Inline rename input ── */
+
+.nm-sidebar-rename-input {
+  font-size: 11px;
+  padding: 2px 6px;
+  height: 24px;
+  min-height: 0;
+  border-width: 1px;
+}
+
+/* ── Inline input (add page/section/course) ── */
+
 .noteometry-sidebar-input-ok {
   padding: 4px 10px;
   background: var(--nm-accent);
@@ -399,48 +542,6 @@
   cursor: pointer;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
-}
-
-/* Show action buttons on touch (no hover on iPad) */
-@media (pointer: coarse) {
-  .noteometry-sidebar-item-action,
-  .noteometry-sidebar-item-del {
-    opacity: 0.4;
-  }
-}
-
-.noteometry-sidebar-add {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--nm-accent);
-  background: none;
-  border: none;
-  border-top: 1px solid var(--nm-paper-border);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.12s;
-}
-
-.noteometry-sidebar-add-buttons {
-  display: flex;
-  flex-direction: column;
-}
-
-.noteometry-sidebar-add-course {
-  background: var(--nm-accent-light);
-  border: 1px solid var(--nm-accent);
-  border-radius: var(--nm-radius-sm);
-  margin: 6px 10px;
-  padding: 8px 14px;
-  font-weight: 600;
-}
-
-.noteometry-sidebar-add:hover {
-  background: var(--nm-accent-light);
 }
 
 .noteometry-sidebar-add-row {
@@ -457,6 +558,7 @@
   background: var(--nm-faceplate-light);
   color: var(--nm-paper-ink);
   box-sizing: border-box;
+  font-family: var(--nm-font);
 }
 
 .noteometry-sidebar-input:focus {
@@ -540,7 +642,8 @@
   display: flex;
   flex-direction: row;
   overflow: hidden;
-  background: var(--nm-warm-bg);
+  background: var(--nm-faceplate);
+  border-left: 1px solid var(--nm-paper-border);
 }
 
 /* Vertical drag handle on left edge of right panel */
@@ -886,8 +989,8 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--nm-paper-border);
-  border-radius: var(--nm-radius);
-  margin: 0 10px;
+  border-radius: 6px;
+  margin: 0 8px;
   background: var(--nm-faceplate);
   box-shadow: var(--nm-shadow-soft);
 }
@@ -1119,9 +1222,9 @@
   flex-direction: column;
   height: 100%;
   background: var(--nm-faceplate);
-  border: 1px solid var(--nm-warm-border-strong);
-  border-radius: var(--nm-radius);
-  margin: 0 10px 10px;
+  border: 1px solid var(--nm-paper-border);
+  border-radius: 6px;
+  margin: 0 8px 8px;
   overflow: hidden;
   box-shadow: var(--nm-shadow-soft);
 }
@@ -1191,19 +1294,19 @@
   -webkit-user-select: text;
   cursor: text;
 }
-/* User messages — amber backlit indicator (the "transmit" dial glow) */
+/* User messages — warm amber indicator */
 .noteometry-chat-bubble.user {
   background: var(--nm-phosphor) !important;
   color: var(--nm-ink) !important;
-  border-radius: 4px;
-  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: 12px 12px 4px 12px;
+  border: none;
 }
-/* Assistant messages — raised faceplate readout panel with gunmetal trim */
+/* Assistant messages — soft cream panel */
 .noteometry-chat-bubble.assistant {
   background: var(--nm-faceplate-light) !important;
   color: var(--nm-ink) !important;
-  border-radius: 4px;
-  border: 1px solid var(--nm-warm-border-strong);
+  border-radius: 12px 12px 12px 4px;
+  border: 1px solid var(--nm-paper-border);
 }
 
 /* Action row at the bottom of assistant messages (Copy for Word + Drop onto canvas) */
@@ -1372,11 +1475,9 @@
 
 /* Ensure inline SVG icons render correctly inside Noteometry sidebar */
 .noteometry-sidebar svg,
-.noteometry-sidebar-add svg,
+.nm-sidebar-action-btn svg,
 .noteometry-sidebar-item svg {
   display: inline-block !important;
-  width: 18px !important;
-  height: 18px !important;
   stroke: currentColor !important;
   fill: none !important;
   visibility: visible !important;
@@ -1384,9 +1485,9 @@
   vertical-align: middle;
   flex-shrink: 0;
 }
-.noteometry-sidebar-item-del svg {
-  width: 13px !important;
-  height: 13px !important;
+.noteometry-sidebar-toggle svg {
+  width: 18px !important;
+  height: 18px !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1395,7 +1496,7 @@
 
 .noteometry-canvas-object {
   border: 1px solid var(--nm-paper-border);
-  border-radius: var(--nm-radius-sm);
+  border-radius: var(--nm-radius);
   background: var(--nm-paper);
   color: var(--nm-paper-ink);
   box-shadow: var(--nm-shadow-soft);
@@ -1488,6 +1589,8 @@
 /* Title bar — flush editable text input that doubles as drag handle.
  * No background/border until hover or focus for a minimal look. */
 .noteometry-object-title-bar {
+  display: flex;
+  align-items: center;
   cursor: grab;
   user-select: none;
   padding: 0;
@@ -1496,17 +1599,20 @@
 
 .noteometry-object-title-input {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.3px;
   color: var(--nm-paper-ink);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 0;
-  padding: 3px 6px;
+  padding: 2px 6px;
+  max-height: 20px;
+  line-height: 16px;
   outline: none;
   cursor: inherit;
 }
@@ -1520,19 +1626,53 @@
   cursor: text;
 }
 
+/* ── Signal Bus link button ───────────────────────────── */
+.noteometry-signal-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;          /* Apple HIG min touch target */
+  min-width: 44px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: var(--nm-radius-sm);
+  transition: background 0.15s ease;
+}
+.noteometry-signal-link-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.noteometry-signal-link-btn.noteometry-signal-linked {
+  background: var(--nm-accent-light);
+}
+.noteometry-signal-link-btn.noteometry-signal-linked svg {
+  filter: drop-shadow(0 0 3px var(--nm-accent, #4A90D9));
+}
+
+/* Pulse animation on the title bar when receiving signal bus updates */
+@keyframes nm-signal-pulse {
+  0%   { border-color: transparent; }
+  50%  { border-color: var(--nm-accent, #4A90D9); }
+  100% { border-color: transparent; }
+}
+
 /* ── Right-click context menu ─────────────────────────── */
 .noteometry-ctx-menu {
-  min-width: 220px;
-  padding: 4px 0;
+  min-width: 200px;
+  padding: 3px 0;
   background: var(--nm-faceplate);
   color: var(--nm-paper-ink);
-  border: 1px solid var(--nm-chassis-dark);
+  border: 1px solid var(--nm-paper-border);
   border-radius: var(--nm-radius);
   box-shadow:
-    0 6px 20px rgba(10, 20, 35, 0.25),
-    0 2px 6px rgba(10, 20, 35, 0.18);
+    0 4px 16px rgba(10, 20, 35, 0.12),
+    0 1px 4px rgba(10, 20, 35, 0.08);
   font-family: var(--nm-font);
-  font-size: 13px;
+  font-size: 12px;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1541,14 +1681,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
   width: 100%;
-  padding: 6px 14px;
+  min-height: 28px;
+  padding: 4px 12px;
   background: none;
   border: none;
   color: var(--nm-paper-ink);
   cursor: pointer;
   font: inherit;
+  font-size: 12px;
   text-align: left;
 }
 .noteometry-ctx-item:hover:not(.disabled) {
@@ -1580,7 +1722,7 @@
 
 .noteometry-ctx-sep {
   height: 1px;
-  margin: 4px 8px;
+  margin: 3px 8px;
   background: var(--nm-paper-border);
 }
 
@@ -1593,7 +1735,8 @@
 
 .noteometry-object-content {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .noteometry-object-resize-handle {
@@ -1683,6 +1826,14 @@
    * Previous values (36px buttons, 14px color dots) were designed for
    * mouse precision — on an iPad with a finger they're unhittable. */
 
+  /* ── Global: minimum 13px font, no overflow ── */
+  .noteometry-container {
+    overflow-x: hidden;
+  }
+  .noteometry-container * {
+    min-font-size: 13px;
+  }
+
   /* Lasso action bar — was desktop density, now finger-friendly */
   .noteometry-lasso-action-btn {
     min-height: 44px;
@@ -1691,7 +1842,7 @@
   }
   .noteometry-lasso-count {
     min-height: 44px;
-    font-size: 12px;
+    font-size: 13px;
     padding: 10px 10px;
   }
 
@@ -1712,25 +1863,47 @@
   .noteometry-panel-clear,
   .noteometry-panel-solve,
   .noteometry-panel-readink {
-    min-height: 36px;
+    min-height: 44px;
     padding: 8px 14px;
     font-size: 13px;
   }
 
-  /* Chat send + attach buttons — bigger hit zones */
-  .noteometry-chat-send-btn,
+  /* Chat send + attach buttons — 44px × 44px hit zones */
+  .noteometry-chat-send-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
   .noteometry-chat-attach-btn {
-    padding: 12px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+  /* Chat textarea — at least 44px tall */
+  .noteometry-chat-textarea {
+    min-height: 44px;
+    font-size: 14px;
   }
   .noteometry-chat-clear {
-    min-height: 40px;
+    min-height: 44px;
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
   }
   .noteometry-chat-copy-btn {
-    min-height: 36px;
+    min-height: 44px;
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
+  }
+  /* Chat bubbles — proper wrapping, no overflow */
+  .noteometry-chat-bubble {
+    max-width: 90%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    overflow-x: hidden;
   }
 
   /* Preset selector button in chat header */
@@ -1745,20 +1918,23 @@
 
   /* Rich text editor toolbar buttons */
   .noteometry-richtext-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
   .noteometry-richtext-select {
-    min-height: 36px;
+    min-height: 44px;
     padding: 6px 10px;
     font-size: 13px;
   }
 
-  /* Sidebar page / section items */
+  /* Sidebar page items and tabs */
   .noteometry-sidebar-item,
-  .noteometry-sidebar-page-item,
-  .noteometry-sidebar-section-item {
+  .noteometry-sidebar-page-item {
     min-height: 44px;
+  }
+  .nm-sidebar-tab {
+    min-height: 40px;
+    padding: 8px 12px;
   }
   .noteometry-sidebar-toggle {
     min-width: 44px;
@@ -1768,7 +1944,7 @@
 
   /* Settings fields and top-right panel close on touch */
   .noteometry-canvas-action-btn {
-    min-height: 40px;
+    min-height: 44px;
     padding: 10px 14px;
     font-size: 13px;
   }
@@ -1782,6 +1958,76 @@
     max-height: 40vh;
     border-left: none !important;
     border-top: 1px solid var(--nm-warm-border-strong);
+  }
+
+  /* ── Mini toolbar: 48px touch targets ── */
+  .nm-mt-btn {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+  .nm-mini-toolbar {
+    width: 48px;
+  }
+  .nm-mt-popout-btn {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  /* ── Context menu: 44px items, no off-screen ── */
+  .noteometry-ctx-item {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .noteometry-ctx-menu {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+  }
+
+  /* ── Floating panel: bottom sheet on mobile ── */
+  .nm-floating-panel {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 40vh !important;
+    border-radius: 12px 12px 0 0 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12) !important;
+  }
+  .nm-floating-panel.nm-fp-docked {
+    border-radius: 12px 12px 0 0 !important;
+  }
+  .nm-floating-panel.nm-fp-minimized {
+    height: 36px !important;
+  }
+  /* Drag handle style for bottom sheet */
+  .nm-fp-titlebar {
+    justify-content: center;
+    position: relative;
+  }
+  .nm-fp-titlebar::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--nm-ink-muted);
+    opacity: 0.3;
+  }
+  .nm-fp-show-btn {
+    position: fixed;
+    bottom: 8px;
+    right: 8px;
+    top: auto;
+    z-index: 600;
   }
 }
 
@@ -1824,7 +2070,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: var(--nm-chassis-fg);
+  color: var(--nm-faceplate-light);
   align-self: center;
 }
 
@@ -1944,3 +2190,504 @@
 
 /* Zoom controls removed from topbar — zoom now in right-click menu.
  * Ctrl+wheel and pinch-zoom still work in InkCanvas. */
+
+/* ── P2-8: Stamp sub/superscript toggle pill ─────────────────────── */
+.nm-stamp-script-toggle {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: var(--nm-radius-sm, 4px);
+  padding: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.nm-script-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--nm-radius-sm, 3px);
+  background: transparent;
+  color: var(--nm-ink);
+  font-family: "Times New Roman", "STIX Two Math", serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+
+.nm-script-btn:hover {
+  background: var(--nm-accent-light);
+}
+
+.nm-script-btn.nm-script-active {
+  background: var(--nm-accent);
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   v1.2 Component Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── P0-1: Zoom Widget ─────────────────────────────────────────── */
+.nm-zoom-widget {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: 20px;
+  box-shadow: var(--nm-dropin-shadow);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.nm-zoom-btn, .nm-zoom-pct {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--nm-font);
+  color: var(--nm-ink);
+  padding: 6px 10px;
+  line-height: 1;
+  transition: background 0.12s;
+}
+.nm-zoom-btn:hover, .nm-zoom-pct:hover {
+  background: var(--nm-accent-light);
+}
+.nm-zoom-pct {
+  font-weight: 600;
+  min-width: 48px;
+  text-align: center;
+  border-left: 1px solid var(--nm-dropin-border);
+  border-right: 1px solid var(--nm-dropin-border);
+}
+
+/* ── P0-3: Color/Thickness Sub-Panel ───────────────────────────── */
+.nm-pen-panel {
+  position: fixed;
+  z-index: 1200;
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  min-width: 200px;
+}
+.nm-pen-panel-section {
+  margin-bottom: 10px;
+}
+.nm-pen-panel-section:last-child {
+  margin-bottom: 0;
+}
+.nm-pen-panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nm-ink-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.nm-pen-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nm-pen-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+  padding: 0;
+}
+.nm-pen-color-swatch:hover {
+  transform: scale(1.1);
+}
+.nm-pen-color-swatch.active {
+  border-color: var(--nm-accent);
+  box-shadow: 0 0 0 2px var(--nm-accent-light);
+}
+.nm-pen-widths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nm-pen-width-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm);
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--nm-ink);
+  transition: background 0.12s;
+}
+.nm-pen-width-btn:hover {
+  background: var(--nm-faceplate-alt);
+}
+.nm-pen-width-btn.active {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+  color: var(--nm-accent);
+}
+.nm-pen-width-preview {
+  width: 40px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+}
+.nm-pen-width-line {
+  width: 100%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* ── P1-6: Prompt Preset Strip ─────────────────────────────────── */
+.nm-preset-strip {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--nm-dropin-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.nm-preset-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: var(--nm-ink);
+  font-size: 11px;
+  font-family: var(--nm-font);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.nm-preset-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+}
+.nm-preset-btn.nm-preset-active {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+  border-color: var(--nm-accent);
+}
+.nm-slash-toast {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--nm-accent);
+  text-align: center;
+  background: var(--nm-accent-light);
+  border-bottom: 1px solid var(--nm-accent);
+}
+
+/* ── P1-7: Floating AI Panel ───────────────────────────────────── */
+.nm-floating-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nm-floating-panel.nm-fp-docked {
+  border-radius: 0;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.06);
+}
+.nm-floating-panel.nm-fp-minimized {
+  overflow: hidden;
+}
+.nm-fp-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--nm-faceplate);
+  border-bottom: 1px solid var(--nm-dropin-border);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+}
+.nm-fp-titlebar:active {
+  cursor: grabbing;
+}
+.nm-fp-drag-icon {
+  font-size: 10px;
+  color: var(--nm-ink-muted);
+  letter-spacing: -1px;
+}
+.nm-fp-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nm-ink);
+  flex: 1;
+}
+.nm-fp-titlebar-actions {
+  display: flex;
+  gap: 4px;
+}
+.nm-fp-dock-btn, .nm-fp-min-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--nm-ink-muted);
+  padding: 2px 4px;
+  border-radius: var(--nm-radius-sm);
+  transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+}
+.nm-fp-dock-btn:hover, .nm-fp-min-btn:hover {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+.nm-fp-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+.nm-fp-resize-br {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 10;
+  touch-action: none;
+}
+.nm-fp-resize-br::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--nm-ink-muted);
+  border-bottom: 2px solid var(--nm-ink-muted);
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.nm-fp-resize-br:hover::after,
+.nm-fp-resize-br:active::after {
+  opacity: 0.8;
+}
+.nm-fp-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.nm-fp-show-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 500;
+  padding: 4px 12px;
+  border: 1px solid var(--nm-dropin-border);
+  border-radius: var(--nm-radius);
+  background: #FFFFFF;
+  color: var(--nm-ink);
+  font-size: 12px;
+  font-family: var(--nm-font);
+  cursor: pointer;
+  box-shadow: var(--nm-dropin-shadow);
+  transition: all 0.12s;
+}
+.nm-fp-show-btn:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+}
+
+/* ── P2-8: Stamp Script Toggle ─────────────────────────────────── */
+.nm-stamp-script-toggle {
+  display: flex;
+  gap: 1px;
+  background: var(--nm-dropin-border);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: var(--nm-dropin-shadow);
+}
+.nm-script-btn {
+  border: none;
+  background: #FFFFFF;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: serif;
+  color: var(--nm-ink);
+  padding: 3px 8px;
+  min-width: 26px;
+  text-align: center;
+  transition: all 0.12s;
+}
+.nm-script-btn:hover {
+  background: var(--nm-faceplate);
+}
+.nm-script-btn.nm-script-active {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+}
+
+/* ── PDF Re-link button ────────────────────────────────────────── */
+.noteometry-pdf-relink {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--nm-accent);
+  border-radius: var(--nm-radius-sm);
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.noteometry-pdf-relink:hover {
+  background: var(--nm-accent);
+  color: #FFFFFF;
+}
+
+/* (Sidebar course button styles are in the main sidebar block above) */
+
+/* ── Mini Toolbar (persistent, left edge) ─────────────────────── */
+.nm-mini-toolbar {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 20px;
+  width: 44px;
+  padding: 4px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nm-mt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #333333;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nm-mt-btn:hover {
+  background: #F0F0F0;
+}
+
+.nm-mt-btn:active {
+  background: #E0E0E0;
+}
+
+.nm-mt-btn.nm-mt-active {
+  background: #F5A623;
+  color: #FFFFFF;
+}
+
+.nm-mt-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.nm-mt-btn:disabled:hover {
+  background: transparent;
+}
+
+/* Insert popout */
+.nm-mt-insert-wrap {
+  position: relative;
+}
+
+.nm-mt-insert-popout {
+  position: absolute;
+  left: 48px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  z-index: 501;
+}
+
+.nm-mt-popout-btn {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #333333;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nm-mt-popout-btn:hover {
+  background: #F0F0F0;
+}
+
+.nm-mt-popout-btn:active {
+  background: #E0E0E0;
+}
+
+/* ── Circuit Sniper: hover-reveal rotate button (desktop) ── */
+.nm-circuit-component .nm-circuit-rotate-btn {
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .nm-circuit-component:hover .nm-circuit-rotate-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}

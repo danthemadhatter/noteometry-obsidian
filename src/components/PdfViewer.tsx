@@ -2,54 +2,66 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import type NoteometryPlugin from "../main";
 import { loadPdfFromVault } from "../lib/persistence";
 
-// pdfjs-dist v2.x — the last version that supports disableWorker: true
-// in getDocument(). v3+ requires an explicit worker URL which doesn't
-// reliably resolve inside Obsidian's Electron/mobile sandbox. v2 runs
-// everything on the main thread when disableWorker is set, which is
-// slower for huge PDFs but works on every platform without any worker
-// bundling gymnastics.
-// @ts-expect-error — pdfjs-dist@2 ships untyped CJS; TS can't resolve the module but esbuild bundles it fine.
-import * as pdfjsLib from "pdfjs-dist/build/pdf";
-(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
+/* ── PDF Viewer — Chromium native renderer ─────────────────
+ * pdfjs-dist is PERMANENTLY broken in Obsidian's esbuild pipeline.
+ * The `GlobalWorkerOptions.workerSrc` error cannot be fixed because
+ * esbuild hoists and evaluates the pdfjs module before any user code
+ * runs — no amount of require(), lazy-load, or pre-assignment tricks
+ * survive the bundler.
+ *
+ * Solution: bypass pdfjs entirely. Obsidian runs on Electron, which
+ * is Chromium, which has a built-in PDF viewer. We read the binary
+ * from the vault, create a Blob URL, and render it in an <iframe>.
+ * Chromium's native PDF viewer handles rendering, zoom, scroll, and
+ * text selection. Page navigation uses the #page=N URL fragment.
+ *
+ * Advantages over pdfjs:
+ *   - Zero bundling issues (no external module)
+ *   - Faster rendering (native C++ vs JS canvas)
+ *   - Text selection, built-in search, zoom all work for free
+ *   - No worker thread needed
+ * ─────────────────────────────────────────────────────────── */
 
 interface Props {
   fileRef: string;
   page: number;
-  /** Called whenever the user navigates to a different page so the parent
-   * can persist the new page into the canvas object. */
   onPageChange: (page: number) => void;
   plugin?: NoteometryPlugin;
 }
 
-interface PdfState {
-  doc: unknown; // pdfjs PDFDocumentProxy
-  pageCount: number;
-}
-
-/**
- * Renders a single PDF page to a <canvas> element. The canvas is a
- * native DOM canvas, so html2canvas (the lasso rasterizer) can capture
- * its pixels directly — which is the whole point of this component.
- * Iframes would have been simpler but cross-origin sandboxing would
- * have broken the rect-lasso → vision-model OCR pipeline.
- */
 export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [state, setState] = useState<PdfState | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rendering, setRendering] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const blobUrlRef = useRef<string | null>(null);
 
-  // Load the document once per fileRef. Re-reads if the path changes
-  // (e.g. if the user replaces the PDF via some future feature).
+  // ── Load PDF binary and create Blob URL ────────────────
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    setState(null);
+    setLoading(true);
+
+    // Clean up previous blob URL
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+      setBlobUrl(null);
+    }
+
+    const timeout = setTimeout(() => {
+      if (!cancelled && !blobUrl) {
+        setError("Timed out loading PDF (15s)");
+        setLoading(false);
+      }
+    }, 15_000);
+
     (async () => {
       try {
         let data: ArrayBuffer;
+
         if (fileRef.startsWith("data:")) {
-          // Data URL fallback — decode inline.
+          // Legacy data URL fallback
           const base64 = fileRef.replace(/^data:application\/pdf;base64,/, "");
           const binary = atob(base64);
           const buf = new Uint8Array(binary.length);
@@ -60,112 +72,138 @@ export default function PdfViewer({ fileRef, page, onPageChange, plugin }: Props
         } else {
           throw new Error("No plugin available to read vault file");
         }
-        const loadingTask = (pdfjsLib as unknown as {
-          getDocument: (opts: unknown) => { promise: Promise<unknown> };
-        }).getDocument({ data, disableWorker: true });
-        const doc = await loadingTask.promise;
+
         if (cancelled) return;
-        const pageCount = (doc as { numPages: number }).numPages;
-        setState({ doc, pageCount });
+
+        const blob = new Blob([data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        setBlobUrl(url);
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : "Failed to load PDF";
           setError(msg);
           console.error("[Noteometry] PDF load failed:", e);
         }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [fileRef, plugin]);
-
-  // Render the requested page any time the doc OR the page changes.
-  useEffect(() => {
-    if (!state || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const safePage = Math.max(1, Math.min(state.pageCount, page));
-    let cancelled = false;
-    setRendering(true);
-
-    (async () => {
-      try {
-        const pdfPage = await (state.doc as {
-          getPage: (n: number) => Promise<unknown>;
-        }).getPage(safePage);
-        if (cancelled) return;
-        // Render at 1.5x scale so the text is crisp when the canvas
-        // object is small and pixel-perfect when lassoed.
-        const viewport = (pdfPage as {
-          getViewport: (opts: { scale: number }) => { width: number; height: number };
-        }).getViewport({ scale: 1.5 });
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(viewport.width * dpr);
-        canvas.height = Math.floor(viewport.height * dpr);
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) throw new Error("Could not get 2D context for PDF canvas");
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, viewport.width, viewport.height);
-        await (pdfPage as {
-          render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> };
-        }).render({ canvasContext: ctx, viewport }).promise;
-      } catch (e) {
-        if (!cancelled) {
-          console.error("[Noteometry] PDF render failed:", e);
-        }
       } finally {
-        if (!cancelled) setRendering(false);
+        clearTimeout(timeout);
+        if (!cancelled) setLoading(false);
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [state, page]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [fileRef, plugin, retryCount]);
 
+  // Clean up blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  // Page navigation buttons
   const prev = useCallback(() => {
-    if (!state) return;
     if (page > 1) onPageChange(page - 1);
-  }, [state, page, onPageChange]);
+  }, [page, onPageChange]);
 
   const next = useCallback(() => {
-    if (!state) return;
-    if (page < state.pageCount) onPageChange(page + 1);
-  }, [state, page, onPageChange]);
+    onPageChange(page + 1);
+  }, [page, onPageChange]);
 
+  // ── Error state ────────────────────────────────────────
   if (error) {
     return (
-      <div className="noteometry-pdf-error">
-        <span>PDF error: {error}</span>
+      <div className="noteometry-pdf-error" style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", height: "100%", gap: "6px", padding: "16px",
+        textAlign: "center",
+      }}>
+        <span style={{ color: "#DC2626", fontWeight: 600 }}>PDF load failed</span>
+        <span style={{ fontSize: "10px", color: "#999", wordBreak: "break-all" }}>
+          {error}
+        </span>
+        <button
+          onClick={() => { setError(null); setRetryCount(c => c + 1); }}
+          style={{
+            marginTop: "8px", padding: "4px 12px", fontSize: "12px",
+            border: "1px solid #E0E0E0", borderRadius: "4px", cursor: "pointer",
+            background: "var(--nm-faceplate, #F5F5F5)",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
+  // ── Loading state ──────────────────────────────────────
+  if (loading || !blobUrl) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        height: "100%", color: "#999", fontSize: "12px",
+      }}>
+        Loading PDF...
+      </div>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────
+  // Chromium's built-in PDF viewer supports #page=N for navigation.
+  // We use a key to force iframe remount on page change since changing
+  // the hash alone doesn't trigger navigation in blob URLs.
+  const iframeSrc = `${blobUrl}#page=${page}`;
+
   return (
-    <div className="noteometry-pdf-viewer">
-      <div className="noteometry-pdf-toolbar">
-        <button
-          className="noteometry-pdf-nav"
-          onClick={prev}
-          disabled={!state || page <= 1}
-          title="Previous page"
+    <div className="noteometry-pdf-viewer" style={{
+      display: "flex", flexDirection: "column", height: "100%",
+    }}>
+      <div className="noteometry-pdf-toolbar" style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: "8px", padding: "4px 8px", borderBottom: "1px solid #E0E0E0",
+        background: "var(--nm-faceplate, #F5F5F5)", flexShrink: 0,
+      }}>
+        <button className="noteometry-pdf-nav" onClick={prev}
+          disabled={page <= 1} title="Previous page"
+          style={{
+            padding: "2px 8px", border: "1px solid #E0E0E0", borderRadius: "4px",
+            background: "var(--nm-faceplate, #F5F5F5)", cursor: page <= 1 ? "default" : "pointer",
+            opacity: page <= 1 ? 0.4 : 1,
+          }}
         >
           ◀
         </button>
-        <span className="noteometry-pdf-page">
-          {state ? `${page} / ${state.pageCount}` : rendering ? "…" : "loading"}
+        <span className="noteometry-pdf-page" style={{
+          fontSize: "11px", color: "var(--nm-ink, #1A1A2E)",
+          fontFamily: "var(--nm-font-mono, monospace)",
+        }}>
+          Page {page}
         </span>
-        <button
-          className="noteometry-pdf-nav"
-          onClick={next}
-          disabled={!state || page >= (state?.pageCount ?? 1)}
+        <button className="noteometry-pdf-nav" onClick={next}
           title="Next page"
+          style={{
+            padding: "2px 8px", border: "1px solid #E0E0E0", borderRadius: "4px",
+            background: "var(--nm-faceplate, #F5F5F5)", cursor: "pointer",
+          }}
         >
           ▶
         </button>
       </div>
-      <div className="noteometry-pdf-canvas-wrap">
-        <canvas ref={canvasRef} className="noteometry-pdf-canvas" />
-      </div>
+      <iframe
+        key={`pdf-page-${page}`}
+        src={iframeSrc}
+        style={{
+          flex: 1, width: "100%", border: "none",
+          background: "#ffffff",
+        }}
+        title="PDF Viewer"
+      />
     </div>
   );
 }
