@@ -1,6 +1,6 @@
 {
 	"name": "noteometry",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"description": "EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students",
 	"main": "main.js",
 	"type": "module",
@@ -38,7 +38,6 @@
 	"dependencies": {
 		"html2canvas": "^1.4.1",
 		"katex": "^0.16.45",
-		"mathjs": "^15.2.0",
 		"obsidian": "latest",
 		"pdfjs-dist": "^2.16.105",
 		"react": "^18.3.1",

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { compile } from "mathjs";
+import { evaluate } from "../../lib/mathExpr";
 import type { GraphPlotterObject } from "../../lib/canvasObjects";
 import { getSignalBus } from "../../services/SignalBus";
 import type { SignalState, WaveformType } from "../../services/SignalBus";
@@ -20,23 +20,11 @@ interface Props {
   onSendToAI?: (dataUrl: string) => void;
 }
 
-/** Safely evaluate an expression string at x using mathjs. */
-function evalExpr(exprStr: string, x: number): number | null {
-  try {
-    const node = compile(exprStr);
-    const result = node.evaluate({ x, pi: Math.PI, e: Math.E, Inf: Infinity });
-    if (typeof result === "number" && isFinite(result)) return result;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/** Register step(x) as a custom function — unit step. */
+/** Safely evaluate an expression string at x using lightweight parser. */
 function evalExprWithStep(exprStr: string, x: number): number | null {
-  // Replace step(…) with a ternary before compiling
+  // Replace step(…) with a ternary before parsing
   const replaced = exprStr.replace(/\bstep\(([^)]*)\)/g, "($1 >= 0 ? 1 : 0)");
-  return evalExpr(replaced, x);
+  return evaluate(replaced, { x, pi: Math.PI, e: Math.E, Inf: Infinity });
 }
 
 /** Build the expression string for a signal bus waveform. */
