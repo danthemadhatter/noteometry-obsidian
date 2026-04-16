@@ -4,7 +4,7 @@ import { getSignalBus } from "../../services/SignalBus";
 import type { SignalState, WaveformType } from "../../services/SignalBus";
 
 const TIME_DIVS = [10e-6, 50e-6, 100e-6, 500e-6, 1e-3, 5e-3, 10e-3, 50e-3, 100e-3];
-const TIME_DIV_LABELS = ["10\u00B5s", "50\u00B5s", "100\u00B5s", "500\u00B5s", "1ms", "5ms", "10ms", "50ms", "100ms"];
+const TIME_DIV_LABELS = ["10µs", "50µs", "100µs", "500µs", "1ms", "5ms", "10ms", "50ms", "100ms"];
 const VOLTS_DIVS = [0.1, 0.2, 0.5, 1, 2, 5];
 const VOLTS_DIV_LABELS = ["0.1V", "0.2V", "0.5V", "1V", "2V", "5V"];
 const WAVEFORM_TYPES: ChannelConfig["waveform"][] = ["sine", "square", "sawtooth", "triangle", "pulse", "dc", "off"];
@@ -403,7 +403,7 @@ function ChannelRow({ label, color, ch, onUpdate }: {
       </select>
       <NumInput label="f" value={ch.frequency} unit="Hz" onChange={(v) => onUpdate({ frequency: v })} />
       <NumInput label="A" value={ch.amplitude} unit="V" onChange={(v) => onUpdate({ amplitude: v })} />
-      <NumInput label="\u03C6" value={ch.phase} unit="\u00B0" onChange={(v) => onUpdate({ phase: v })} />
+      <NumInput label="φ" value={ch.phase} unit="°" onChange={(v) => onUpdate({ phase: v })} />
       <select
         value={ch.voltsDivIndex}
         onChange={(e) => onUpdate({ voltsDivIndex: parseInt(e.target.value) })}
@@ -488,7 +488,7 @@ function formatFreq(hz: number): string {
 
 function formatTime(s: number): string {
   if (s < 1e-6) return `${(s * 1e9).toFixed(1)}ns`;
-  if (s < 1e-3) return `${(s * 1e6).toFixed(1)}\u00B5s`;
+  if (s < 1e-3) return `${(s * 1e6).toFixed(1)}µs`;
   if (s < 1) return `${(s * 1e3).toFixed(2)}ms`;
   return `${s.toFixed(4)}s`;
 }

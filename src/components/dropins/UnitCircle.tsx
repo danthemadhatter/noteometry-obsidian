@@ -10,22 +10,22 @@ const DEG_TO_RAD = Math.PI / 180;
 /** Map snapped degree values to exact radian fraction strings. */
 const RADIAN_FRACTIONS: Record<number, string> = {
   0: "0",
-  30: "\u03C0/6",
-  45: "\u03C0/4",
-  60: "\u03C0/3",
-  90: "\u03C0/2",
-  120: "2\u03C0/3",
-  135: "3\u03C0/4",
-  150: "5\u03C0/6",
-  180: "\u03C0",
-  210: "7\u03C0/6",
-  225: "5\u03C0/4",
-  240: "4\u03C0/3",
-  270: "3\u03C0/2",
-  300: "5\u03C0/3",
-  315: "7\u03C0/4",
-  330: "11\u03C0/6",
-  360: "2\u03C0",
+  30: "π/6",
+  45: "π/4",
+  60: "π/3",
+  90: "π/2",
+  120: "2π/3",
+  135: "3π/4",
+  150: "5π/6",
+  180: "π",
+  210: "7π/6",
+  225: "5π/4",
+  240: "4π/3",
+  270: "3π/2",
+  300: "5π/3",
+  315: "7π/4",
+  330: "11π/6",
+  360: "2π",
 };
 
 interface Props {
@@ -319,16 +319,16 @@ export default function UnitCircle({ obj, onChange }: Props) {
         overflow: "auto",
         minWidth: 0,
       }}>
-        <ValueRow label="\u03B8" value={`${angleDeg.toFixed(1)}\u00B0`} />
-        <ValueRow label="\u03B8" value={isExactFraction ? `${radianStr} rad` : radianStr} />
+        <ValueRow label="θ" value={`${angleDeg.toFixed(1)}°`} />
+        <ValueRow label="θ" value={isExactFraction ? `${radianStr} rad` : radianStr} />
         <div style={{ height: 4 }} />
         <ValueRow label="sin" value={sinVal.toFixed(4)} color="#4A90D9" />
         <ValueRow label="cos" value={cosVal.toFixed(4)} color="#E53935" />
         <ValueRow label="tan" value={tanVal !== null ? tanVal.toFixed(4) : "undefined"} />
         <div style={{ height: 4 }} />
-        <ValueRow label="z" value={`${cosVal.toFixed(3)}+j\u00B7${sinVal.toFixed(3)}`} />
+        <ValueRow label="z" value={`${cosVal.toFixed(3)}+j·${sinVal.toFixed(3)}`} />
         <ValueRow label="|z|" value="1.000" />
-        <ValueRow label="\u2220z" value={`${angleDeg.toFixed(1)}\u00B0`} />
+        <ValueRow label="∠z" value={`${angleDeg.toFixed(1)}°`} />
         {linked && busFrequency !== null && (
           <>
             <div style={{ height: 4 }} />
