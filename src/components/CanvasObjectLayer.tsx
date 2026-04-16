@@ -17,6 +17,7 @@ import UnitCircle from "./dropins/UnitCircle";
 import Oscilloscope from "./dropins/Oscilloscope";
 import AnimationCanvas from "./dropins/AnimationCanvas";
 import StudyGantt from "./dropins/StudyGantt";
+import Compute from "./dropins/Compute";
 import type {
   ImageAnnotatorObject,
   FormulaCardObject,
@@ -27,6 +28,7 @@ import type {
   OscilloscopeObject,
   AnimationCanvasObject,
   StudyGanttObject,
+  ComputeObject,
 } from "../lib/canvasObjects";
 
 /* ── Signal Bus link helpers ──────────────────────────────────── */
@@ -86,6 +88,8 @@ export function DropinIcon({ type }: { type: string }) {
       return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><polygon points="10 8 10 16 16 12" fill="currentColor" stroke="none"/></svg>;
     case "study-gantt":
       return <svg {...iconProps}><rect x="3" y="4" width="10" height="3" rx="1"/><rect x="7" y="10" width="12" height="3" rx="1"/><rect x="5" y="16" width="8" height="3" rx="1"/></svg>;
+    case "compute":
+      return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><text x="12" y="15" fontSize="10" fontWeight="700" fill="currentColor" stroke="none" textAnchor="middle" fontFamily="monospace">fx</text></svg>;
     default:
       return <svg {...iconProps}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>;
   }
@@ -572,6 +576,16 @@ export default function CanvasObjectLayer({
             {obj.type === "study-gantt" && (
               <StudyGantt
                 obj={obj as StudyGanttObject}
+                onChange={(patch) => {
+                  onObjectsChange(objects.map(o =>
+                    o.id === obj.id ? { ...o, ...patch } as CanvasObject : o
+                  ));
+                }}
+              />
+            )}
+            {obj.type === "compute" && (
+              <Compute
+                obj={obj as ComputeObject}
                 onChange={(patch) => {
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id ? { ...o, ...patch } as CanvasObject : o

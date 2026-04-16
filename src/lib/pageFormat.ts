@@ -9,7 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig, AnimationFrame, GanttTask } from "./canvasObjects";
+import type { CanvasObject, RelativeStroke, CircuitElement, ChannelConfig, AnimationFrame, GanttTask, ComputeCell } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -257,6 +257,18 @@ export interface StudyGanttElementV3 {
   name?: string;
 }
 
+export interface ComputeElementV3 {
+  type: "compute";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cells: ComputeCell[];
+  variables: Record<string, string>;
+  name?: string;
+}
+
 export type PageElementV3 =
   | StrokeElementV3
   | StampElementV3
@@ -272,7 +284,8 @@ export type PageElementV3 =
   | UnitCircleElementV3
   | OscilloscopeElementV3
   | AnimationCanvasElementV3
-  | StudyGanttElementV3;
+  | StudyGanttElementV3
+  | ComputeElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -450,6 +463,15 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         tasks: obj.tasks,
         startDate: obj.startDate,
+        name: obj.name,
+      });
+    } else if (obj.type === "compute") {
+      elements.push({
+        type: "compute",
+        id: obj.id,
+        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
+        cells: obj.cells,
+        variables: obj.variables,
         name: obj.name,
       });
     }
@@ -646,6 +668,16 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           tasks: el.tasks ?? [],
           startDate: el.startDate ?? new Date().toISOString().slice(0, 10),
+          name: el.name,
+        });
+        break;
+      case "compute":
+        canvasObjects.push({
+          id: el.id,
+          type: "compute",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          cells: el.cells ?? [],
+          variables: el.variables ?? {},
           name: el.name,
         });
         break;

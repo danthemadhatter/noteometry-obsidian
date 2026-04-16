@@ -174,6 +174,18 @@ export interface StudyGanttObject extends CanvasObjectBase {
   startDate: string; // ISO date string — left edge of chart
 }
 
+export interface ComputeCell {
+  id: string;
+  label: string;
+  expr: string;
+}
+
+export interface ComputeObject extends CanvasObjectBase {
+  type: "compute";
+  cells: ComputeCell[];
+  variables: Record<string, string>;
+}
+
 export type CanvasObject =
   | TextBoxObject
   | TableObject
@@ -187,7 +199,8 @@ export type CanvasObject =
   | UnitCircleObject
   | OscilloscopeObject
   | AnimationCanvasObject
-  | StudyGanttObject;
+  | StudyGanttObject
+  | ComputeObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -338,6 +351,18 @@ export function createStudyGantt(
   };
 }
 
+export function createCompute(
+  x: number, y: number,
+  name: string = "Compute"
+): ComputeObject {
+  return {
+    id: newObjectId(), type: "compute", x, y,
+    w: 380, h: 260, name,
+    cells: [],
+    variables: {},
+  };
+}
+
 /** Default display name when an object has none set (old pages). */
 export function defaultObjectName(obj: CanvasObject): string {
   if (obj.name && obj.name.trim()) return obj.name;
@@ -355,5 +380,6 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "oscilloscope": return "Oscilloscope";
     case "animation-canvas": return "Animation Canvas";
     case "study-gantt": return "Study Gantt";
+    case "compute": return "Compute";
   }
 }
