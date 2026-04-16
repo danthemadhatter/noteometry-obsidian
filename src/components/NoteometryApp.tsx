@@ -3,7 +3,7 @@ import { App, Notice, TFolder, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { strokeIntersectsPolygon, strokeFullyInsidePolygon, stampIntersectsPolygon, stampBBox, newStampId, groupStrokes } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
-import { createTextBox, createTable, createImageObject, createPdfObject, createImageAnnotator, createFormulaCard, createUnitConverter, createCircuitSniper, createGraphPlotter, createUnitCircle, createOscilloscope } from "../lib/canvasObjects";
+import { createTextBox, createTable, createImageObject, createPdfObject, createUnitConverter, createCircuitSniper, createGraphPlotter, createUnitCircle, createOscilloscope } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, pagePath, loadPage, migrateBase64Images, CanvasData } from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 import CanvasObjectLayer, { DropinIcon } from "./CanvasObjectLayer";
@@ -644,19 +644,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pdfInputRef.current?.click();
   }, []);
 
-  const handleInsertImageAnnotator = useCallback(() => {
-    const obj = createImageAnnotator(scrollX + 150, scrollY + 150);
-    setCanvasObjects((prev) => [...prev, obj]);
-    setTool("select");
-    setSelectedObjectId(obj.id);
-  }, [scrollX, scrollY]);
-
-  const handleInsertFormulaCard = useCallback(() => {
-    const obj = createFormulaCard(scrollX + 150, scrollY + 150);
-    setCanvasObjects((prev) => [...prev, obj]);
-    setTool("select");
-    setSelectedObjectId(obj.id);
-  }, [scrollX, scrollY]);
 
   const handleInsertUnitConverter = useCallback(() => {
     const obj = createUnitConverter(scrollX + 150, scrollY + 150);
@@ -818,8 +805,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Text Box", icon: <DropinIcon type="textbox" />, onClick: handleInsertTextBox },
         { label: "Table", icon: <DropinIcon type="table" />, onClick: handleInsertTable },
         { label: "Image\u2026", icon: <DropinIcon type="image" />, onClick: handleInsertImage },
-        { label: "Image Annotator", icon: <DropinIcon type="image-annotator" />, onClick: handleInsertImageAnnotator },
-        { label: "Formula Card", icon: <DropinIcon type="formula-card" />, onClick: handleInsertFormulaCard },
         { label: "Unit Converter", icon: <DropinIcon type="unit-converter" />, onClick: handleInsertUnitConverter },
         { label: "Circuit Sniper", icon: <DropinIcon type="circuit-sniper" />, onClick: handleInsertCircuitSniper },
         { label: "PDF\u2026", icon: <DropinIcon type="pdf" />, onClick: handleInsertPdf },
@@ -899,7 +884,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     setZoomLocked, toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
-    handleInsertImageAnnotator, handleInsertFormulaCard, handleInsertUnitConverter, handleInsertCircuitSniper,
+    handleInsertUnitConverter, handleInsertCircuitSniper,
     handleInsertGraphPlotter, handleInsertUnitCircle, handleInsertOscilloscope,
   ]);
 
@@ -1271,7 +1256,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
               onPointerUp={() => { fpDragRef.current = null; }}
             >
               <span className="nm-fp-drag-icon">⋮⋮</span>
-              <span className="nm-fp-title">{fpMinimized ? "AI Panel ▼" : "AI Panel"}</span>
+              <span className="nm-fp-title">{fpMinimized ? "AI Drop-in ▼" : "AI Drop-in"}</span>
               <div className="nm-fp-titlebar-actions">
                 {!fpDocked && !fpMinimized && (
                   <button className="nm-fp-dock-btn" onClick={() => { setFpDocked(true); setFpPos({ x: -1, y: 0 }); }} title="Dock to right edge" aria-label="Dock to right edge">
@@ -1362,9 +1347,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
         <button
           className="nm-fp-show-btn"
           onClick={() => setPanelOpen(true)}
-          title="Show AI Panel"
+          title="Show AI Drop-in"
         >
-          AI Panel
+          AI Drop-in
         </button>
       )}
 

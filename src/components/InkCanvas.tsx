@@ -622,7 +622,7 @@ export default function InkCanvas({
         ref={inkCanvasRef}
         className="noteometry-ink-layer"
         style={{
-          cursor: tool === "grab" ? "grab" : tool === "eraser" ? "cell" : (tool === "pen" || tool === "line" || tool === "arrow" || tool === "rect" || tool === "circle") ? "crosshair" : "default",
+          cursor: tool === "grab" ? "grab" : tool === "eraser" ? "cell" : tool === "select" ? "default" : "crosshair",
           pointerEvents: (tool === "select" || disabled) ? "none" : "auto",
         }}
       />
