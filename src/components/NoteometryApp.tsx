@@ -741,11 +741,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
           link.click();
         }},
         { label: "Clear Canvas", danger: true, onClick: () => {
-          if (!confirm("Clear all strokes and stamps from this page?")) return;
-          if (!confirm("Are you SURE? This wipes every stroke and stamp. Click OK only if you really mean it.")) return;
+          if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
+          if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
           pushUndo();
           setStrokes([]);
           setStamps([]);
+          setCanvasObjects([]);
+          setSelectedObjectId(null);
+          setSelectedStampId(null);
         }},
       );
     }
