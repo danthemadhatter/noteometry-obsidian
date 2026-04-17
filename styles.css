@@ -304,38 +304,33 @@
 
 .nm-sidebar-tab-bar {
   display: flex;
-  flex-direction: row;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-direction: column;
+  overflow-y: auto;
   flex-shrink: 0;
+  max-height: 40%;
   border-bottom: 1px solid var(--nm-paper-border);
   background: var(--nm-faceplate-alt);
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-}
-.nm-sidebar-tab-bar::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
 }
 
 .nm-sidebar-tab {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 10px;
-  font-size: 11px;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
   color: var(--nm-ink);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   border: none;
   background: none;
-  border-bottom: 2px solid transparent;
-  transition: all 0.12s;
+  border-left: 3px solid transparent;
+  transition: background 0.12s;
   -webkit-tap-highlight-color: transparent;
+  text-align: left;
+  width: 100%;
 }
 
 .nm-sidebar-tab:hover {
@@ -343,15 +338,16 @@
 }
 
 .nm-sidebar-tab.active {
-  border-bottom-color: var(--nm-accent);
+  border-left-color: var(--nm-accent);
   color: var(--nm-accent);
+  background: rgba(74, 144, 217, 0.08);
 }
 
 .nm-sidebar-tab-label {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100px;
 }
 
 /* Delete button on tab — hidden until hover */
