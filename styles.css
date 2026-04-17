@@ -2784,3 +2784,420 @@
     pointer-events: auto !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Dashboard redesign — sidebar + panel + chat polish
+   Added to make the GUI icon-rich and card-like without removing any
+   existing features. Every selector here is additive or scoped so the
+   pre-existing rules above remain the source of truth for dimensions.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar header: brand mark + count badge ───────────────────── */
+.noteometry-sidebar-hdr {
+  padding: 10px 12px 8px;
+  gap: 8px;
+  background: linear-gradient(180deg,
+    var(--nm-faceplate-alt) 0%,
+    var(--nm-faceplate-light) 100%);
+  position: relative;
+}
+.noteometry-sidebar-hdr::after {
+  content: '';
+  position: absolute;
+  left: 10px; right: 10px; bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--nm-paper-border) 20%,
+    var(--nm-paper-border) 80%,
+    transparent 100%);
+}
+.noteometry-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.noteometry-sidebar-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--nm-accent), var(--nm-phosphor));
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.noteometry-sidebar-brand-mark svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+.noteometry-sidebar-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.noteometry-sidebar-hdr-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+  flex-shrink: 0;
+}
+
+/* ── Section tab bar: larger max-height, card rows ─────────────── */
+.nm-sidebar-tab-bar {
+  max-height: 48%;
+  padding: 4px 6px;
+  gap: 2px;
+  background: var(--nm-faceplate-light);
+}
+
+/* Section tab: card layout with folder chip + tone bar + count pill */
+.nm-sidebar-tab {
+  padding: 8px 10px 8px 8px;
+  border-radius: 10px;
+  border-left: none;
+  position: relative;
+  overflow: hidden;
+  gap: 10px;
+}
+.nm-sidebar-tab::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--nm-tone, var(--nm-accent));
+  opacity: 0.35;
+  transition: opacity 0.15s, width 0.15s;
+}
+.nm-sidebar-tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.nm-sidebar-tab:hover::before { opacity: 0.7; }
+.nm-sidebar-tab.active {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--nm-tone, var(--nm-accent)) 14%, transparent) 0%,
+    color-mix(in srgb, var(--nm-tone, var(--nm-accent)) 4%, transparent) 100%);
+  color: var(--nm-ink);
+  font-weight: 700;
+}
+.nm-sidebar-tab.active::before { opacity: 1; width: 4px; }
+
+/* Tone colors cycled through sections so each has its own identity */
+.nm-sidebar-tab.nm-tone-1 { --nm-tone: #4A90D9; }  /* blue */
+.nm-sidebar-tab.nm-tone-2 { --nm-tone: #E07A5F; }  /* coral */
+.nm-sidebar-tab.nm-tone-3 { --nm-tone: #81B29A; }  /* sage */
+.nm-sidebar-tab.nm-tone-4 { --nm-tone: #B68CDB; }  /* violet */
+.nm-sidebar-tab.nm-tone-5 { --nm-tone: #F2CC8F; }  /* amber */
+.nm-sidebar-tab.nm-tone-6 { --nm-tone: #6F8AB7; }  /* slate */
+
+.nm-sidebar-tab-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--nm-tone, var(--nm-accent)) 18%, transparent);
+  color: var(--nm-tone, var(--nm-accent));
+  flex-shrink: 0;
+}
+.nm-sidebar-tab-chip svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+.nm-sidebar-tab.active .nm-sidebar-tab-chip {
+  background: var(--nm-tone, var(--nm-accent));
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+.nm-sidebar-tab-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: rgba(0,0,0,0.06);
+  color: var(--nm-ink-muted, #666);
+  flex-shrink: 0;
+}
+.nm-sidebar-tab.active .nm-sidebar-tab-count {
+  background: color-mix(in srgb, var(--nm-tone, var(--nm-accent)) 22%, transparent);
+  color: var(--nm-tone, var(--nm-accent));
+}
+
+/* ── Page list rows: leading icon + softer active card ──────────── */
+.nm-sidebar-page-list {
+  padding: 4px 6px 6px;
+}
+.noteometry-sidebar-item {
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border-left: none;
+  margin: 1px 0;
+  height: auto;
+  min-height: 32px;
+}
+.noteometry-sidebar-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--nm-ink-muted, #666);
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.noteometry-sidebar-item-icon svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-icon {
+  background: rgba(0,0,0,0.05);
+  color: var(--nm-ink);
+}
+.noteometry-sidebar-item.active {
+  background: linear-gradient(90deg,
+    var(--nm-accent-light) 0%,
+    color-mix(in srgb, var(--nm-accent-light) 50%, transparent) 100%);
+  border-left: none;
+  box-shadow: inset 3px 0 0 var(--nm-accent);
+}
+.noteometry-sidebar-item.active .noteometry-sidebar-item-icon {
+  background: var(--nm-accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+
+/* Empty state: centered icon + gentle hint */
+.nm-sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.nm-sidebar-empty svg {
+  width: 28px !important;
+  height: 28px !important;
+  color: var(--nm-ink-muted, #aaa);
+  opacity: 0.5;
+}
+.nm-sidebar-empty b {
+  color: var(--nm-accent);
+  font-weight: 700;
+}
+
+/* ── Bottom action bar: distinct pill for each action ───────────── */
+.nm-sidebar-bottom-bar {
+  padding: 8px 8px 10px;
+  background: linear-gradient(0deg,
+    var(--nm-faceplate-alt) 0%,
+    var(--nm-faceplate-light) 100%);
+}
+.nm-sidebar-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.nm-sidebar-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--nm-ink);
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-paper-border);
+  box-shadow: var(--nm-shadow-soft, 0 1px 2px rgba(0,0,0,0.04));
+  transition: all 0.15s ease;
+}
+.nm-sidebar-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  background: var(--nm-faceplate-light);
+}
+.nm-sidebar-action-btn .nm-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.nm-sidebar-action-btn .nm-action-icon svg {
+  width: 15px !important;
+  height: 15px !important;
+}
+.nm-sidebar-action-btn.nm-action-page .nm-action-icon {
+  background: color-mix(in srgb, #4A90D9 18%, transparent);
+  color: #4A90D9;
+}
+.nm-sidebar-action-btn.nm-action-section .nm-action-icon {
+  background: color-mix(in srgb, #81B29A 22%, transparent);
+  color: #4c8a71;
+}
+.nm-sidebar-action-btn.nm-sidebar-action-course .nm-action-icon {
+  background: color-mix(in srgb, #B68CDB 22%, transparent);
+  color: #8a5cc4;
+}
+.nm-sidebar-action-btn .nm-action-label {
+  letter-spacing: 0.1px;
+}
+
+/* ── Panel box headers: icon + title + nicer action pills ───────── */
+.noteometry-panel-box-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+  margin-right: auto;
+}
+.noteometry-panel-box-title svg {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--nm-accent);
+  opacity: 0.85;
+}
+
+.noteometry-panel-solve {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--nm-accent), color-mix(in srgb, var(--nm-accent) 70%, #6fb3d9));
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.14);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.noteometry-panel-solve:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+}
+.noteometry-panel-solve svg {
+  width: 11px !important;
+  height: 11px !important;
+}
+.noteometry-panel-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.noteometry-panel-clear svg {
+  width: 11px !important;
+  height: 11px !important;
+}
+
+/* ── Chat header: icon + count pill ─────────────────────────────── */
+.noteometry-chat-header {
+  padding: 10px 14px 6px;
+}
+.noteometry-chat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  color: var(--nm-ink);
+}
+.noteometry-chat-title svg {
+  width: 14px !important;
+  height: 14px !important;
+  color: var(--nm-accent);
+}
+.noteometry-chat-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+  margin-left: 2px;
+}
+
+/* ── Canvas "open panel" button: icon + label pill ──────────────── */
+.nm-canvas-action-panel {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+}
+.nm-canvas-action-panel svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* ── Tools FAB: let the bolt icon breathe on mobile ─────────────── */
+.nm-tools-fab svg {
+  width: 22px !important;
+  height: 22px !important;
+  color: var(--nm-accent);
+}
+
+/* ── Mobile right-panel tabs: icon + label stacked ──────────────── */
+@media (max-width: 767px) {
+  .nm-right-tab {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .nm-right-tab svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .nm-right-tab-hide svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+}
+
+/* ── Dark theme adjustments ─────────────────────────────────────── */
+.theme-dark .noteometry-sidebar-hdr {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.02) 0%,
+    transparent 100%);
+}
+.theme-dark .nm-sidebar-action-btn {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.08);
+}
+.theme-dark .nm-sidebar-action-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+.theme-dark .noteometry-sidebar-item:hover .noteometry-sidebar-item-icon {
+  background: rgba(255,255,255,0.06);
+}
+.theme-dark .nm-sidebar-tab:hover {
+  background: rgba(255,255,255,0.04);
+}

@@ -48,3 +48,52 @@ export const IconZoomOut = () => <svg {...s}><circle cx="11" cy="11" r="7"/><lin
 // manuals onto the canvas and lasso-clip pieces into the chat.
 export const IconPdf = () => <svg {...s}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h1.5a1.5 1.5 0 0 1 0 3H9v-3z" fill="currentColor" stroke="none"/><path d="M9 13v5"/></svg>;
 export const IconBook = () => <svg {...s}><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>;
+
+/* ── Contextual page / dashboard icons ────────────────────────────────
+ * Added so pages auto-show a meaningful glyph based on name keywords
+ * (math, physics, coding, writing, planning, etc). Improves at-a-glance
+ * recognition — critical for ADHD/visual-memory users who scan not read.
+ */
+export const IconSparkles = () => <svg {...s}><path d="M12 3v3m0 12v3M4.5 4.5l2 2m11 11 2 2M3 12h3m12 0h3M4.5 19.5l2-2m11-11 2-2"/><circle cx="12" cy="12" r="3"/></svg>;
+export const IconBrain = () => <svg {...s}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2a2.5 2.5 0 0 0-2.5 2.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/></svg>;
+export const IconCalculator = () => <svg {...s}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M12 10h2M16 10h0.01M8 14h2M12 14h2M16 14h0.01M8 18h2M12 18h6"/></svg>;
+export const IconFlask = () => <svg {...s}><path d="M10 2v7.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V2"/><path d="M8 2h8"/><path d="M7 14h10"/></svg>;
+export const IconAtom = () => <svg {...s}><circle cx="12" cy="12" r="1"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>;
+export const IconCode = () => <svg {...s}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
+export const IconTarget = () => <svg {...s}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+export const IconCalendar = () => <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>;
+export const IconPlay = () => <svg {...s}><polygon points="6 3 20 12 6 21 6 3" fill="currentColor" stroke="none"/></svg>;
+export const IconEye = () => <svg {...s}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>;
+export const IconEdit3 = () => <svg {...s}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>;
+export const IconMessageCircle = () => <svg {...s}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>;
+export const IconZap = () => <svg {...s}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+export const IconLayout = () => <svg {...s}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>;
+export const IconList = () => <svg {...s}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>;
+export const IconGlobe = () => <svg {...s}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>;
+export const IconMusic = () => <svg {...s}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+export const IconFeather = () => <svg {...s}><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>;
+
+/* Map a page/section name to a contextual icon. Cheap substring pass:
+ * no dependencies, safe fallback to IconFile. Callers render the returned
+ * component directly — no runtime cost beyond a single regex-free scan. */
+const iconMap: Array<[RegExp, React.ComponentType]> = [
+  [/\b(math|algebra|calc|geom|trig|stat)/i, IconCalculator],
+  [/\b(chem|lab|flask|reaction)/i, IconFlask],
+  [/\b(phys|physics|mech|quantum|atom)/i, IconAtom],
+  [/\b(bio|biolog|anat|cell|gene)/i, IconFeather],
+  [/\b(code|program|software|dev|cs|comp.?sci)/i, IconCode],
+  [/\b(goal|target|objective|plan|okr)/i, IconTarget],
+  [/\b(week|day|schedule|calendar|gantt)/i, IconCalendar],
+  [/\b(idea|brainstorm|think|notes?)/i, IconBrain],
+  [/\b(chat|journal|log|diary)/i, IconMessageCircle],
+  [/\b(essay|writ|paper|draft)/i, IconEdit3],
+  [/\b(history|world|geo|country)/i, IconGlobe],
+  [/\b(music|song|audio)/i, IconMusic],
+  [/\b(todo|list|checklist)/i, IconList],
+  [/\b(spark|quick|scratch)/i, IconSparkles],
+];
+
+export function iconFromName(name: string): React.ComponentType {
+  for (const [re, Icon] of iconMap) if (re.test(name)) return Icon;
+  return IconFile;
+}

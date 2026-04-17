@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
+import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck, IconMessageCircle } from "./Icons";
 import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
 
@@ -169,7 +169,13 @@ export default function ChatPanel({
     >
       {/* Header — just the chat title + New button */}
       <div className="noteometry-chat-header">
-        <span className="noteometry-chat-title">Chat</span>
+        <span className="noteometry-chat-title">
+          <IconMessageCircle />
+          <span>Chat</span>
+          {messages.length > 0 && (
+            <span className="noteometry-chat-count">{messages.length}</span>
+          )}
+        </span>
         {messages.length > 0 && (
           <button className="noteometry-chat-clear" onClick={onClear} title="New conversation">
             <IconRotate />

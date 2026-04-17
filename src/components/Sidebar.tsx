@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Notice } from "obsidian";
 import {
-  IconPlus, IconTrash, IconFolder, IconFile,
-  IconChevDown, IconChevRight, IconMenu, IconX, IconPen, IconBook,
+  IconPlus, IconFolder,
+  IconMenu, IconX, IconBook, IconLayout, IconSparkles,
+  iconFromName,
 } from "./Icons";
 import type NoteometryPlugin from "../main";
 import {
@@ -336,19 +337,29 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
         {/* ── Header ── */}
         <div className="noteometry-sidebar-hdr">
           {toggleBtn}
-          <span className="noteometry-sidebar-title">Notebooks</span>
+          <span className="noteometry-sidebar-brand">
+            <span className="noteometry-sidebar-brand-mark"><IconLayout /></span>
+            <span className="noteometry-sidebar-title">Notebooks</span>
+          </span>
+          <span className="noteometry-sidebar-hdr-count" title="Total sections">
+            {sections.length}
+          </span>
         </div>
 
-        {/* ── Section tabs (horizontal, scrollable) ── */}
+        {/* ── Section tabs (vertical list, each row shows a folder glyph
+               + a colored tone chip derived from the section index so it's
+               visually distinct at a glance) ── */}
         <div className="nm-sidebar-tab-bar" ref={tabBarRef}>
-          {sections.map((s) => {
+          {sections.map((s, idx) => {
             const isActive = activeTab === s;
             const isRenaming = renamingItem?.type === "section" && renamingItem.name === s;
+            const tone = (idx % 6) + 1;
+            const pageCount = pagesMap[s]?.length;
 
             return (
               <div
                 key={s}
-                className={`nm-sidebar-tab${isActive ? " active" : ""}`}
+                className={`nm-sidebar-tab nm-tone-${tone}${isActive ? " active" : ""}`}
                 onClick={() => {
                   if (!isRenaming) setActiveTab(s);
                 }}
@@ -360,7 +371,11 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
               >
                 {isRenaming ? renameInput() : (
                   <>
+                    <span className="nm-sidebar-tab-chip"><IconFolder /></span>
                     <span className="nm-sidebar-tab-label">{s}</span>
+                    {typeof pageCount === "number" && (
+                      <span className="nm-sidebar-tab-count">{pageCount}</span>
+                    )}
                     <button
                       className="nm-sidebar-tab-del"
                       onPointerUp={(e) => { e.stopPropagation(); handleDeleteSection(s); }}
@@ -375,13 +390,15 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
           })}
         </div>
 
-        {/* ── Pages list ── */}
+        {/* ── Pages list (each row shows an auto-chosen icon based on
+               page name keywords for faster visual scanning) ── */}
         <div className="nm-sidebar-page-list">
           {activeTab ? (
             currentPages.length > 0 ? (
               currentPages.map((p) => {
                 const isActive = activeTab === currentSection && p === currentPage;
                 const isRenaming = renamingItem?.type === "page" && renamingItem.section === activeTab && renamingItem.name === p;
+                const PageIcon = iconFromName(p);
 
                 return (
                   <div
@@ -395,6 +412,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   >
                     {isRenaming ? renameInput() : (
                       <>
+                        <span className="noteometry-sidebar-item-icon"><PageIcon /></span>
                         <span className="noteometry-sidebar-item-name">{p}</span>
                         <button
                           className="noteometry-sidebar-item-del"
@@ -409,10 +427,16 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                 );
               })
             ) : (
-              <div className="nm-sidebar-empty">No pages yet</div>
+              <div className="nm-sidebar-empty">
+                <IconSparkles />
+                <span>No pages yet — tap <b>+ Page</b> below</span>
+              </div>
             )
           ) : (
-            <div className="nm-sidebar-empty">Select a section</div>
+            <div className="nm-sidebar-empty">
+              <IconFolder />
+              <span>Select a section to see its pages</span>
+            </div>
           )}
         </div>
 
@@ -430,7 +454,8 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
           ) : (
             <div className="nm-sidebar-action-buttons">
               <button
-                className="nm-sidebar-action-btn"
+                className="nm-sidebar-action-btn nm-action-page"
+                title="Add a new page to the active section"
                 onClick={() => {
                   if (!activeTab) { new Notice("Select a section first"); return; }
                   setAddingPage(true);
@@ -440,10 +465,12 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   setNewName("");
                 }}
               >
-                <IconPlus /> Page
+                <span className="nm-action-icon"><IconPlus /></span>
+                <span className="nm-action-label">Page</span>
               </button>
               <button
-                className="nm-sidebar-action-btn"
+                className="nm-sidebar-action-btn nm-action-section"
+                title="Create a new section (folder)"
                 onClick={() => {
                   setAddingSection(true);
                   setAddingPage(false);
@@ -452,10 +479,12 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   setNewName("");
                 }}
               >
-                <IconPlus /> Section
+                <span className="nm-action-icon"><IconFolder /></span>
+                <span className="nm-action-label">Section</span>
               </button>
               <button
                 className="nm-sidebar-action-btn nm-sidebar-action-course"
+                title="Create a 16-week course section"
                 onClick={() => {
                   setAddingCourse(true);
                   setAddingSection(false);
@@ -464,7 +493,8 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   setNewName("APUS");
                 }}
               >
-                <IconBook /> Course
+                <span className="nm-action-icon"><IconBook /></span>
+                <span className="nm-action-label">Course</span>
               </button>
             </div>
           )}

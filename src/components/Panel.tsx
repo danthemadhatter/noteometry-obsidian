@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { IconChevRight } from "./Icons";
+import { IconChevRight, IconEye, IconEdit3, IconPlay, IconTrash } from "./Icons";
 import KaTeXRenderer from "./KaTeXRenderer";
 import MathPalette from "./MathPalette";
 
@@ -77,7 +77,10 @@ export default function Panel({
       {/* Preview */}
       <div className="noteometry-panel-box" style={{ flex: heights[0] }}>
         <div className="noteometry-panel-box-hdr">
-          <span>Preview</span>
+          <span className="noteometry-panel-box-title">
+            <IconEye />
+            <span>Preview</span>
+          </span>
           <button
             className="noteometry-panel-action noteometry-panel-hide"
             onClick={onClosePanel}
@@ -98,11 +101,15 @@ export default function Panel({
       {/* Input editor + symbols */}
       <div className="noteometry-panel-box" style={{ flex: heights[1] }}>
         <div className="noteometry-panel-box-hdr">
-          <span>Input</span>
+          <span className="noteometry-panel-box-title">
+            <IconEdit3 />
+            <span>Input</span>
+          </span>
           <div className="noteometry-panel-box-actions">
             {inputCode.trim() && (
-              <button className="noteometry-panel-solve" onClick={onSolve}>
-                Solve
+              <button className="noteometry-panel-solve" onClick={onSolve} title="Send this to the solver">
+                <IconPlay />
+                <span>Solve</span>
               </button>
             )}
             {inputCode && (
@@ -111,7 +118,8 @@ export default function Panel({
                 onClick={() => setInputCode("")}
                 title="Clear the LaTeX input box (does not clear chat)"
               >
-                Clear Input
+                <IconTrash />
+                <span>Clear</span>
               </button>
             )}
           </div>

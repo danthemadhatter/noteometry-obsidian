@@ -22,6 +22,7 @@ import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
 import MathPalette from "./MathPalette";
+import { IconLayout, IconZap, IconEdit3, IconMessageCircle, IconX as IconXClose } from "./Icons";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
@@ -994,11 +995,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
               {!panelOpen && (
                 <div className="noteometry-canvas-actions">
                   <button
-                    className="noteometry-canvas-action-btn"
+                    className="noteometry-canvas-action-btn nm-canvas-action-panel"
                     onClick={() => setPanelOpen(true)}
-                    title="Open panel"
+                    title="Open the side panel (Input + Chat)"
                   >
-                    ◨ Panel
+                    <IconLayout />
+                    <span>Panel</span>
                   </button>
                 </div>
               )}
@@ -1072,7 +1074,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 }}
                 title="Tools"
                 aria-label="Tools"
-              >☰</button>
+              ><IconZap /></button>
 
               {/* ── Floating undo/redo + zoom widget ── */}
               <div className="nm-zoom-widget" style={{
@@ -1113,17 +1115,23 @@ export default function NoteometryApp({ plugin, app }: Props) {
                   <button
                     className={`nm-right-tab${mobileRightTab === "input" ? " active" : ""}`}
                     onClick={() => setMobileRightTab("input")}
-                  >Input</button>
+                  >
+                    <IconEdit3 />
+                    <span>Input</span>
+                  </button>
                   <button
                     className={`nm-right-tab${mobileRightTab === "chat" ? " active" : ""}`}
                     onClick={() => setMobileRightTab("chat")}
-                  >Chat</button>
+                  >
+                    <IconMessageCircle />
+                    <span>Chat</span>
+                  </button>
                   <button
                     className="nm-right-tab nm-right-tab-hide"
                     onClick={() => setPanelOpen(false)}
                     title="Hide panel"
                     aria-label="Hide panel"
-                  >×</button>
+                  ><IconXClose /></button>
                 </div>
 
                 <div className="nm-right-pane nm-right-pane-input">
