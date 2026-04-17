@@ -1096,6 +1096,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     className={`nm-right-tab${mobileRightTab === "chat" ? " active" : ""}`}
                     onClick={() => setMobileRightTab("chat")}
                   >Chat</button>
+                  <button
+                    className="nm-right-tab nm-right-tab-hide"
+                    onClick={() => setPanelOpen(false)}
+                    title="Hide panel"
+                    aria-label="Hide panel"
+                  >×</button>
                 </div>
 
                 <div className="nm-right-pane nm-right-pane-input">
@@ -1153,12 +1159,11 @@ export default function NoteometryApp({ plugin, app }: Props) {
       )}
       {/* ── Floating Math Palette ── */}
       {mathPaletteOpen && (
-        <div style={{
-          position: "fixed", bottom: "60px", left: "50%", transform: "translateX(-50%)",
+        <div className="nm-math-palette-popup" style={{
           zIndex: 600, background: "var(--nm-faceplate, #F5F5F5)",
           border: "1px solid var(--nm-paper-border, #E0E0E0)",
           borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-          maxWidth: "460px", width: "90vw", overflow: "hidden",
+          overflow: "hidden",
         }}>
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
