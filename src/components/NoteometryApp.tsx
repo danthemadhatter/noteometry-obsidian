@@ -619,7 +619,16 @@ export default function NoteometryApp({ plugin, app }: Props) {
       );
     } else if (hitStamp) {
       /* ── Right-clicked on a stamp ── */
+      const curSize: StampSize = hitStamp.size ?? "normal";
+      const setStampSize = (sz: StampSize) => {
+        setStamps((prev) => prev.map((s) =>
+          s.id === hitStamp.id ? { ...s, size: sz, fontSize: STAMP_SIZES[sz] } : s
+        ));
+      };
       items.push(
+        { label: "Small", shortcut: curSize === "small" ? "\u2713" : "", onClick: () => setStampSize("small") },
+        { label: "Regular", shortcut: curSize === "normal" ? "\u2713" : "", onClick: () => setStampSize("normal") },
+        { label: "", separator: true },
         { label: "Delete Stamp", danger: true, onClick: () => {
           setStamps((prev) => prev.filter((s) => s.id !== hitStamp.id));
         }},
@@ -1036,44 +1045,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />
-
-              {/* ── Stamp size toggle (visible when a stamp is selected) ── */}
-              {selectedStampId && (() => {
-                const sel = stamps.find(s => s.id === selectedStampId);
-                if (!sel) return null;
-                const curSize: StampSize = sel.size ?? "normal";
-                const sizes: StampSize[] = ["small", "normal", "large"];
-                return (
-                  <div style={{
-                    position: "absolute", zIndex: 200,
-                    left: (sel.x - scrollX) * zoom - 10,
-                    top: (sel.y - scrollY) * zoom - 44,
-                    display: "flex", gap: "2px",
-                    background: "var(--nm-faceplate, #F5F5F5)",
-                    border: "1px solid var(--nm-paper-border, #E0E0E0)",
-                    borderRadius: "6px", padding: "2px",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                  }}>
-                    {sizes.map(sz => (
-                      <button key={sz} onClick={() => {
-                        setStamps(prev => prev.map(s =>
-                          s.id === selectedStampId
-                            ? { ...s, size: sz, fontSize: STAMP_SIZES[sz] }
-                            : s
-                        ));
-                      }} style={{
-                        padding: "3px 8px", fontSize: sz === "small" ? "10px" : sz === "normal" ? "13px" : "16px",
-                        fontWeight: curSize === sz ? 700 : 400, border: "none", borderRadius: "4px",
-                        cursor: "pointer",
-                        background: curSize === sz ? "var(--nm-accent, #4A90D9)" : "transparent",
-                        color: curSize === sz ? "#fff" : "var(--nm-ink, #1A1A2E)",
-                      }}>
-                        {sz === "small" ? "S" : sz === "normal" ? "M" : "L"}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
 
               {/* ── Floating undo/redo + zoom widget ── */}
               <div className="nm-zoom-widget" style={{

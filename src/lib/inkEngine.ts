@@ -16,12 +16,11 @@ export interface Stroke {
   width: number; // base width, modulated by pressure
 }
 
-/** Stamp size presets — small for subscript, normal for body, large for display. */
-export type StampSize = "small" | "normal" | "large";
+/** Stamp size presets — small for subscript, normal for body. */
+export type StampSize = "small" | "normal";
 export const STAMP_SIZES: Record<StampSize, number> = {
   small: 48,
   normal: 96,
-  large: 144,
 };
 
 /** A "stamp" — a math symbol dropped onto the canvas from the palette.
