@@ -34,6 +34,9 @@ interface Props {
   selectedStampId?: string | null;
   onEraseStart?: () => void;
   onEraseEnd?: () => void;
+  /** If true, a single-finger touch draws instead of pans. Two-finger
+   * touch still pans/pinches. Default false (iPad + Apple Pencil flow). */
+  fingerDrawing?: boolean;
 }
 
 export default function InkCanvas({
@@ -46,7 +49,10 @@ export default function InkCanvas({
   onCycleTool,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
+  fingerDrawing = false,
 }: Props) {
+  const fingerDrawingRef = useRef(fingerDrawing);
+  useEffect(() => { fingerDrawingRef.current = fingerDrawing; }, [fingerDrawing]);
   const containerRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const inkCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -218,9 +224,17 @@ export default function InkCanvas({
 
   useEffect(() => { redrawGrid(); redrawInk(); }, [strokes, stamps, scrollX, scrollY, selectedStampId, zoom]);
 
-  // ── Pen/Eraser pointer handlers (NO touch — that's separate) ───
+  // ── Pen/Eraser pointer handlers ──────────────────────
+  // Touch events are normally routed to the touch-pan handler below. When
+  // fingerDrawing is on, single-finger touches draw instead; only multi-
+  // touch reaches the pan/pinch handler.
   const handlePointerDown = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return; // handled by touch pan effect
+    if (e.pointerType === "touch") {
+      if (!fingerDrawingRef.current) return;
+      // A second finger arriving while one is already down is a pinch,
+      // not a stroke — bail so the pan handler runs instead.
+      if (touchesRef.current.size > 0) return;
+    }
     if (e.button === 2) return; // right-click — let onContextMenu handle it
 
     // Double-tap / double-click detection for pen AND mouse. Fires
@@ -297,7 +311,11 @@ export default function InkCanvas({
   }, [onStrokesChange, onStampsChange, onToolChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") {
+      if (!fingerDrawingRef.current) return;
+      // A second finger entered → pinch/pan owns the gesture now.
+      if (touchesRef.current.size > 1) return;
+    }
 
     if (isGrabbingRef.current && grabLastRef.current) {
       // Screen-space drag delta → world-space scroll delta: divide by zoom.
@@ -350,7 +368,7 @@ export default function InkCanvas({
   }, [onStrokesChange, onStampsChange, redrawInk]);
 
   const handlePointerUp = useCallback((e: PointerEvent) => {
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch" && !fingerDrawingRef.current) return;
 
     if (isGrabbingRef.current) {
       isGrabbingRef.current = false;
@@ -482,6 +500,25 @@ export default function InkCanvas({
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (fingerDrawingRef.current) {
+        // Finger-drawing mode: single finger draws via the pen handler;
+        // only arm pan/pinch once a second finger joins.
+        if (touchesRef.current.size === 2) {
+          // Abort any in-progress single-finger stroke so the user can't
+          // accidentally leave a tick-mark when they pinch to zoom.
+          if (isDrawingRef.current) {
+            isDrawingRef.current = false;
+            activeStrokeRef.current = [];
+            redrawInk();
+          }
+          pinchStartDistRef.current = getPinchDist();
+          pinchStartZoomRef.current = zoomRef.current;
+          lastPanRef.current = null;
+        }
+        return;
+      }
+
       if (touchesRef.current.size === 1) {
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         pinchStartDistRef.current = null;
@@ -518,7 +555,9 @@ export default function InkCanvas({
         return;
       }
 
-      // Single-finger pan path
+      // Single-finger pan path — skipped entirely when finger-drawing
+      // is on so the pen handler owns the stroke.
+      if (fingerDrawingRef.current) return;
       if (lastPanRef.current) {
         const touch = touchesRef.current.values().next().value;
         if (touch) {

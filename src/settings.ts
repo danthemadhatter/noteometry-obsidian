@@ -151,5 +151,18 @@ export class NoteometrySettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    /* ── Finger drawing ──────────────────────────────── */
+    new Setting(containerEl)
+      .setName("Finger drawing")
+      .setDesc("Draw with a single finger on touch devices. Leave off on iPad with Apple Pencil (keeps palm-rejection pan). Turn on for Android / finger-only phones. Two-finger pan/pinch always works.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.fingerDrawing)
+          .onChange(async (value) => {
+            this.plugin.settings.fingerDrawing = value;
+            await this.plugin.saveSettings();
+          })
+      );
   }
 }

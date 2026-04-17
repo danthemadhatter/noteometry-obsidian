@@ -12,6 +12,11 @@ export interface NoteometrySettings {
   vaultFolder: string;
   autoSave: boolean;
   autoSaveDelay: number;
+  /** Draw with a single finger on touch devices. Off by default so iPad
+   * with Apple Pencil still gets palm rejection via touch-to-pan. Turn
+   * on for Android / finger-only devices. Two-finger gestures always
+   * pan/pinch regardless. */
+  fingerDrawing: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -26,6 +31,7 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   vaultFolder: "Noteometry",
   autoSave: true,
   autoSaveDelay: 2000,
+  fingerDrawing: false,
 };
 
 export interface ChatMessage {

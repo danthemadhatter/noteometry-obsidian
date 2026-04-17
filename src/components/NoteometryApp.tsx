@@ -1021,6 +1021,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 zoomLocked={zoomLocked}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
                 onCycleTool={handleCycleTool}
+                fingerDrawing={plugin.settings.fingerDrawing}
                 onViewportChange={handleViewportChange}
                 disabled={lassoActive}
                 selectedStampId={selectedStampId}
