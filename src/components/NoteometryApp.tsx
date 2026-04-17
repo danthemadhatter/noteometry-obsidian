@@ -1053,6 +1053,27 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onMoveComplete={handleLassoMoveComplete}
               />
 
+              {/* ── Mobile-only Tools FAB — opens the canvas context menu
+                      at the button position. Touch devices can't long-press
+                      the canvas because we preventDefault touchstart to
+                      drive drawing, so this is the only reachable entry
+                      point to the tool menu on Android. ── */}
+              <button
+                className="nm-tools-fab"
+                onClick={(e) => {
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  const fake = new MouseEvent("contextmenu", {
+                    clientX: rect.left,
+                    clientY: rect.top,
+                    bubbles: true,
+                  });
+                  Object.defineProperty(fake, "preventDefault", { value: () => {} });
+                  handleCanvasContextMenu(fake as unknown as React.MouseEvent);
+                }}
+                title="Tools"
+                aria-label="Tools"
+              >☰</button>
+
               {/* ── Floating undo/redo + zoom widget ── */}
               <div className="nm-zoom-widget" style={{
                 position: "absolute", bottom: "12px", right: "12px", zIndex: 200,

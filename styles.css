@@ -680,6 +680,9 @@
   width: 90vw;
 }
 
+/* Tools FAB — mobile only, hidden on desktop where right-click works */
+.nm-tools-fab { display: none; }
+
 /* ── Resize handles ───────────────────────────────────────── */
 
 .noteometry-resize-handle {
@@ -2009,6 +2012,26 @@
     border-left: 1px solid var(--nm-paper-border);
   }
   .nm-desktop-only { display: none !important; }
+
+  /* Tools FAB — visible on mobile, bottom-left of the canvas area */
+  .nm-tools-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+    z-index: 200;
+    background: var(--nm-faceplate, #F5F5F5);
+    border: 1px solid var(--nm-paper-border, #E0E0E0);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   /* Math palette as a top-anchored sheet on mobile so it never sits on top
    * of the right panel's input bar. */

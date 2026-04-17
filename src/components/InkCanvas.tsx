@@ -368,6 +368,14 @@ export default function InkCanvas({
   }, [onStrokesChange, onStampsChange, redrawInk]);
 
   const handlePointerUp = useCallback((e: PointerEvent) => {
+    // Release pointer capture unconditionally so a touch sequence that set
+    // capture on pointerdown doesn't keep eating events after the finger
+    // lifts — which was making the top/bottom toolbars stop responding.
+    const canvas = inkCanvasRef.current;
+    if (canvas && canvas.hasPointerCapture?.(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+
     if (e.pointerType === "touch" && !fingerDrawingRef.current) return;
 
     if (isGrabbingRef.current) {
