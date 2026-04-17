@@ -627,7 +627,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       };
       items.push(
         { label: "Small", shortcut: curSize === "small" ? "\u2713" : "", onClick: () => setStampSize("small") },
-        { label: "Regular", shortcut: curSize === "normal" ? "\u2713" : "", onClick: () => setStampSize("normal") },
+        { label: "Normal", shortcut: curSize === "normal" ? "\u2713" : "", onClick: () => setStampSize("normal") },
         { label: "", separator: true },
         { label: "Delete Stamp", danger: true, onClick: () => {
           setStamps((prev) => prev.filter((s) => s.id !== hitStamp.id));
