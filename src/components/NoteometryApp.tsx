@@ -260,6 +260,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
   /* ── Panel state ──────────────────────────────────────── */
   const [panelOpen, setPanelOpen] = useState(true);
   const [mathPaletteOpen, setMathPaletteOpen] = useState(false);
+  /* Mobile-only: which of the two stacked right-panel sections is visible.
+   * On wider screens CSS shows both simultaneously. */
+  const [mobileRightTab, setMobileRightTab] = useState<"input" | "chat">("input");
 
   /* ── Persistence coordination ─────────────────────────── */
   const saveTimer = useRef<number>(0);
@@ -1082,36 +1085,50 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 onPointerMove={handlePanelResizeMove}
                 onPointerUp={handlePanelResizeUp}
               />
-              <div className="noteometry-right-inner">
-                <Panel
-                  inputCode={inputCode}
-                  setInputCode={setInputCode}
-                  onInsertSymbol={handleInsertSymbol}
-                  onStampSymbol={(sym) => setPendingSymbol(sym)}
-                  onDropStamp={(display, screenX, screenY) => {
-                    // Direct stamp placement from touch drag. Divide
-                    // by zoom before adding scroll so the drop lands
-                    // under the finger at any zoom level — same screen
-                    // → world math used by InkCanvas pointer handlers.
-                    const rect = canvasAreaRef.current?.getBoundingClientRect();
-                    if (!rect) return;
-                    const x = (screenX - rect.left) / zoom + scrollX;
-                    const y = (screenY - rect.top) / zoom + scrollY;
-                    setStamps(prev => [...prev, {
-                      id: newStampId(), x, y,
-                      text: display, fontSize: 96, color: activeColor,
-                    }]);
-                  }}
-                  onSolve={handleSolveInput}
-                  onClosePanel={() => setPanelOpen(false)}
-                />
+              <div className="noteometry-right-inner" data-mobile-tab={mobileRightTab}>
+                {/* Mobile-only tab switcher — hidden on desktop via CSS */}
+                <div className="nm-right-tabs">
+                  <button
+                    className={`nm-right-tab${mobileRightTab === "input" ? " active" : ""}`}
+                    onClick={() => setMobileRightTab("input")}
+                  >Input</button>
+                  <button
+                    className={`nm-right-tab${mobileRightTab === "chat" ? " active" : ""}`}
+                    onClick={() => setMobileRightTab("chat")}
+                  >Chat</button>
+                </div>
+
+                <div className="nm-right-pane nm-right-pane-input">
+                  <Panel
+                    inputCode={inputCode}
+                    setInputCode={setInputCode}
+                    onInsertSymbol={handleInsertSymbol}
+                    onStampSymbol={(sym) => setPendingSymbol(sym)}
+                    onDropStamp={(display, screenX, screenY) => {
+                      // Direct stamp placement from touch drag. Divide
+                      // by zoom before adding scroll so the drop lands
+                      // under the finger at any zoom level — same screen
+                      // → world math used by InkCanvas pointer handlers.
+                      const rect = canvasAreaRef.current?.getBoundingClientRect();
+                      if (!rect) return;
+                      const x = (screenX - rect.left) / zoom + scrollX;
+                      const y = (screenY - rect.top) / zoom + scrollY;
+                      setStamps(prev => [...prev, {
+                        id: newStampId(), x, y,
+                        text: display, fontSize: 96, color: activeColor,
+                      }]);
+                    }}
+                    onSolve={handleSolveInput}
+                    onClosePanel={() => setPanelOpen(false)}
+                  />
+                </div>
                 <div
-                  className="noteometry-resize-handle"
+                  className="noteometry-resize-handle nm-desktop-only"
                   onPointerDown={handleChatResizeDown}
                   onPointerMove={handleChatResizeMove}
                   onPointerUp={handleChatResizeUp}
                 />
-                <div style={{ height: chatHeight, flexShrink: 0 }}>
+                <div className="nm-right-pane nm-right-pane-chat" style={{ height: chatHeight }}>
                   <ChatPanel
                     messages={chatMessages}
                     onSend={sendToChat}

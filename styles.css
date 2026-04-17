@@ -664,6 +664,12 @@
   background: var(--nm-faceplate);
 }
 
+/* Mobile right-pane tab bar — hidden on desktop, both panes always visible */
+.nm-right-tabs { display: none; }
+.nm-right-pane { display: flex; flex-direction: column; min-height: 0; }
+.nm-right-pane-input { flex: 1; overflow: hidden; }
+.nm-right-pane-chat { flex-shrink: 0; }
+
 /* ── Resize handles ───────────────────────────────────────── */
 
 .noteometry-resize-handle {
@@ -1951,9 +1957,43 @@
   }
   .noteometry-right {
     width: 100% !important;
-    max-height: 40vh;
+    max-height: 65vh;
     border-left: none !important;
     border-top: 1px solid var(--nm-warm-border-strong);
+  }
+
+  /* Mobile right-pane tabs — only one pane visible at a time */
+  .nm-right-tabs {
+    display: flex;
+    flex-shrink: 0;
+    background: var(--nm-faceplate-alt);
+    border-bottom: 1px solid var(--nm-paper-border);
+  }
+  .nm-right-tab {
+    flex: 1;
+    min-height: 44px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--nm-ink-muted, #666);
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nm-right-tab.active {
+    color: var(--nm-accent);
+    border-bottom-color: var(--nm-accent);
+  }
+  .nm-desktop-only { display: none !important; }
+  .noteometry-right-inner[data-mobile-tab="input"] .nm-right-pane-chat { display: none; }
+  .noteometry-right-inner[data-mobile-tab="chat"] .nm-right-pane-input { display: none; }
+  .noteometry-right-inner .nm-right-pane-chat {
+    height: auto !important;
+    flex: 1;
   }
 
   /* ── Mini toolbar: 48px touch targets ── */
