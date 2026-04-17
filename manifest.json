@@ -1,7 +1,7 @@
 {
 	"id": "noteometry",
 	"name": "Noteometry",
-	"version": "1.6.3",
+	"version": "1.6.4",
 	"minAppVersion": "1.0.0",
 	"description": "EE workstation \u2014 canvas, ink, AI, and drop-ins for electrical engineering students",
 	"author": "Dan",

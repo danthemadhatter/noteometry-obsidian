@@ -241,7 +241,7 @@
 }
 
 /* ── Mobile overlay ── */
-@media (max-width: 768px) {
+@media (max-width: 768px), (pointer: coarse) {
   .noteometry-sidebar-open {
     position: absolute;
     top: 0;
@@ -1840,7 +1840,7 @@
    Responsive
    ═══════════════════════════════════════════════════════════════════ */
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (pointer: coarse) {
   /* Phase 5A: 44px minimum touch targets per Apple HIG / Material Design.
    * Previous values (36px buttons, 14px color dots) were designed for
    * mouse precision — on an iPad with a finger they're unhittable. */
