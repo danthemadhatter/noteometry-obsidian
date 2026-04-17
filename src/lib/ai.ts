@@ -38,10 +38,11 @@ async function callClaude(
         messages,
         temperature,
       }),
+      throw: false,
     });
 
     if (res.status !== 200) {
-      return { ok: false, text: "", error: `Claude HTTP ${res.status}: ${res.text.slice(0, 200)}` };
+      return { ok: false, text: "", error: `Claude HTTP ${res.status}: ${res.text.slice(0, 400)}` };
     }
 
     const data = res.json;
@@ -208,6 +209,7 @@ async function callLMStudio(
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+      throw: false,
     });
 
     if (res.status !== 200) {
@@ -361,9 +363,10 @@ export async function chat(
 ): Promise<AIResult> {
   const systemPrompt = systemOverride ?? CHAT_SYSTEM;
   if (settings.aiProvider === "lmstudio") {
-    // Build OpenAI-format messages
-    const formatted = messages.map((m, i) => {
-      const isLastUser = m.role === "user" && i === messages.length - 1;
+    type LMMessage = { role: string; content: unknown };
+    const lmLastIdx = messages.length - 1;
+    const formatted: LMMessage[] = messages.flatMap((m, i): LMMessage[] => {
+      const isLastUser = m.role === "user" && i === lmLastIdx;
       if (isLastUser && attachments.length) {
         const content: unknown[] = [];
         for (const att of attachments) {
@@ -374,10 +377,17 @@ export async function chat(
           });
         }
         if (m.text?.trim()) content.push({ type: "text", text: m.text.trim() });
-        return { role: m.role, content };
+        return [{ role: m.role, content }];
       }
-      return { role: m.role, content: m.text ?? "" };
+      const text = (m.text ?? "").trim();
+      if (!text) return [];
+      return [{ role: m.role, content: text }];
     });
+
+    const tail = formatted[formatted.length - 1];
+    if (!tail || tail.role !== "user") {
+      return { ok: false, text: "", error: "Nothing to send — type a message or attach an image." };
+    }
 
     return callLMStudio(
       settings,
@@ -391,8 +401,12 @@ export async function chat(
   // Claude-shaped message format — shared by callClaude and callPerplexity.
   // callPerplexity translates it into Perplexity's input_text/input_image
   // shape at the last moment.
-  const formatted = messages.map((m, i) => {
-    const isLastUser = m.role === "user" && i === messages.length - 1;
+  // Anthropic rejects messages with empty content. Ghost entries can land in
+  // history if an earlier turn was image-only (attachments are not persisted
+  // across reloads, so only the empty text survives). Drop those.
+  const lastIdx = messages.length - 1;
+  const formatted: ClaudeMessage[] = messages.flatMap((m, i): ClaudeMessage[] => {
+    const isLastUser = m.role === "user" && i === lastIdx;
     if (isLastUser && attachments.length) {
       const content: ClaudeContentPart[] = [];
       for (const att of attachments) {
@@ -403,10 +417,17 @@ export async function chat(
         });
       }
       if (m.text?.trim()) content.push({ type: "text", text: m.text.trim() });
-      return { role: m.role, content };
+      return [{ role: m.role, content }];
     }
-    return { role: m.role, content: m.text ?? "" };
+    const text = (m.text ?? "").trim();
+    if (!text) return [];
+    return [{ role: m.role, content: text }];
   });
+
+  const finalMsg = formatted[formatted.length - 1];
+  if (!finalMsg || finalMsg.role !== "user") {
+    return { ok: false, text: "", error: "Nothing to send — type a message or attach an image." };
+  }
 
   if (settings.aiProvider === "perplexity") {
     return callPerplexity(settings, systemPrompt, formatted, 0.3);
