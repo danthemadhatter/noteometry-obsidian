@@ -88,13 +88,12 @@ export async function createSection(plugin: NoteometryPlugin, name: string): Pro
 export async function deleteSection(plugin: NoteometryPlugin, name: string): Promise<void> {
   const path = sectionPath(plugin, name);
   const adapter = plugin.app.vault.adapter;
-  if (await adapter.exists(path)) {
-    const pages = await listPages(plugin, name);
-    for (const p of pages) {
-      await deletePage(plugin, name, p);
-    }
-    await adapter.rmdir(path, false);
-  }
+  if (!(await adapter.exists(path))) return;
+  // Recursive: the section folder contains an `attachments/` subfolder
+  // with images/PDFs. A non-recursive rmdir fails silently if any child
+  // remains, leaving the folder on disk — which then reappears in the
+  // sidebar on next render and looks like "delete didn't work".
+  await adapter.rmdir(path, true);
 }
 
 /* ── Pages (files) ───────────────────────────────────── */
