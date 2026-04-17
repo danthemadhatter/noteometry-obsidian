@@ -17,7 +17,6 @@ import { join } from 'node:path';
 const HOME = process.env.HOME || "";
 const VAULT_PLUGIN_PATHS = [
   join(HOME, "Documents/Noteometry/.obsidian/plugins/noteometry"),
-  join(HOME, "Documents/Noteometry/.obsidian/plugins/noteometry-build"),
 ];
 
 function deployToVaults() {

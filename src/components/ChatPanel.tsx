@@ -120,21 +120,53 @@ export default function ChatPanel({
     setAttachments([]);
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const attachFiles = useCallback((files: File[]) => {
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const data = (ev.target?.result as string) || "";
-        setAttachments((prev) => [...prev, { name: file.name, mimeType: file.type, data }]);
+        const name = file.name || `pasted-${Date.now()}.${(file.type.split("/")[1] || "bin")}`;
+        setAttachments((prev) => [...prev, { name, mimeType: file.type, data }]);
       };
       reader.readAsDataURL(file);
     });
+  }, []);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    attachFiles(Array.from(e.target.files || []));
     e.target.value = "";
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files || []);
+    if (files.length) {
+      e.preventDefault();
+      attachFiles(files);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length) {
+      e.preventDefault();
+      e.stopPropagation();
+      attachFiles(files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer?.types.includes("Files")) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
-    <div className="noteometry-chat">
+    <div
+      className="noteometry-chat"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       {/* Header — just the chat title + New button */}
       <div className="noteometry-chat-header">
         <span className="noteometry-chat-title">Chat</span>
@@ -221,6 +253,7 @@ export default function ChatPanel({
           className="noteometry-chat-textarea"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
