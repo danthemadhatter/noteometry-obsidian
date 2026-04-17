@@ -324,6 +324,20 @@ export default function CanvasObjectLayer({
     onSelectObject(id);
   }, [onSelectObject]);
 
+  /* Bring an object to the top of the z-order by moving it to the end
+   * of the objects array. Fires on pointer-down capture so that any
+   * interaction inside a drop-in — even ones that stopPropagation — still
+   * raises that drop-in above others. */
+  const bringToFront = useCallback((id: string) => {
+    const idx = objects.findIndex(o => o.id === id);
+    if (idx === -1 || idx === objects.length - 1) return;
+    const next = objects.slice();
+    const [obj] = next.splice(idx, 1);
+    if (!obj) return;
+    next.push(obj);
+    onObjectsChange(next);
+  }, [objects, onObjectsChange]);
+
   // Only individual objects are interactive in select mode.
   // Parent div is ALWAYS pointerEvents: none so it never blocks
   // drag-and-drop, wheel scroll, or canvas click-to-deselect.
@@ -358,6 +372,7 @@ export default function CanvasObjectLayer({
             pointerEvents: objectsInteractive ? "auto" : "none",
           }}
           onClick={(e) => handleObjectClick(e, obj.id)}
+          onPointerDownCapture={() => bringToFront(obj.id)}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
