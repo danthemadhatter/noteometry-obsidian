@@ -22,7 +22,7 @@ import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
 import MathPalette from "./MathPalette";
-import { IconLayout, IconZap, IconEdit3, IconMessageCircle, IconX as IconXClose } from "./Icons";
+import { IconLayout, IconZap, IconEdit3, IconMessageCircle, IconTrash, IconX as IconXClose } from "./Icons";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
@@ -557,6 +557,21 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
   }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
+  /* Clear everything on the current page. Shared by the right-click
+   * context menu AND the visible "Erase" button on the canvas overlay
+   * so the destructive action is always reachable, not buried in a
+   * menu a touchscreen user can't open. Two confirms protect it. */
+  const handleClearCanvas = useCallback(() => {
+    if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
+    if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
+    pushUndo();
+    setStrokes([]);
+    setStamps([]);
+    setCanvasObjects([]);
+    setSelectedObjectId(null);
+    setSelectedStampId(null);
+  }, [pushUndo, setStrokes, setStamps, setCanvasObjects, setSelectedObjectId, setSelectedStampId]);
+
   /* ── Right-click context menu ──────────────────────────
    * This is now the PRIMARY tool interface — the toolbar has been removed
    * entirely. Detects what the user right-clicked on (canvas object /
@@ -744,16 +759,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
           link.href = dataUrl;
           link.click();
         }},
-        { label: "Clear Canvas", danger: true, onClick: () => {
-          if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
-          if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
-          pushUndo();
-          setStrokes([]);
-          setStamps([]);
-          setCanvasObjects([]);
-          setSelectedObjectId(null);
-          setSelectedStampId(null);
-        }},
+        { label: "Clear Canvas", danger: true, onClick: handleClearCanvas },
       );
     }
 
@@ -767,7 +773,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     handleInsertCircuitSniper, handleInsertUnitConverter, handleInsertGraphPlotter,
     handleInsertUnitCircle, handleInsertOscilloscope, handleInsertCompute,
     handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertAIDropin, handleInsertMultimeter,
-    mathPaletteOpen,
+    mathPaletteOpen, handleClearCanvas,
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -992,8 +998,16 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
             {/* ── Viewport: the full drawing surface (toolbar removed — use right-click) ── */}
             <div ref={viewportRef} className="noteometry-canvas-viewport">
-              {!panelOpen && (
-                <div className="noteometry-canvas-actions">
+              <div className="noteometry-canvas-actions">
+                <button
+                  className="noteometry-canvas-action-btn nm-canvas-action-erase"
+                  onClick={handleClearCanvas}
+                  title="Clear everything on this page (two confirms)"
+                >
+                  <IconTrash />
+                  <span>Erase</span>
+                </button>
+                {!panelOpen && (
                   <button
                     className="noteometry-canvas-action-btn nm-canvas-action-panel"
                     onClick={() => setPanelOpen(true)}
@@ -1002,8 +1016,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
                     <IconLayout />
                     <span>Panel</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Ink canvas */}
               <InkCanvas

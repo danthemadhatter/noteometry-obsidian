@@ -485,11 +485,16 @@ export default function InkCanvas({
 
   // ── Touch panning + pinch-zoom — ALWAYS active, on the container ─
   //
-  // Single-finger drag → pan (existing behavior).
-  // Two-finger pinch → zoom, driven by the ratio between the current
-  // and initial distance between the two fingers. We update zoomRef
-  // and redraw synchronously for smooth feedback, then call
-  // onZoomChange() so the parent state catches up on the next render.
+  // Single-finger drag → pan.
+  // Two fingers → pan (by the centroid delta) AND zoom (by the distance
+  // ratio) simultaneously, frame by frame. This is the standard mobile
+  // gesture model (Google Maps, Figma, iOS Photos): two fingers moving
+  // together scroll the canvas, two fingers spreading zoom in place.
+  //
+  // The old implementation froze pan when a second finger joined and only
+  // zoomed based on the ratio against the initial distance, which is why
+  // Android two-finger scrolls registered as tiny pinch-zooms — the
+  // centroid was moving but only the distance was being read.
   //
   // touch-action: none on .noteometry-ink-layer plus the preventTouch
   // handler below keeps the OS from eating our gestures (double-tap
@@ -498,11 +503,29 @@ export default function InkCanvas({
     const container = containerRef.current;
     if (!container) return;
 
-    const getPinchDist = (): number => {
+    // Per-frame refs: we update these on every pointermove so pan and
+    // zoom both read the *last* frame's values, not the initial snapshot.
+    // pinchStartDistRef/pinchStartZoomRef are reused as "last-frame" state.
+    const getMulti = (): { cx: number; cy: number; dist: number } | null => {
       const vals = Array.from(touchesRef.current.values());
-      if (vals.length < 2) return 0;
+      if (vals.length < 2) return null;
       const [a, b] = vals;
-      return Math.hypot(b!.x - a!.x, b!.y - a!.y);
+      return {
+        cx: (a!.x + b!.x) / 2,
+        cy: (a!.y + b!.y) / 2,
+        dist: Math.hypot(b!.x - a!.x, b!.y - a!.y),
+      };
+    };
+
+    const armMulti = () => {
+      const m = getMulti();
+      if (!m) return;
+      pinchStartDistRef.current = m.dist;
+      pinchStartZoomRef.current = zoomRef.current;
+      // Reuse lastPanRef as the centroid tracker while multi-touch is
+      // active — single-finger pan is suspended during multi-touch so
+      // there's no conflict.
+      lastPanRef.current = { x: m.cx, y: m.cy };
     };
 
     const onDown = (e: PointerEvent) => {
@@ -514,15 +537,13 @@ export default function InkCanvas({
         // only arm pan/pinch once a second finger joins.
         if (touchesRef.current.size === 2) {
           // Abort any in-progress single-finger stroke so the user can't
-          // accidentally leave a tick-mark when they pinch to zoom.
+          // accidentally leave a tick-mark when they start two-finger pan.
           if (isDrawingRef.current) {
             isDrawingRef.current = false;
             activeStrokeRef.current = [];
             redrawInk();
           }
-          pinchStartDistRef.current = getPinchDist();
-          pinchStartZoomRef.current = zoomRef.current;
-          lastPanRef.current = null;
+          armMulti();
         }
         return;
       }
@@ -531,11 +552,9 @@ export default function InkCanvas({
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         pinchStartDistRef.current = null;
       } else if (touchesRef.current.size === 2) {
-        // Second finger landed — start a pinch. Freeze the single-finger
-        // pan so pinch and pan don't fight for the same scroll delta.
-        pinchStartDistRef.current = getPinchDist();
-        pinchStartZoomRef.current = zoomRef.current;
-        lastPanRef.current = null;
+        // Second finger landed — start tracking centroid + distance so
+        // we can pan AND zoom on every subsequent move.
+        armMulti();
       }
     };
 
@@ -543,23 +562,44 @@ export default function InkCanvas({
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      // Pinch-zoom path (2 fingers)
+      // Multi-touch path (2+ fingers): combined pan-by-centroid +
+      // zoom-by-distance. Runs every frame so gestures feel continuous.
       if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
-        if (zoomLockedRef.current) return;
-        const currentDist = getPinchDist();
-        if (currentDist <= 0) return;
-        const ratio = currentDist / pinchStartDistRef.current;
-        // Clamp to [0.5, 4] matching the Cmd+wheel limits in NoteometryApp.
-        const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
-        if (Math.abs(newZoom - zoomRef.current) < 0.001) return;
-        // Update ref + redraw synchronously so the canvas tracks fingers
-        // without waiting for a React re-render round-trip.
-        zoomRef.current = newZoom;
+        const m = getMulti();
+        if (!m || !lastPanRef.current) return;
+
+        // Pan: move the viewport by the centroid delta. Always applied,
+        // even when zoom is locked, so two-finger scroll works.
+        const z = zoomRef.current;
+        const dx = (m.cx - lastPanRef.current.x) / z;
+        const dy = (m.cy - lastPanRef.current.y) / z;
+        if (dx !== 0 || dy !== 0) {
+          const newX = scrollRef.current.x - dx;
+          const newY = scrollRef.current.y - dy;
+          scrollRef.current = { x: newX, y: newY };
+          onViewportChange(newX, newY);
+        }
+        lastPanRef.current = { x: m.cx, y: m.cy };
+
+        // Zoom: apply distance ratio against the *previous* frame's
+        // distance, so pinch and pan compose cleanly. Skipped if locked
+        // or if the distance effectively hasn't changed (pure pan).
+        if (!zoomLockedRef.current && m.dist > 0 && pinchStartDistRef.current > 0) {
+          const ratio = m.dist / pinchStartDistRef.current;
+          // Dead-zone: ignore sub-1% distance jitter so two-finger pan
+          // doesn't accidentally zoom when fingers rotate slightly.
+          if (Math.abs(ratio - 1) > 0.01) {
+            const newZoom = Math.max(0.5, Math.min(4, zoomRef.current * ratio));
+            if (Math.abs(newZoom - zoomRef.current) > 0.001) {
+              zoomRef.current = newZoom;
+              onZoomChangeRef.current?.(newZoom);
+            }
+          }
+        }
+        pinchStartDistRef.current = m.dist;
+
         redrawGrid();
         redrawInk();
-        // Tell the parent so object layer, zoom percent readout, and
-        // everything else that mirrors the state stays in sync.
-        onZoomChangeRef.current?.(newZoom);
         return;
       }
 
@@ -590,8 +630,9 @@ export default function InkCanvas({
         lastPanRef.current = null;
         pinchStartDistRef.current = null;
       } else if (touchesRef.current.size === 1) {
-        // One finger remains after a pinch — resume pan from where
-        // that finger currently is, not from its stale pre-pinch spot.
+        // One finger remains after multi-touch — resume single-finger
+        // pan from where that finger currently is, not from a stale
+        // centroid. Drop the multi-touch state.
         pinchStartDistRef.current = null;
         const r = touchesRef.current.values().next().value;
         if (r) lastPanRef.current = { x: r.x, y: r.y };

@@ -3141,17 +3141,26 @@
   margin-left: 2px;
 }
 
-/* ── Canvas "open panel" button: icon + label pill ──────────────── */
-.nm-canvas-action-panel {
+/* ── Canvas "open panel" / "erase" buttons: icon + label pills ──── */
+.nm-canvas-action-panel,
+.nm-canvas-action-erase {
   display: inline-flex !important;
   align-items: center;
   gap: 6px;
   padding: 6px 12px !important;
   border-radius: 999px !important;
 }
-.nm-canvas-action-panel svg {
+.nm-canvas-action-panel svg,
+.nm-canvas-action-erase svg {
   width: 14px !important;
   height: 14px !important;
+}
+.nm-canvas-action-erase {
+  color: var(--nm-danger, #c7483c);
+}
+.nm-canvas-action-erase:hover {
+  background: color-mix(in srgb, var(--nm-danger, #e25555) 14%, rgba(255,255,255,0.9));
+  color: var(--nm-danger, #c7483c);
 }
 
 /* ── Tools FAB: let the bolt icon breathe on mobile ─────────────── */
