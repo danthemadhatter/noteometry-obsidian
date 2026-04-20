@@ -21,12 +21,17 @@ const VAULT_PLUGIN_PATHS = [
 
 function deployToVaults() {
   for (const dest of VAULT_PLUGIN_PATHS) {
-    if (!existsSync(dest)) {
-      // Don't silently skip — log so we notice if a vault path rot
-      // develops. mkdir here is intentional so a fresh vault picks up
-      // the build automatically once the dir is created.
-      console.log(`[deploy] skipping missing vault: ${dest}`);
+    // If the vault plugin dir is gone (e.g. drive cleanup wiped it),
+    // recreate it so Obsidian sees the plugin on next reload. The vault
+    // root still has to exist — we only auto-create the plugin folder.
+    const vaultRoot = dest.split('/.obsidian/')[0];
+    if (!existsSync(vaultRoot)) {
+      console.log(`[deploy] skipping — vault root missing: ${vaultRoot}`);
       continue;
+    }
+    if (!existsSync(dest)) {
+      mkdirSync(dest, { recursive: true });
+      console.log(`[deploy] created missing plugin dir: ${dest}`);
     }
     let ok = 0;
     for (const f of ["main.js", "styles.css", "manifest.json"]) {
