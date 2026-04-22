@@ -17,6 +17,12 @@ export interface NoteometrySettings {
    * on for Android / finger-only devices. Two-finger gestures always
    * pan/pinch regardless. */
   fingerDrawing: boolean;
+  /** When on, the right-click hub also lists experimental / legacy drop-ins
+   * (Animation Canvas, Study Gantt, Multimeter). Off by default — those
+   * tools were sources of confusion in manual testing: users didn't know
+   * what they did or how they fit. Keep them shippable but out of the way
+   * until either their purpose is reworked or the user opts in. */
+  showExperimentalTools: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -32,6 +38,7 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   autoSave: true,
   autoSaveDelay: 2000,
   fingerDrawing: false,
+  showExperimentalTools: false,
 };
 
 export interface ChatMessage {

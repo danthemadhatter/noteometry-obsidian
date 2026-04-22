@@ -547,7 +547,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const handleInsertGraphPlotter = useCallback(() => insertDropin(createGraphPlotter, "Graph Plotter"), [insertDropin]);
   const handleInsertUnitCircle = useCallback(() => insertDropin(createUnitCircle, "Unit Circle"), [insertDropin]);
   const handleInsertOscilloscope = useCallback(() => insertDropin(createOscilloscope, "Oscilloscope"), [insertDropin]);
-  const handleInsertCompute = useCallback(() => insertDropin(createCompute, "Compute"), [insertDropin]);
+  // Renamed v1.6.7: user called this "Computer" in feedback — the label
+   // "Compute" wasn't doing its job. "Calculator" matches what it actually
+   // is (a named-variables scratchpad that spits out a number). The
+   // create* factory still uses the "compute" kind for persistence
+   // compatibility.
+   const handleInsertCompute = useCallback(() => insertDropin(createCompute, "Calculator"), [insertDropin]);
   const handleInsertAnimationCanvas = useCallback(() => insertDropin(createAnimationCanvas, "Animation Canvas"), [insertDropin]);
   const handleInsertStudyGantt = useCallback(() => insertDropin(createStudyGantt, "Study Gantt"), [insertDropin]);
   // handleInsertAIDropin removed in v1.6.6 — the AI drop-in is quarantined;
@@ -718,32 +723,48 @@ export default function NoteometryApp({ plugin, app }: Props) {
       );
 
       // ── Engineering ──
+      // Multimeter was hidden from the main hub in v1.6.7 — user reported
+      // they didn't know how it fit the math/EE workbench flow. Still
+      // reachable behind the "Show experimental tools" setting so existing
+      // pages keep working and power users can opt in.
       items.push(
         { label: "\u2500\u2500 Engineering \u2500\u2500", disabled: true },
         { label: "Circuit Sniper", icon: "⚡", onClick: handleInsertCircuitSniper },
         { label: "Unit Converter", icon: "🔄", onClick: handleInsertUnitConverter },
-        { label: "Multimeter", icon: "🔌", onClick: handleInsertMultimeter },
-        { label: "", separator: true },
       );
+      if (plugin.settings.showExperimentalTools) {
+        items.push({ label: "Multimeter (experimental)", icon: "🔌", onClick: handleInsertMultimeter });
+      }
+      items.push({ label: "", separator: true });
 
       // ── Math Tools ──
+      // Compute → renamed "Calculator" in v1.6.7; user's feedback was
+      // "WTF is 'Computer' for?" — the label was the problem, not the
+      // feature. Animation Canvas was a Manim-inspired speculative
+      // experiment; hide behind the setting until it earns its keep.
       items.push(
         { label: "\u2500\u2500 Math Tools \u2500\u2500", disabled: true },
         { label: "Math Palette", icon: "🧮", shortcut: mathPaletteOpen ? "\u2713" : "", onClick: () => setMathPaletteOpen(p => !p) },
         { label: "Graph Plotter", icon: "📈", onClick: handleInsertGraphPlotter },
         { label: "Unit Circle", icon: "🔘", onClick: handleInsertUnitCircle },
         { label: "Oscilloscope", icon: "📟", onClick: handleInsertOscilloscope },
-        { label: "Compute", icon: "🧮", onClick: handleInsertCompute },
-        { label: "Animation Canvas", icon: "🎬", onClick: handleInsertAnimationCanvas },
-        { label: "", separator: true },
+        { label: "Calculator", icon: "🧮", onClick: handleInsertCompute },
       );
+      if (plugin.settings.showExperimentalTools) {
+        items.push({ label: "Animation Canvas (experimental)", icon: "🎬", onClick: handleInsertAnimationCanvas });
+      }
+      items.push({ label: "", separator: true });
 
       // ── Study ──
-      items.push(
-        { label: "\u2500\u2500 Study \u2500\u2500", disabled: true },
-        { label: "Study Gantt", icon: "📅", onClick: handleInsertStudyGantt },
-        { label: "", separator: true },
-      );
+      // Study Gantt was reported as "completely worthless" — hide behind
+      // the setting. Legacy pages still render via CanvasObjectLayer.
+      if (plugin.settings.showExperimentalTools) {
+        items.push(
+          { label: "\u2500\u2500 Study \u2500\u2500", disabled: true },
+          { label: "Study Gantt (experimental)", icon: "📅", onClick: handleInsertStudyGantt },
+          { label: "", separator: true },
+        );
+      }
 
       // AI Drop-in removed from menu — Preview + Input remain in the right panel
 
@@ -788,7 +809,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     handleInsertCircuitSniper, handleInsertUnitConverter, handleInsertGraphPlotter,
     handleInsertUnitCircle, handleInsertOscilloscope, handleInsertCompute,
     handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertMultimeter,
-    mathPaletteOpen,
+    mathPaletteOpen, plugin.settings.showExperimentalTools,
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
