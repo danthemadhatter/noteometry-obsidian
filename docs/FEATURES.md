@@ -132,7 +132,7 @@
 ## AI Chat
 
 ### Chat Panel
-- Multi-turn conversation with Claude Opus 4 (or LM Studio)
+- Multi-turn conversation with the configured AI provider (Perplexity, Claude, or LM Studio)
 - Renders math as native MathML (Safari renders natively)
 - "Copy for Word" button puts MathML on clipboard (pastes as editable equations in Word)
 - File attachments (images, PDFs, documents)
@@ -172,15 +172,18 @@
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| AI Provider | Claude | Claude (cloud) or LM Studio (local) |
+| AI Provider | Perplexity | Perplexity (cloud), Claude (cloud), or LM Studio (local) |
 | Claude API Key | (empty) | Anthropic API key |
-| Claude Model | claude-opus-4-20250514 | Model ID for all AI tasks |
+| Claude Model | claude-opus-4-6 | Model ID for Claude |
+| Perplexity API Key | (empty) | Perplexity API key |
+| Perplexity Model | openai/gpt-5.4 | Model ID for Perplexity |
 | LM Studio URL | http://localhost:1234 | Local LM Studio server |
 | LM Studio Text Model | qwen3-235b | Text model for solving/chat |
 | LM Studio Vision Model | qwen2-vl-72b | Vision model for OCR |
 | Vault Folder | Noteometry | Root folder for page data |
 | Auto Save | true | Enable auto-save |
 | Auto Save Delay | 2000 | Debounce delay in ms |
+| Finger Drawing | false | Draw with a single finger (enable for Android) |
 
 ## Responsive Design
 
