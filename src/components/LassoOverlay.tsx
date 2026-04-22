@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { Notice } from "obsidian";
 import type { LassoMode, LassoRegion } from "../features/lasso/useLassoStack";
 
 interface LassoBounds {
@@ -60,6 +61,8 @@ export default function LassoOverlay({
 
   // Move mode state (only meaningful when stack has exactly 1 region)
   const [moveMode, setMoveMode] = useState(false);
+  const moveModeRef = useRef(moveMode);
+  moveModeRef.current = moveMode;
   const moveDragRef = useRef<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const moveBoundsRef = useRef<LassoBounds | null>(null);
   const snapshotRef = useRef<{ canvas: HTMLCanvasElement; sx: number; sy: number } | null>(null);
@@ -98,6 +101,10 @@ export default function LassoOverlay({
     if (current.length !== 1) return;
     moveBoundsRef.current = current[0]!.bounds;
     setMoveMode(true);
+    // Tell the user what to do next. Without this hint the action bar
+    // disappears and the ghost snapshot sits still until they drag —
+    // which reads as "Move does nothing" if they don't know to drag.
+    new Notice("Drag the selection to its new position", 4000);
   }, []);
 
   // Capture a snapshot of the lasso region from the ink canvas for ghost rendering
@@ -160,6 +167,11 @@ export default function LassoOverlay({
 
     const rafId = requestAnimationFrame(() => {
       captureSnapshot();
+      // Paint the snapshot at its starting position so the user sees the
+      // selection they're about to move. Without this initial paint the
+      // ghost canvas is blank until the first pointermove, which looks
+      // like "Move does nothing" — users don't know to drag.
+      drawGhost(0, 0);
     });
 
     const onDown = (e: PointerEvent) => {
@@ -323,6 +335,9 @@ export default function LassoOverlay({
 
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
+      // Move mode owns pointer events — don't start a new lasso while the
+      // user is mid-move.
+      if (moveModeRef.current) return;
       // Don't intercept clicks that land on the action bar — let those
       // flow through to the buttons. Also ignore clicks on any UI that
       // the canvas shouldn't steal.
@@ -348,6 +363,7 @@ export default function LassoOverlay({
 
     const onMove = (e: PointerEvent) => {
       if (!drawingRef.current) return;
+      if (moveModeRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -364,6 +380,7 @@ export default function LassoOverlay({
 
     const onUp = (e: PointerEvent) => {
       if (!drawingRef.current) return;
+      if (moveModeRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
