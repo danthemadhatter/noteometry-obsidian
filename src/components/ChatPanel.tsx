@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { IconSend, IconPaperclip, IconX, IconRotate, IconCopy, IconCheck } from "./Icons";
-import katex from "katex";
 import type { ChatMessage, Attachment } from "../types";
+import { renderAsMathML, toMathMLForClipboard } from "../lib/mathml";
 
 interface Props {
   messages: ChatMessage[];
@@ -14,55 +14,6 @@ interface Props {
    * Receives the pre-rendered HTML (LaTeX → MathML) ready to drop into a
    * contenteditable text box on the canvas. */
   onDropToCanvas?: (html: string) => void;
-}
-
-/**
- * Render content with LaTeX as pure MathML (no KaTeX wrapper spans).
- * This produces bare <math> elements that Safari renders natively
- * and that copy-paste into Word as real equations.
- */
-function renderAsMathML(text: string): string {
-  if (!text) return "";
-  let result = text;
-
-  // Helper: render LaTeX to pure MathML, stripping KaTeX wrapper spans
-  const toMath = (tex: string, display: boolean): string => {
-    try {
-      const html = katex.renderToString(tex.trim(), {
-        output: "mathml",
-        displayMode: display,
-        throwOnError: false,
-      });
-      // KaTeX wraps in <span class="katex">...</span>, extract the <math> element
-      const match = html.match(/<math[\s\S]*?<\/math>/);
-      if (match) {
-        return display
-          ? `<div style="text-align:center;margin:8px 0">${match[0]}</div>`
-          : match[0];
-      }
-      return html;
-    } catch { return tex; }
-  };
-
-  // Display math $$...$$
-  result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_m, tex) => toMath(tex, true));
-
-  // Inline math $...$
-  result = result.replace(/\$([^$]+?)\$/g, (_m, tex) => toMath(tex, false));
-
-  result = result.replace(/\n/g, "<br>");
-  return result;
-}
-
-/** Same as renderAsMathML but with <p> wrapping for Word clipboard */
-function toMathMLForClipboard(text: string): string {
-  const lines = text.split(/\n/);
-  return lines
-    .map((line) => {
-      if (!line.trim()) return "";
-      return `<p>${renderAsMathML(line)}</p>`;
-    })
-    .join("\n");
 }
 
 export default function ChatPanel({
