@@ -51,7 +51,14 @@ export interface UseInkReturn {
 export function useInk(): UseInkReturn {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [stamps, setStamps] = useState<Stamp[]>([]);
-  const [tool, setToolState] = useState<CanvasTool>("select");
+  // v1.6.9: default to "pen" so Apple Pencil / mouse can draw as soon as
+  // the view opens. Pre-1.6.9 the default was "select", which silently
+  // disabled the ink layer (pointer-events:none) and was the reason Dan
+  // reported "Apple Pencil does not work on iPad" — the ink canvas wasn't
+  // listening. Objects are now always selectable/draggable regardless of
+  // the ink tool, so "select" is no longer needed as a discrete mode for
+  // the basic tap-to-select / drag-to-move flow.
+  const [tool, setToolState] = useState<CanvasTool>("pen");
   // Fountain pen navy — reads as "black enough" on the pale canvas, less
   // harsh than pure #000, consistent with the military palette's ink tone.
   const [activeColor, setActiveColor] = useState("#1a2a4a");

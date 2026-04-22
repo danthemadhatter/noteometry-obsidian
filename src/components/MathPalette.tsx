@@ -5,6 +5,11 @@ interface Props {
   onDragStart?: (display: string) => void;
   /** Place a stamp directly at screen coordinates (for touch drag) */
   onDropStamp?: (display: string, screenX: number, screenY: number) => void;
+  /** v1.6.9: arm a "pending stamp" so the next canvas tap places it.
+   * Called for symbol items that are obvious stamps (Greek letters,
+   * arrows, circuit marks) instead of dumping them into the Input
+   * textarea where they read as random unicode noise. */
+  onArmStamp?: (display: string) => void;
 }
 
 export interface SymbolItem {
@@ -237,7 +242,30 @@ const TABS: TabDef[] = [
 export { TABS };
 export type { TabDef };
 
-export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Props) {
+/** v1.6.9: decide whether tapping a palette entry should insert LaTeX
+ * into the Input panel, or arm a pending stamp so the next canvas tap
+ * drops the glyph. Rule: if the latex looks structural — fractions,
+ * environments, functions with argument placeholders `{}` or explicit
+ * `\begin` blocks — it belongs in the Input. Otherwise it's a pure glyph
+ * (π, ⊕, →, GND…) and belongs on the canvas. This matches classic
+ * math-notebook behavior and is what Dan asked for when he called the
+ * palette "super janky".
+ */
+export function shouldArmStamp(item: SymbolItem): boolean {
+  // Explicit `stamp` always means "has a clean canvas glyph" → stamp.
+  if (item.stamp !== undefined) return true;
+  const l = item.latex;
+  // Structural latex — send to input so the user can keep editing it.
+  if (l.includes("\\begin{")) return false;
+  if (l.includes("{}")) return false; // empty-argument template
+  if (l.includes("^{}") || l.includes("_{}")) return false;
+  if (/\\(frac|sqrt|overline|hat|bar|vec|dot|ddot|tilde|mathbf|mathbb|cancel|boxed|int_|sum_|prod_|lim_|log_|mathcal)\b/.test(l)) return false;
+  // Anything else — single glyph or short command like \alpha / \rightarrow →
+  // stamp the display character.
+  return true;
+}
+
+export default function MathPalette({ onInsert, onDragStart, onDropStamp, onArmStamp }: Props) {
   const [openTab, setOpenTab] = useState<string | null>(null);
   const dragRef = useRef<{
     item: SymbolItem;
@@ -322,8 +350,13 @@ export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Prop
           }
         }
       } else if (!state.moved) {
-        // Pure tap — insert into Input only
-        onInsert(state.item.latex);
+        // v1.6.9: pure tap now either arms a stamp (pure glyphs) or
+        // inserts LaTeX (structural). See shouldArmStamp() for the rule.
+        if (shouldArmStamp(state.item) && onArmStamp) {
+          onArmStamp(state.item.stamp ?? state.item.display);
+        } else {
+          onInsert(state.item.latex);
+        }
       }
     };
 
@@ -355,7 +388,17 @@ export default function MathPalette({ onInsert, onDragStart, onDropStamp }: Prop
                 key={`${tab.id}-${i}`}
                 className="noteometry-mathpal-btn"
                 draggable
-                onClick={() => onInsert(item.latex)}
+                onClick={() => {
+                  // v1.6.9: route pure-glyph taps to a pending stamp so
+                  // the next canvas click places them, mirroring the
+                  // desktop touch drag path. Structural LaTeX still
+                  // goes into Input as before.
+                  if (shouldArmStamp(item) && onArmStamp) {
+                    onArmStamp(item.stamp ?? item.display);
+                  } else {
+                    onInsert(item.latex);
+                  }
+                }}
                 onDragStart={(e) => handleDragStart(e, item)}
                 onTouchStart={(e) => onTouchStart(e, item)}
                 title={item.title ?? item.latex}

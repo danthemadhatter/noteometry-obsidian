@@ -1679,9 +1679,18 @@
 .noteometry-ctx-menu {
   min-width: 200px;
   max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
+  /* v1.6.9: cap at 80vh so there's always breathing room above and below
+   * the menu on iPad. Pre-1.6.9 used 100vh-16px, which on iPad Safari
+   * put the menu edge right at the Safari bottom toolbar — two-finger
+   * scroll there gets intercepted by iOS rubber-band before our menu
+   * ever sees it, making lower items feel unreachable. */
+  max-height: 80vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* pan-y is critical on iPad: lets the menu vertically scroll with
+   * touch even when the page outside uses touch-action: none. */
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   padding: 3px 0;
   background: var(--nm-faceplate);
   color: var(--nm-paper-ink);
@@ -2072,11 +2081,23 @@
     min-height: 44px;
     padding: 8px 14px;
     font-size: 13px;
+    /* manipulation disables the iOS double-tap zoom delay on menu items
+     * so a single tap always fires the action immediately. Combined with
+     * pan-y on the parent container, this gives the menu reliable
+     * touch scrolling + tap-to-pick on iPad. */
+    touch-action: manipulation;
   }
   .noteometry-ctx-menu {
     max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 16px);
+    /* On iPad we leave more vertical airspace (70vh) so Safari's URL
+     * bar and the iOS rubber-band zone never intercept the bottom rows.
+     * Pre-1.6.9 used calc(100vh - 16px) which put the last row right at
+     * the toolbar edge and the user couldn't reach it. */
+    max-height: 70vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* ── Floating panel: bottom sheet on mobile ── */

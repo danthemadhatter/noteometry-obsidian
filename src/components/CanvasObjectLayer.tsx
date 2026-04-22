@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { defaultObjectName } from "../lib/canvasObjects";
+import { shouldStartObjectDrag } from "../lib/objectDragHitTest";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
 import { loadImageFromVault } from "../lib/persistence";
@@ -338,10 +339,18 @@ export default function CanvasObjectLayer({
     onObjectsChange(next);
   }, [objects, onObjectsChange]);
 
-  // Only individual objects are interactive in select mode.
-  // Parent div is ALWAYS pointerEvents: none so it never blocks
-  // drag-and-drop, wheel scroll, or canvas click-to-deselect.
-  const objectsInteractive = tool === "select";
+  // v1.6.9: objects are ALWAYS interactive — classic direct manipulation.
+  // Dan's feedback: "objects should be selectable and movable directly by
+  // tapping/clicking and dragging. Should NOT have to lasso to move."
+  // The parent div stays pointer-events:none so pen strokes fall through
+  // to the ink canvas on empty space; each object's own wrapper turns
+  // pointer-events back on so tap/drag over a drop-in grabs it, even
+  // while the pen tool is active.
+  //
+  // `tool` is kept as a prop for future per-tool behavior (e.g. eraser
+  // could elect to skip object capture) but no longer gates selectability.
+  void tool;
+  const objectsInteractive = true;
 
   return (
     <div
@@ -391,11 +400,29 @@ export default function CanvasObjectLayer({
             }}
           />
 
-          {/* Content — stop propagation so drag handler doesn't steal focus */}
+          {/* Content — v1.6.9: body is now a secondary drag handle.
+           * If the pointer lands on an interactive control (input, button,
+           * textarea, contenteditable, anything with role=button) we let
+           * the control receive the event normally. Otherwise we start a
+           * classic drag on the object, matching Figma/Notion behavior.
+           *
+           * Pre-1.6.9 the body always stopped propagation, so dragging a
+           * drop-in required either the small title-bar handle or the
+           * lasso flow. Dan's feedback was explicit: "objects should be
+           * selectable and movable directly by tapping/clicking and
+           * dragging. Should NOT have to lasso to move." */}
           <div
             className="noteometry-object-content"
             data-dropin-id={obj.id}
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (!shouldStartObjectDrag(e.target as HTMLElement)) {
+                // Let the control handle the event; don't bubble to drag.
+                e.stopPropagation();
+                return;
+              }
+              // Non-interactive body — treat as drag handle.
+              handleDragStart(e, obj);
+            }}
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
