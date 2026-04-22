@@ -21,6 +21,7 @@ import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
+import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
@@ -802,7 +803,14 @@ export default function NoteometryApp({ plugin, app }: Props) {
           link.href = dataUrl;
           link.click();
         }},
-        { label: "Clear Canvas", danger: true, onClick: () => {
+        { label: "", separator: true },
+        // v1.6.8: Clear Canvas was reported as "disappeared" after the
+        // v1.6.6/v1.6.7 hub repairs. It never actually left, but it was
+        // the last item in a ~30-entry menu with no visual break from
+        // Export PNG. Pulled into a named factory so a registry test
+        // can pin the invariant, and fronted by its own separator so
+        // it reads as a distinct destructive action (not a lasso op).
+        buildClearCanvasAction(() => {
           if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
           if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
           pushUndo();
@@ -811,8 +819,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
           setCanvasObjects([]);
           setSelectedObjectId(null);
           setSelectedStampId(null);
-        }},
+        }),
       );
+
+      // Belt-and-braces: if a future refactor ever drops Clear Canvas
+      // from the menu, surface it loudly in the console instead of
+      // silently vanishing (the exact failure mode v1.6.8 is fixing).
+      if (!items.some((i) => i.label === CLEAR_CANVAS_LABEL)) {
+        console.error("[Noteometry] Clear Canvas missing from context menu — this is a regression.");
+      }
     }
 
     setCtxMenu({ x: e.clientX, y: e.clientY, items });

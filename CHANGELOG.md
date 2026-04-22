@@ -2,8 +2,10 @@
 
 ## 1.6.8 — 2026-04-22
 
-Narrow lasso repair pass on v1.6.7 test feedback: "Lasso Clear does nothing. Lasso Move does nothing." The existing lasso architecture (multi-region stack, freehand/rect modes, right-click hub entry) is preserved; these fixes adjust the action bar's Clear and Move to behave classically without rewriting anything.
+Two narrow repairs from v1.6.7 test feedback: **"Clear Canvas tool disappeared"** and **"Lasso Clear does nothing. Lasso Move does nothing."** Existing architecture — right-click hub, multi-region lasso stack, freehand/rect modes, rasterize/composite pipeline, stack-based action bar — is preserved; these fixes restore classic behaviour without rewriting anything.
 
+- **Clear Canvas restored to visible prominence.** The action had never actually left the codebase — it was the last item in the Canvas section of the right-click hub — but after the v1.6.6/v1.6.7 hub repairs it sat immediately below **Export PNG** with no separator, in a ~30-entry menu that scrolls on shorter viewports. With a visually identical neighbour it read as gone. Added a separator above it, pulled the item into a dedicated `buildClearCanvasAction` factory (so a unit test can pin the invariant), and kept the existing safety rails: two-step confirm, `pushUndo()` before state wipe, autosave naturally picks up the post-clear state.
+- **Defensive console error** if a future refactor ever drops Clear Canvas from the assembled menu — silent disappearance is the exact failure mode this release is fixing, so regressions now shout.
 - **Lasso Clear now deletes.** The Clear button previously only wiped the region outlines while leaving all captured content in place, so it read as a no-op. Clear now:
   - Removes strokes whose points fall inside any region polygon,
   - Removes stamps whose center is inside any region,
@@ -14,9 +16,9 @@ Narrow lasso repair pass on v1.6.7 test feedback: "Lasso Clear does nothing. Las
 - **Lasso Move stops being swallowed by a new lasso draw.** The main lasso drawing listeners on the viewport container ran in capture phase and fired even while Move mode was active, so the user's pointerdown started a fresh lasso instead of grabbing the selection. Added a `moveModeRef` guard to those listeners.
 - **Move now gives visual feedback on entry.** The ghost snapshot canvas is painted at the selection's starting position as soon as Move activates (instead of staying blank until the first `pointermove`), and a `Drag the selection to its new position` Notice fires. Previously the action bar disappeared and the canvas looked idle, which read as "Move does nothing".
 - **Pure selection/mutation helpers extracted.** `src/features/lasso/selection.ts` holds `deleteStrokesInPolygons`, `moveStrokesInPolygon`, `selectionIsEmpty`, world/screen transforms, etc. `handleLassoMoveComplete` was refactored onto these helpers — same math, testable without a DOM.
-- **Tests:** `tests/unit/lassoSelection.test.ts` covers the helpers end-to-end — screen↔world conversion, polygon + bbox selection, pure delete/move semantics on strokes/stamps/objects, multi-region union, preserved relative positions, and the "empty selection" predicate.
+- **Tests:** `clearCanvasAction.test.ts` pins the Clear Canvas label, `danger` flag, onClick wiring, and the distinction from the lasso overlay's "Clear" button. `lassoSelection.test.ts` covers the lasso helpers end-to-end — screen↔world conversion, polygon + bbox selection, pure delete/move semantics on strokes/stamps/objects, multi-region union, preserved relative positions, and the "empty selection" predicate.
 
-Out of scope (hard constraints, untouched): Math v12 prompt, MathML generation, copy-to-Word, clipboard pipeline, right-click context hub. The lasso was not rewritten from scratch — the existing `LassoOverlay`, `useLassoStack`, rasterize/composite pipeline, and stack-based action bar are preserved.
+Out of scope (hard constraints, untouched): Math v12 prompt, MathML generation, copy-to-Word, clipboard pipeline, right-click context hub concept. The lasso was not rewritten from scratch — the existing `LassoOverlay`, `useLassoStack`, rasterize/composite pipeline, and stack-based action bar are preserved.
 
 ## 1.6.7 — 2026-04-22
 
