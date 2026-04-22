@@ -62,9 +62,11 @@ export default function ComputeDropin({ cells, resultExpr, onChange }: Props) {
           color: "var(--nm-ink)", fontFamily: "var(--nm-font, sans-serif)",
           lineHeight: 1.4,
         }}>
-          <strong>Compute:</strong> scratchpad for named values. Add variables
-          (e.g. <code>R = 1000</code>), then write a result expression using them
-          (e.g. <code>V / R</code>). Math.* functions are available.
+          <strong>Calculator:</strong> a named-variable scratchpad.
+          Add a variable (e.g. <code>V = 12</code>, <code>R = 1000</code>),
+          then write a result expression that uses them
+          (e.g. <code>V / R</code>). <code>Math.*</code> is in scope —
+          try <code>Math.sqrt(V / R)</code>.
         </div>
       )}
       <div style={{

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.7 — 2026-04-22
+
+Follow-up pass on v1.6.6 manual-test feedback.
+
+- **Circuit Sniper — angled snap, take two.** v1.6.6 fixed `getPinCoords` so rendered pins match returned endpoints at 30/45/60°, but pins still didn't *connect* — the 12 px pin hit target is tiny and off-grid at those angles, so the pointer kept missing it mid-drag. Added proximity-based pin lookup (`findNearestPin`, 20 px threshold): while drawing or editing a wire, the tip now locks onto the nearest pin across any angled component. Same logic for wire endpoint edits.
+- **Trackpad pinch zoom on desktop.** The InkCanvas container's wheel handler was pan-on-every-event, which ate the pinch gestures (Chromium synthesises `wheel` + `ctrlKey: true`) before the viewport's zoom handler could see them. Bailed early when `ctrlKey` or `metaKey` is set so pinch zoom reaches the parent cleanly; plain two-finger scroll still pans.
+- **Context-hub cleanup:**
+  - Renamed **Compute → Calculator** in the hub and on the drop-in chrome. The feature is the same (named-variable scratchpad); the label was the problem. Persistence keeps the `compute` kind for backward compatibility.
+  - Hid **Animation Canvas**, **Study Gantt**, and **Multimeter** from the main hub by default. User feedback was "WTF is this for" / "worthless" / "doesn't fit" — they're legacy or speculative, not part of the core math/EE flow. Re-enable via **Settings → Show experimental tools**. Existing pages with these drop-ins still render exactly as before.
+- **Calculator inline help** now gives a concrete EE example (`V=12`, `R=1000`, `V/R`) so the drop-in's purpose is obvious at first insert.
+
+Out of scope for this pass (hard constraints): Math v12 prompt, MathML generation, copy-to-Word, clipboard pipeline, right-click hub concept — untouched.
+
 ## 1.6.6 — 2026-04-22
 
 - **Context hub repair:** audited every right-click insert action. Fixed broken wiring in GraphPlotter (empty signal-bus subscribe removed, added pan/zoom controls), StudyGantt (exposed startDay/duration/progress/color controls so tasks aren't inert), UnitConverter (re-sync baseValue when the persisted prop changes externally), CircuitSniper (moved render-phase onChange into useEffect).

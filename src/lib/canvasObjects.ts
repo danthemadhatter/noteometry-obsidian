@@ -202,7 +202,7 @@ export function createOscilloscope(x: number, y: number, name = "Oscilloscope"):
   };
 }
 
-export function createCompute(x: number, y: number, name = "Compute"): ComputeObject {
+export function createCompute(x: number, y: number, name = "Calculator"): ComputeObject {
   return {
     id: newObjectId(), type: "compute", x, y, w: 300, h: 250, name,
     cells: [], resultExpr: "",
@@ -244,7 +244,7 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "graph-plotter": return "Graph Plotter";
     case "unit-circle": return "Unit Circle";
     case "oscilloscope": return "Oscilloscope";
-    case "compute": return "Compute";
+    case "compute": return "Calculator";
     case "animation-canvas": return "Animation Canvas";
     case "study-gantt": return "Study Gantt";
     case "ai-dropin": return "AI Drop-in";

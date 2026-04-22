@@ -623,10 +623,18 @@ export default function InkCanvas({
   }, [resizeCanvases]);
 
   // ── Mouse wheel scrolling — on the CONTAINER (works in all modes) ──
+  //
+  // Plain wheel → pan. Trackpad two-finger pinch on Mac/Chromium synthesises
+  // wheel events with `ctrlKey: true` (and no metaKey). Cmd+wheel on desktop
+  // is also a zoom gesture. In both cases we must NOT consume the event here —
+  // bail out and let the viewport-level handler in NoteometryApp do the zoom.
+  // Without this early return, pan and zoom fought over the same event and
+  // pinch-to-zoom visibly failed (users reported a jittery pan).
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return; // zoom gesture — parent handles it
       e.preventDefault();
       const newX = scrollRef.current.x + e.deltaX;
       const newY = scrollRef.current.y + e.deltaY;

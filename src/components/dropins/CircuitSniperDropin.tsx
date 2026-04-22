@@ -349,7 +349,7 @@ function getSnap45(
   };
 }
 
-function getPinCoords(
+export function getPinCoords(
   el: CircuitElement,
   pin: Pin
 ): { x: number; y: number } {
@@ -390,6 +390,38 @@ function resolveEndpoint(
     }
   }
   return { x: ep.x, y: ep.y };
+}
+
+/** Find the pin (if any) within `threshold` pixels of the given world-space
+ * coordinate. Used during wire drag so angled components snap together
+ * without requiring the user to land the pointer inside a pin's tiny hit
+ * circle — which is the failure mode at 30/45/60° rotations where the
+ * pin is off the grid. Excludes pins belonging to `ignoreElId` so a wire
+ * being drawn from one pin doesn't instantly snap to another pin on the
+ * same component. */
+export function findNearestPin(
+  wx: number,
+  wy: number,
+  elements: Element[],
+  threshold = 18,
+  ignoreElId?: string
+): { elId: string; pinId: string; x: number; y: number } | null {
+  let best: { elId: string; pinId: string; x: number; y: number; d: number } | null = null;
+  for (const el of elements) {
+    if (isWire(el)) continue;
+    if (ignoreElId && el.id === ignoreElId) continue;
+    const def = COMP_LIB[el.type];
+    if (!def) continue;
+    for (const pin of def.pins) {
+      const c = getPinCoords(el as CircuitElement, pin);
+      const d = Math.hypot(c.x - wx, c.y - wy);
+      if (d <= threshold && (!best || d < best.d)) {
+        best = { elId: el.id, pinId: pin.id, x: c.x, y: c.y, d };
+      }
+    }
+  }
+  if (!best) return null;
+  return { elId: best.elId, pinId: best.pinId, x: best.x, y: best.y };
 }
 
 /* ================================================================== */
@@ -864,6 +896,21 @@ export default function CircuitSniperDropin({
               : prev
           );
       } else if (drawWire) {
+        // Proximity snap first: if the mouse is close to any other pin,
+        // lock the wire tip to that pin. This is what makes angled
+        // (30/45/60°) components actually connect — at those angles pins
+        // don't sit on the grid, so the 12px DOM hit target is tiny and
+        // keeps getting missed. Distance check bypasses the DOM entirely.
+        const near = findNearestPin(mouseX, mouseY, elements, 20, drawWire.start.elId);
+        if (near) {
+          setHoverPin({ elId: near.elId, pinId: near.pinId, x: near.x, y: near.y });
+          setDrawWire((prev) =>
+            prev ? { ...prev, currentX: near.x, currentY: near.y } : prev
+          );
+          return;
+        }
+        // No pin nearby — fall back to angle-snapped freehand tip.
+        if (hoverPin) setHoverPin(null);
         const snapped = getSnap45(
           drawWire.start.x,
           drawWire.start.y,
@@ -878,10 +925,18 @@ export default function CircuitSniperDropin({
       } else if (editWire) {
         const wire = elements.find((w) => w.id === editWire.id) as WireElement;
         if (wire) {
-          const otherEnd = resolveEndpoint(
-            wire[editWire.endKey === "from" ? "to" : "from"],
-            elements
-          );
+          const otherEndKey = editWire.endKey === "from" ? "to" : "from";
+          const otherEnd = resolveEndpoint(wire[otherEndKey], elements);
+          const anchoredElId = wire[otherEndKey].elId;
+          const near = findNearestPin(mouseX, mouseY, elements, 20, anchoredElId);
+          if (near) {
+            setHoverPin({ elId: near.elId, pinId: near.pinId, x: near.x, y: near.y });
+            setEditWire((prev) =>
+              prev ? { ...prev, currentX: near.x, currentY: near.y } : prev
+            );
+            return;
+          }
+          if (hoverPin) setHoverPin(null);
           const snapped = getSnap45(otherEnd.x, otherEnd.y, mouseX, mouseY);
           setEditWire((prev) =>
             prev
