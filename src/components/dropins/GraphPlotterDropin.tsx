@@ -135,13 +135,82 @@ export default function GraphPlotterDropin({ functions, viewX, viewY, viewW, vie
     onChange({ viewX: -10, viewY: -2, viewW: 20, viewH: 4 });
   }, [onChange]);
 
+  /* Direct canvas pan/zoom — users expect click-and-drag to pan and
+   * wheel to zoom, in addition to the button row. Button-row fallback
+   * remains for touch/pen. v1.6.6 patch: the view transform buttons
+   * existed but users reported "pan/zoom does not work" because they
+   * reached for mouse/wheel gestures first. */
+  const dragStateRef = useRef<{ startX: number; startY: number; viewX0: number; viewY0: number } | null>(null);
+
+  const onCanvasPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.stopPropagation();
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    dragStateRef.current = { startX: e.clientX, startY: e.clientY, viewX0: viewX, viewY0: viewY };
+  }, [viewX, viewY]);
+
+  const onCanvasPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const st = dragStateRef.current;
+    if (!st) return;
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const dxScreen = e.clientX - st.startX;
+    const dyScreen = e.clientY - st.startY;
+    const worldDx = -(dxScreen / rect.width) * viewW;
+    const worldDy = (dyScreen / rect.height) * viewH;
+    onChange({ viewX: st.viewX0 + worldDx, viewY: st.viewY0 + worldDy });
+  }, [viewW, viewH, onChange]);
+
+  const onCanvasPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragStateRef.current) {
+      try { (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId); } catch { /* empty */ }
+    }
+    dragStateRef.current = null;
+  }, []);
+
+  const onCanvasWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    // Mouse position in world-space → keep it anchored after zoom.
+    const mx = viewX + ((e.clientX - rect.left) / rect.width) * viewW;
+    const my = viewY + (1 - (e.clientY - rect.top) / rect.height) * viewH;
+    // Two-finger trackpad pinch reports ctrlKey=true in Chromium/Electron.
+    // Small steps feel more natural at that granularity.
+    const base = e.ctrlKey ? 0.01 : 0.0015;
+    const factor = Math.exp(e.deltaY * base);
+    const nw = viewW * factor;
+    const nh = viewH * factor;
+    const newViewX = mx - ((e.clientX - rect.left) / rect.width) * nw;
+    const newViewY = my - (1 - (e.clientY - rect.top) / rect.height) * nh;
+    onChange({ viewX: newViewX, viewY: newViewY, viewW: nw, viewH: nh });
+  }, [viewX, viewY, viewW, viewH, onChange]);
+
+  // Prevent passive default handler from swallowing the wheel event.
+  useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const block = (ev: WheelEvent) => { ev.preventDefault(); };
+    cvs.addEventListener("wheel", block, { passive: false });
+    return () => cvs.removeEventListener("wheel", block);
+  }, []);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <canvas
           ref={canvasRef}
           width={400} height={250}
-          style={{ width: "100%", height: "100%", display: "block" }}
+          style={{ width: "100%", height: "100%", display: "block", cursor: dragStateRef.current ? "grabbing" : "grab", touchAction: "none" }}
+          onPointerDown={onCanvasPointerDown}
+          onPointerMove={onCanvasPointerMove}
+          onPointerUp={onCanvasPointerUp}
+          onPointerCancel={onCanvasPointerUp}
+          onWheel={onCanvasWheel}
         />
       </div>
       <div style={{ padding: "4px 8px", fontSize: "11px", borderTop: "1px solid #E0E0E0" }}>

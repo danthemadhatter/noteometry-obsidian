@@ -399,7 +399,15 @@ export default function CanvasObjectLayer({
             onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              // Focus the first editable element inside (keyboard popup on iPad)
+              // Only auto-focus the first editable when the user clicked empty
+              // space inside the wrapper (i.e. NOT on an already-interactive
+              // control). Otherwise clicking the duration / progress field in
+              // dropins like StudyGantt would steal focus back to the title,
+              // making those fields effectively uneditable.
+              const target = e.target as HTMLElement;
+              const onInteractive =
+                target.closest("input, textarea, select, button, [contenteditable='true']");
+              if (onInteractive) return;
               const editable = (e.currentTarget as HTMLElement).querySelector<HTMLElement>(
                 '[contenteditable], input, textarea'
               );

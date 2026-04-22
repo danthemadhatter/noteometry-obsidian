@@ -103,8 +103,10 @@ export default function AnimationCanvasDropin({ frames, currentFrame, fps, onCha
     onChange({ frames: next, currentFrame: next.length - 1 });
   }, [frames, onChange]);
 
+  const showHint = frames.length <= 1 && !(frames[0] && frames[0].length > 0);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
       <canvas
         ref={canvasRef} width={400} height={300}
         style={{ width: "100%", flex: 1, minHeight: 0, cursor: playing ? "default" : "crosshair" }}
@@ -112,6 +114,20 @@ export default function AnimationCanvasDropin({ frames, currentFrame, fps, onCha
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       />
+      {showHint && (
+        <div style={{
+          position: "absolute", top: "8px", left: "8px", right: "8px",
+          padding: "6px 8px",
+          background: "var(--nm-accent-light, rgba(74,144,217,0.12))",
+          border: "1px dashed var(--nm-accent, #4a90d9)",
+          borderRadius: "4px", fontSize: "10px",
+          color: "var(--nm-ink)", fontFamily: "var(--nm-font, sans-serif)",
+          lineHeight: 1.35, pointerEvents: "none",
+        }}>
+          <strong>Animation:</strong> draw on this frame, then +Frame to add another.
+          Play cycles through them. Per-frame onion-style sketching.
+        </div>
+      )}
       <div style={{
         display: "flex", alignItems: "center", gap: "6px", padding: "4px 8px",
         borderTop: "1px solid #E0E0E0", fontSize: "11px", background: "var(--nm-faceplate)",

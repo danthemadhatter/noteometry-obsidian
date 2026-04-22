@@ -8,6 +8,15 @@
 - **Type cleanup:** removed unneeded `as "DCV"` cast on Multimeter wiring — factory type already matches.
 - **Tests:** added `contextMenuInsert.test.ts` guardrail covering every hub factory + the quarantined legacy factory.
 
+### Manual-test follow-ups (second pass)
+
+- **Insert Image:** FileReader / Image decode / vault-save now each have their own error notice + console path, and successful inserts select the new object (matching Text Box / Table). Previously any silent failure — unreadable file, unsupported format, blocked vault write — looked identical to "nothing happened".
+- **StudyGantt edit controls:** clicking duration / start-day / progress inputs no longer steals focus back to the title field. The auto-focus fallback only fires when the click lands on empty space inside the object wrapper, not on an interactive control.
+- **Graph Plotter pan/zoom:** canvas is now directly click-drag pannable and wheel/trackpad-pinch zoomable; the button row remains for touch/pen. Pinch (`ctrlKey` synthesized by Chromium/Electron) uses a finer zoom step.
+- **Trackpad two-finger scroll:** plain wheel events (without Cmd/Ctrl) now pan the canvas viewport via `scrollX`/`scrollY` deltas, divided by the current zoom so gesture distance matches on-screen. Drop-in internal scrollers still win over canvas pan.
+- **Circuit Sniper angled snap:** `getPinCoords` no longer grid-snaps pin coords when the component is at a non-axis-aligned rotation. At 30°/45°/60° etc. the rendered pin and the returned endpoint now agree, so angled components actually overlap when you push them together.
+- **Compute / Animation Canvas / Multimeter:** added minimal inline hints so first-use isn't confusing — "useless"-looking empty states now explain what to do.
+
 ## 1.6.5 — 2026-04-17
 
 - **Math v12 guardrails:** regression tests for Math v12 prompt, MathML output, and copy-to-Word clipboard behavior. (`1615dd0`)

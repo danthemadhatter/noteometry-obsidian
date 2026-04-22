@@ -796,38 +796,63 @@ export default function NoteometryApp({ plugin, app }: Props) {
     if (!file) return;
     e.target.value = "";
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataURL = ev.target?.result as string;
-      if (dataURL) {
+    try {
+      const reader = new FileReader();
+      reader.onerror = () => {
+        console.error("[Noteometry] image FileReader error:", reader.error);
+        new Notice("Image insert failed — couldn't read file (see console)", 8000);
+      };
+      reader.onload = async (ev) => {
+        const dataURL = ev.target?.result as string;
+        if (!dataURL) {
+          new Notice("Image insert failed — empty file", 6000);
+          return;
+        }
         const img = new window.Image();
+        img.onerror = () => {
+          console.error("[Noteometry] image decode failed for", file.name);
+          new Notice(`Can't decode image "${file.name}" — unsupported format?`, 8000);
+        };
         img.onload = async () => {
-          const maxW = 400;
-          const scale = Math.min(1, maxW / img.width);
-          const obj = createImageObject(
-            scrollX + 150, scrollY + 150,
-            dataURL,
-            img.width * scale,
-            img.height * scale
-          );
-          // Save to vault if we have a section
-          const sec = sectionRef.current;
-          if (sec) {
-            try {
-              const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
-              obj.dataURL = vaultPath;
-            } catch (err) {
-              console.error("[Noteometry] image vault save failed:", err);
-              new Notice("Image save failed — kept in memory only, may not sync across devices", 8000);
+          try {
+            const maxW = 400;
+            const scale = Math.min(1, maxW / img.width);
+            const obj = createImageObject(
+              scrollX + 150, scrollY + 150,
+              dataURL,
+              img.width * scale,
+              img.height * scale
+            );
+            // Save to vault if we have a section; otherwise the dataURL
+            // stays in memory (still renders, won't sync across devices).
+            const sec = sectionRef.current;
+            if (sec) {
+              try {
+                const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                obj.dataURL = vaultPath;
+              } catch (err) {
+                console.error("[Noteometry] image vault save failed:", err);
+                new Notice("Image saved in-memory only — vault write failed (see console)", 8000);
+              }
+            } else {
+              new Notice("No active page — image dropped on canvas but not saved to vault", 6000);
             }
+            setCanvasObjects((prev) => [...prev, obj]);
+            setTool("select");
+            setSelectedObjectId(obj.id);
+          } catch (err) {
+            console.error("[Noteometry] image insert failed in onload:", err);
+            new Notice("Couldn't insert Image — see console", 8000);
           }
-          setCanvasObjects((prev) => [...prev, obj]);
         };
         img.src = dataURL;
-      }
-    };
-    reader.readAsDataURL(file);
-  }, [scrollX, scrollY, plugin]);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("[Noteometry] image insert outer error:", err);
+      new Notice("Couldn't insert Image — see console", 8000);
+    }
+  }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
   // Paste listener for images
   useEffect(() => {
@@ -875,27 +900,43 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setScrollY(newY);
   }, []);
 
-  /* ── Cmd/Ctrl + wheel → zoom (desktop) ─────────────────── */
+  /* ── Wheel handler: Cmd/Ctrl+wheel → zoom, plain wheel → pan.
+   * Trackpad two-finger scroll arrives as plain wheel events (no ctrl).
+   * Chromium also synthesizes `ctrlKey: true` for pinch-zoom — handled
+   * as zoom below. Plain 2-finger drag pans the canvas viewport. */
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      if (zoomLocked) {
+      const zoomGesture = e.metaKey || e.ctrlKey;
+      if (zoomGesture) {
+        if (zoomLocked) { e.preventDefault(); return; }
         e.preventDefault();
+        setZoom((z) => {
+          // Pinch-zoom (ctrl synthesized) sends smaller deltas; boost it.
+          const scale = e.ctrlKey && !e.metaKey ? 0.01 : 0.005;
+          const delta = -e.deltaY * scale;
+          return clampZoom(Math.round((z + delta) * 100) / 100);
+        });
         return;
       }
+      // Skip if the wheel event originated inside an internally-scrollable
+      // drop-in (textareas, tables, BOM panels, etc.). Those should scroll
+      // their own content before hijacking canvas pan.
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-dropin-id], textarea, .noteometry-object-content")) {
+        return;
+      }
+      // Pan the canvas. Divide by zoom so the world-space distance matches
+      // the on-screen gesture at any zoom level.
       e.preventDefault();
-      // Scroll up → zoom in; scroll down → zoom out.
-      // Sensitivity: ~1 wheel tick per 0.05 zoom step.
-      setZoom((z) => {
-        const delta = -e.deltaY * 0.005;
-        return clampZoom(Math.round((z + delta) * 100) / 100);
-      });
+      const z = zoom || 1;
+      setScrollX((x) => x + e.deltaX / z);
+      setScrollY((y) => y + e.deltaY / z);
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [zoomLocked, clampZoom]);
+  }, [zoomLocked, clampZoom, zoom]);
 
   /* ── Drag-and-drop math symbols onto canvas ──────────── */
   const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
