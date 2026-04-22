@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.6 — 2026-04-22
+
+- **Context hub repair:** audited every right-click insert action. Fixed broken wiring in GraphPlotter (empty signal-bus subscribe removed, added pan/zoom controls), StudyGantt (exposed startDay/duration/progress/color controls so tasks aren't inert), UnitConverter (re-sync baseValue when the persisted prop changes externally), CircuitSniper (moved render-phase onChange into useEffect).
+- **Quarantined AI drop-in:** the inline textarea + "Type a problem" input bar had no handlers and silently dropped input. The drop-in is removed from the creatable hub and replaced with a deprecation placeholder pointing at the right panel. Legacy pages still load.
+- **Robust insert path:** every Insert/Drop-in handler now wraps in try/catch and surfaces a Notice on failure instead of silently no-oping.
+- **Type cleanup:** removed unneeded `as "DCV"` cast on Multimeter wiring — factory type already matches.
+- **Tests:** added `contextMenuInsert.test.ts` guardrail covering every hub factory + the quarantined legacy factory.
+
 ## 1.6.5 — 2026-04-17
 
 - **Math v12 guardrails:** regression tests for Math v12 prompt, MathML output, and copy-to-Word clipboard behavior. (`1615dd0`)

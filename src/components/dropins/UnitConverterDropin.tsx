@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 interface Props {
   category: string;
@@ -34,6 +34,15 @@ export default function UnitConverterDropin({ category, inputValue, onChange }: 
   const [baseValue, setBaseValue] = useState(() => parseFloat(inputValue) || 1);
   const [editingPrefix, setEditingPrefix] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState("");
+
+  // Re-sync when the persisted prop changes externally (e.g. page reload,
+  // undo, or a different instance saving). Without this the display can
+  // drift from the saved value silently.
+  useEffect(() => {
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed) && parsed !== baseValue) setBaseValue(parsed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue]);
 
   const cat = CATEGORIES.find(c => c.key === category) ?? CATEGORIES[0];
 

@@ -529,7 +529,7 @@ export default function CanvasObjectLayer({
             )}
             {obj.type === "multimeter" && (
               <MultimeterDropin
-                mode={obj.meterMode as "DCV"}
+                mode={obj.meterMode}
                 inputValue={obj.inputValue}
                 onChange={(u) => {
                   onObjectsChange(objects.map(o =>

@@ -12,6 +12,13 @@ interface Props {
 
 const COLORS = ["#4A90D9", "#16A34A", "#F59E0B", "#DC2626", "#7C3AED", "#EC4899"];
 
+const ganttNumInput: React.CSSProperties = {
+  width: "36px", fontSize: "10px", padding: "1px 2px",
+  border: "1px solid #E0E0E0", borderRadius: "3px",
+  background: "var(--nm-faceplate)", color: "var(--nm-ink)",
+  textAlign: "right",
+};
+
 export default function StudyGanttDropin({ startDate, tasks, onChange }: Props) {
   const addTask = useCallback(() => {
     const id = crypto.randomUUID();
@@ -55,10 +62,33 @@ export default function StudyGanttDropin({ startDate, tasks, onChange }: Props) 
       {tasks.map(task => (
         <div key={task.id} style={{ marginBottom: "6px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: task.color, flexShrink: 0 }} />
+            <span
+              onClick={() => {
+                const idx = COLORS.indexOf(task.color);
+                const next = COLORS[(idx + 1) % COLORS.length] ?? task.color;
+                updateTask(task.id, { color: next });
+              }}
+              title="Click to cycle color"
+              style={{ width: "10px", height: "10px", borderRadius: "50%", background: task.color, flexShrink: 0, cursor: "pointer" }}
+            />
             <input value={task.title}
               onChange={e => updateTask(task.id, { title: e.target.value })}
               style={{ flex: 1, fontSize: "11px", border: "none", background: "transparent", color: "var(--nm-ink)", fontWeight: 600 }}
+            />
+            <label title="Start day" style={{ color: "#666", fontSize: "10px" }}>s</label>
+            <input type="number" min={0} value={task.startDay}
+              onChange={e => updateTask(task.id, { startDay: Math.max(0, parseInt(e.target.value) || 0) })}
+              style={ganttNumInput}
+            />
+            <label title="Duration in days" style={{ color: "#666", fontSize: "10px" }}>d</label>
+            <input type="number" min={1} value={task.duration}
+              onChange={e => updateTask(task.id, { duration: Math.max(1, parseInt(e.target.value) || 1) })}
+              style={ganttNumInput}
+            />
+            <label title="Progress %" style={{ color: "#666", fontSize: "10px" }}>%</label>
+            <input type="number" min={0} max={100} value={task.progress}
+              onChange={e => updateTask(task.id, { progress: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
+              style={ganttNumInput}
             />
             <button onClick={() => removeTask(task.id)}
               style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: "10px" }}

@@ -3,6 +3,7 @@ import React, {
   useRef,
   useState,
   useCallback,
+  useEffect,
   type ReactElement,
 } from "react";
 
@@ -698,20 +699,17 @@ export default function CircuitSniperDropin({
     []
   );
 
-  /* For UNDO/REDO, we need to sync after state updates. We use a ref-based
-     approach: check after each render if elements changed. */
-  const lastSyncedRef = useRef(prevJson.current);
-  const currentJson = JSON.stringify(elements);
-  if (currentJson !== lastSyncedRef.current) {
-    lastSyncedRef.current = currentJson;
-    if (currentJson !== prevJson.current) {
-      prevJson.current = currentJson;
-      // Schedule sync outside render via microtask
-      Promise.resolve().then(() => {
-        onChangeRef.current({ circuitData: currentJson });
-      });
+  /* Persist on element change. Moved out of render phase into useEffect
+     in v1.6.6 so React doesn't see side-effects-in-render during
+     reconciliation (previous Promise.resolve().then(...) trick worked
+     but was fragile). */
+  useEffect(() => {
+    const json = JSON.stringify(elements);
+    if (json !== prevJson.current) {
+      prevJson.current = json;
+      onChangeRef.current({ circuitData: json });
     }
-  }
+  }, [elements]);
 
   /* -- Interaction state -- */
   const canvasRef = useRef<HTMLDivElement>(null);

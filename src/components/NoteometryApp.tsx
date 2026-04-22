@@ -7,7 +7,7 @@ import {
   createTextBox, createTable, createImageObject, createPdfObject,
   createCircuitSniper, createUnitConverter, createGraphPlotter,
   createUnitCircle, createOscilloscope, createCompute,
-  createAnimationCanvas, createStudyGantt, createAIDropin,
+  createAnimationCanvas, createStudyGantt,
   createMultimeter,
 } from "../lib/canvasObjects";
 import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
@@ -470,10 +470,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   /* ── Insert canvas objects ───────────────────────────── */
   const handleInsertTextBox = useCallback(() => {
-    const obj = createTextBox(scrollX + 150, scrollY + 150);
-    setCanvasObjects((prev) => [...prev, obj]);
-    setTool("select");
-    setSelectedObjectId(obj.id);
+    try {
+      const obj = createTextBox(scrollX + 150, scrollY + 150);
+      setCanvasObjects((prev) => [...prev, obj]);
+      setTool("select");
+      setSelectedObjectId(obj.id);
+    } catch (err) {
+      console.error("[Noteometry] Text Box insert failed:", err);
+      new Notice("Couldn't insert Text Box — see console", 6000);
+    }
   }, [scrollX, scrollY]);
 
   /* ── Drop AI chat response onto the canvas ──────────────
@@ -500,10 +505,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, [scrollX, scrollY, canvasObjects, setCanvasObjects, setSelectedObjectId]);
 
   const handleInsertTable = useCallback(() => {
-    const obj = createTable(scrollX + 200, scrollY + 200);
-    setCanvasObjects((prev) => [...prev, obj]);
-    setTool("select");
-    setSelectedObjectId(obj.id);
+    try {
+      const obj = createTable(scrollX + 200, scrollY + 200);
+      setCanvasObjects((prev) => [...prev, obj]);
+      setTool("select");
+      setSelectedObjectId(obj.id);
+    } catch (err) {
+      console.error("[Noteometry] Table insert failed:", err);
+      new Notice("Couldn't insert Table — see console", 6000);
+    }
   }, [scrollX, scrollY]);
 
   const handleInsertImage = useCallback(() => {
@@ -514,24 +524,36 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pdfInputRef.current?.click();
   }, []);
 
-  /* ── v1.2+ drop-in insert handlers ────────────────────── */
-  const insertDropin = useCallback((factory: (x: number, y: number) => CanvasObject) => {
-    const obj = factory(scrollX + 100, scrollY + 100);
-    setCanvasObjects((prev) => [...prev, obj]);
-    setTool("select");
-    setSelectedObjectId(obj.id);
+  /* ── v1.2+ drop-in insert handlers ──────────────────────
+   * Factories build a fully-formed CanvasObject; historically they never
+   * threw, but a bad factory or a state setter throwing would surface as
+   * a silent no-op from the user's perspective. v1.6.6 wraps the insert
+   * path so any failure gets logged + surfaced via a Notice. */
+  const insertDropin = useCallback((factory: (x: number, y: number) => CanvasObject, label?: string) => {
+    try {
+      const obj = factory(scrollX + 100, scrollY + 100);
+      setCanvasObjects((prev) => [...prev, obj]);
+      setTool("select");
+      setSelectedObjectId(obj.id);
+    } catch (err) {
+      const name = label ?? "drop-in";
+      console.error(`[Noteometry] ${name} insert failed:`, err);
+      new Notice(`Couldn't insert ${name} — see console`, 6000);
+    }
   }, [scrollX, scrollY, setCanvasObjects, setSelectedObjectId]);
 
-  const handleInsertCircuitSniper = useCallback(() => insertDropin(createCircuitSniper), [insertDropin]);
-  const handleInsertUnitConverter = useCallback(() => insertDropin(createUnitConverter), [insertDropin]);
-  const handleInsertGraphPlotter = useCallback(() => insertDropin(createGraphPlotter), [insertDropin]);
-  const handleInsertUnitCircle = useCallback(() => insertDropin(createUnitCircle), [insertDropin]);
-  const handleInsertOscilloscope = useCallback(() => insertDropin(createOscilloscope), [insertDropin]);
-  const handleInsertCompute = useCallback(() => insertDropin(createCompute), [insertDropin]);
-  const handleInsertAnimationCanvas = useCallback(() => insertDropin(createAnimationCanvas), [insertDropin]);
-  const handleInsertStudyGantt = useCallback(() => insertDropin(createStudyGantt), [insertDropin]);
-  const handleInsertAIDropin = useCallback(() => insertDropin(createAIDropin), [insertDropin]);
-  const handleInsertMultimeter = useCallback(() => insertDropin(createMultimeter), [insertDropin]);
+  const handleInsertCircuitSniper = useCallback(() => insertDropin(createCircuitSniper, "Circuit Sniper"), [insertDropin]);
+  const handleInsertUnitConverter = useCallback(() => insertDropin(createUnitConverter, "Unit Converter"), [insertDropin]);
+  const handleInsertGraphPlotter = useCallback(() => insertDropin(createGraphPlotter, "Graph Plotter"), [insertDropin]);
+  const handleInsertUnitCircle = useCallback(() => insertDropin(createUnitCircle, "Unit Circle"), [insertDropin]);
+  const handleInsertOscilloscope = useCallback(() => insertDropin(createOscilloscope, "Oscilloscope"), [insertDropin]);
+  const handleInsertCompute = useCallback(() => insertDropin(createCompute, "Compute"), [insertDropin]);
+  const handleInsertAnimationCanvas = useCallback(() => insertDropin(createAnimationCanvas, "Animation Canvas"), [insertDropin]);
+  const handleInsertStudyGantt = useCallback(() => insertDropin(createStudyGantt, "Study Gantt"), [insertDropin]);
+  // handleInsertAIDropin removed in v1.6.6 — the AI drop-in is quarantined;
+  // chat/solve live in the right panel. Old pages with an ai-dropin object
+  // still render via CanvasObjectLayer with a deprecation placeholder.
+  const handleInsertMultimeter = useCallback(() => insertDropin(createMultimeter, "Multimeter"), [insertDropin]);
 
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -765,7 +787,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
     handleInsertCircuitSniper, handleInsertUnitConverter, handleInsertGraphPlotter,
     handleInsertUnitCircle, handleInsertOscilloscope, handleInsertCompute,
-    handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertAIDropin, handleInsertMultimeter,
+    handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertMultimeter,
     mathPaletteOpen,
   ]);
 
