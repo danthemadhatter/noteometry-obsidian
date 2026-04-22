@@ -3,18 +3,21 @@
 ## Core Types (`src/types.ts`)
 
 ```typescript
-type AIProvider = "claude" | "lmstudio"
+type AIProvider = "claude" | "lmstudio" | "perplexity"
 
 interface NoteometrySettings {
-  aiProvider: AIProvider
+  aiProvider: AIProvider        // default: "perplexity"
   claudeApiKey: string
-  claudeModel: string           // default: "claude-opus-4-20250514"
+  claudeModel: string           // default: "claude-opus-4-6"
+  perplexityApiKey: string
+  perplexityModel: string       // default: "openai/gpt-5.4"
   lmStudioUrl: string           // default: "http://localhost:1234"
   lmStudioTextModel: string     // default: "qwen3-235b"
   lmStudioVisionModel: string   // default: "qwen2-vl-72b"
   vaultFolder: string           // default: "Noteometry"
   autoSave: boolean             // default: true
   autoSaveDelay: number         // default: 2000 (ms)
+  fingerDrawing: boolean        // default: false
 }
 
 interface ChatMessage {

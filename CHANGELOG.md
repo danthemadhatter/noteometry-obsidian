@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.6.5 — 2026-04-17
+
+- **Math v12 guardrails:** regression tests for Math v12 prompt, MathML output, and copy-to-Word clipboard behavior. (`1615dd0`)
+
+## 1.6.4 — 2026-04-17
+
+- **Mobile CSS:** trigger mobile layout on coarse pointer too, so Z-Fold / foldable devices get the mobile tabs and FAB. (`72f1951`)
+
+## 1.6.3 — 2026-04-17
+
+- **Touch strokes:** release pointer capture after touch strokes so subsequent taps aren't swallowed.
+- **Mobile:** add Tools FAB for quick access to drawing tools on mobile. (`1151fc5`)
+
+## 1.6.2 — 2026-04-17
+
+- **Android:** finger drawing mode toggle in Settings → Finger drawing, so users without a stylus can still draw on Android. (`5048bbc`)
+
+## 1.6.1 — 2026-04-17
+
+- **deleteSection:** use recursive rmdir so the section folder actually goes away instead of leaving empty shells behind. (`985a021`)
+
 ## 1.6.0 — 2026-04-17
 
 - **Mobile:** right panel Input/Chat tabs with hide button; math palette docks top on mobile instead of bottom; context menu scrolls when it overflows.

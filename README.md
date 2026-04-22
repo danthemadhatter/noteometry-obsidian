@@ -1,4 +1,4 @@
-# Noteometry v1.5.0
+# Noteometry v1.6.5
 
 **EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students.**
 
@@ -98,7 +98,9 @@ All tools are accessed via **right-click context menu**:
 ### From GitHub Releases (BRAT)
 1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) in Obsidian
 2. Add this repository: `danthemadhatter/noteometry-obsidian`
-3. BRAT will pull the latest release automatically
+3. BRAT will pull the latest GitHub release automatically
+
+**Note on updates:** BRAT matches the `version` in the repo's `manifest.json` against a published GitHub release with the same tag. If you're stuck on an older version, check that a release with the tag shown in `manifest.json` exists on the [releases page](https://github.com/danthemadhatter/noteometry-obsidian/releases). The release tag must match exactly (this repo uses the `v` prefix, e.g. `v1.6.5`).
 
 ### Manual
 1. Download `main.js`, `styles.css`, `manifest.json` from the [latest release](https://github.com/danthemadhatter/noteometry-obsidian/releases)
@@ -120,21 +122,23 @@ npm run build
 
 | Setting | Description |
 |---------|-------------|
-| AI Provider | Claude, Perplexity, or LM Studio |
+| AI Provider | Claude, Perplexity, or LM Studio (default: Perplexity) |
 | Claude API Key | Your Anthropic API key |
-| Claude Model | e.g. `claude-sonnet-4-20250514` |
+| Claude Model | e.g. `claude-opus-4-6` |
 | Perplexity API Key | Your Perplexity API key |
+| Perplexity Model | e.g. `openai/gpt-5.4` |
 | LM Studio URL | Default: `http://localhost:1234` |
-| LM Studio Text Model | Model name for chat |
-| LM Studio Vision Model | Model name for READ INK |
-| Auto-save | Enable/disable + debounce delay |
+| LM Studio Text Model | Model name for chat (default: `qwen3-235b`) |
+| LM Studio Vision Model | Model name for READ INK (default: `qwen2-vl-72b`) |
+| Auto-save | Enable/disable + debounce delay (default: 2000ms) |
+| Finger drawing | Draw with a single finger on touch devices (default: off, enable for Android) |
 
 ---
 
 ## Architecture
 
 ```
-Noteometry v1.5.0 — System Architecture
+Noteometry v1.6.5 — System Architecture
 
 Layer 1: Obsidian Plugin API (requestUrl, vault, TFile, WorkspaceLeaf)
 Layer 2: Canvas Engine (infinite canvas, zoom, pan, grid, pointer events)
@@ -167,4 +171,4 @@ Notebooks/
 
 ## License
 
-MIT
+0BSD — see [LICENSE](./LICENSE).

@@ -11,7 +11,7 @@ Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, era
 - **Build:** esbuild (bundles to single `main.js`)
 - **Types:** TypeScript (strict, skipLibCheck)
 - **Math:** KaTeX 0.16 for LaTeX rendering and MathML output
-- **AI:** Claude API (`claude-sonnet-4-6` default) via Obsidian's `requestUrl`, LM Studio (local) as alternative
+- **AI:** Perplexity (default, `openai/gpt-5.4`), Claude (`claude-opus-4-6`) via Obsidian's `requestUrl`, and LM Studio (local) as alternatives
 - **Icons:** Custom inline SVGs (no external icon library in the bundle)
 - **Tests:** Vitest
 
