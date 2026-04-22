@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { App, Notice } from "obsidian";
 import type NoteometryPlugin from "../main";
-import { strokeIntersectsPolygon, stampIntersectsPolygon, stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEngine";
+import { stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import {
   createTextBox, createTable, createImageObject, createPdfObject,
@@ -32,6 +32,18 @@ import { usePipeline } from "../features/pipeline/usePipeline";
 import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
+import {
+  regionsToWorldSelection,
+  selectionIsEmpty,
+  deleteStrokesInPolygons,
+  deleteStampsInPolygons,
+  deleteObjectsInBounds,
+  moveStrokesInPolygon,
+  moveStampsInPolygon,
+  moveObjectsInBounds,
+  polygonToWorld,
+  boundsToWorld,
+} from "../features/lasso/selection";
 
 /* ── Color and width presets for context-menu cycling ───────────── */
 const INK_COLORS = [
@@ -416,55 +428,59 @@ export default function NoteometryApp({ plugin, app }: Props) {
     // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
     // At 2x zoom, a screen bound of 100px maps to 50 world units.
     const z = zoom;
-    const scenePolygon = bounds.points.map((p) => ({
-      x: p.x / z + scrollX,
-      y: p.y / z + scrollY,
-    }));
-
-    const regionBounds = {
-      minX: bounds.minX / z + scrollX,
-      minY: bounds.minY / z + scrollY,
-      maxX: bounds.maxX / z + scrollX,
-      maxY: bounds.maxY / z + scrollY,
-    };
+    const scenePolygon = polygonToWorld(bounds.points, scrollX, scrollY, z);
+    const regionBounds = boundsToWorld(bounds, scrollX, scrollY, z);
 
     // Delta is also in screen space (from the move drag overlay).
     const worldDx = delta.dx / z;
     const worldDy = delta.dy / z;
 
     pushUndo();
-
-    // Move strokes inside lasso
-    setStrokes(prev => prev.map(s => {
-      if (strokeIntersectsPolygon(s, scenePolygon)) {
-        return { ...s, points: s.points.map(p => ({ ...p, x: p.x + worldDx, y: p.y + worldDy })) };
-      }
-      return s;
-    }));
-
-    // Move stamps inside lasso
-    setStamps(prev => prev.map(s => {
-      if (stampIntersectsPolygon(s, scenePolygon)) {
-        return { ...s, x: s.x + worldDx, y: s.y + worldDy };
-      }
-      return s;
-    }));
-
-    // Move canvas objects whose bbox overlaps the lasso bounds.
-    setCanvasObjects(prev => prev.map(obj => {
-      const objRight = obj.x + obj.w;
-      const objBottom = obj.y + obj.h;
-      const overlaps = !(objRight < regionBounds.minX || obj.x > regionBounds.maxX ||
-                         objBottom < regionBounds.minY || obj.y > regionBounds.maxY);
-      if (overlaps) {
-        return { ...obj, x: obj.x + worldDx, y: obj.y + worldDy };
-      }
-      return obj;
-    }));
+    setStrokes(prev => moveStrokesInPolygon(prev, scenePolygon, worldDx, worldDy));
+    setStamps(prev => moveStampsInPolygon(prev, scenePolygon, worldDx, worldDy));
+    setCanvasObjects(prev => moveObjectsInBounds(prev, regionBounds, worldDx, worldDy));
 
     setLassoActive(false);
     clearStack();
-  }, [scrollX, scrollY, zoom, pushUndo, setLassoActive, clearStack]);
+  }, [scrollX, scrollY, zoom, pushUndo, setLassoActive, clearStack, setStrokes, setStamps, setCanvasObjects]);
+
+  /* ── Lasso Clear → classic delete: remove any strokes/stamps/objects
+   * inside the current region stack, record undo, and exit selection. If
+   * the stack has no captured content, we still wipe the outline (matches
+   * prior behavior of "cancel selection"). The button is hidden when the
+   * stack is empty so there's no silent no-op from the action bar. */
+  const handleLassoClear = useCallback(() => {
+    const snapshot = lassoRegions;
+    if (snapshot.length === 0) {
+      // Nothing selected — just ensure lasso is dismissed cleanly.
+      setLassoActive(false);
+      return;
+    }
+
+    const { polygons, bounds } = regionsToWorldSelection(snapshot, scrollX, scrollY, zoom);
+
+    if (selectionIsEmpty(strokes, stamps, canvasObjects, polygons, bounds)) {
+      // Region drawn over empty canvas — no content to delete. Clear the
+      // selection outlines and let the user know so it doesn't look broken.
+      new Notice("Nothing selected to delete", 3000);
+      clearStack();
+      setLassoActive(false);
+      return;
+    }
+
+    pushUndo();
+    setStrokes((prev) => deleteStrokesInPolygons(prev, polygons));
+    setStamps((prev) => deleteStampsInPolygons(prev, polygons));
+    setCanvasObjects((prev) => deleteObjectsInBounds(prev, bounds));
+
+    clearStack();
+    setLassoActive(false);
+  }, [
+    lassoRegions, scrollX, scrollY, zoom,
+    strokes, stamps, canvasObjects,
+    pushUndo, setStrokes, setStamps, setCanvasObjects,
+    clearStack, setLassoActive,
+  ]);
 
   // Chat send, solve from input, and symbol insertion all live in usePipeline now.
 
@@ -1132,7 +1148,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 regions={lassoRegions}
                 onComplete={handleLassoComplete}
                 onCancel={clearStack}
-                onClear={clearStack}
+                onClear={handleLassoClear}
                 onProcess={handleProcessStack}
                 onMoveComplete={handleLassoMoveComplete}
               />

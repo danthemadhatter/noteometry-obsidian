@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.6.8 — 2026-04-22
+
+Narrow lasso repair pass on v1.6.7 test feedback: "Lasso Clear does nothing. Lasso Move does nothing." The existing lasso architecture (multi-region stack, freehand/rect modes, right-click hub entry) is preserved; these fixes adjust the action bar's Clear and Move to behave classically without rewriting anything.
+
+- **Lasso Clear now deletes.** The Clear button previously only wiped the region outlines while leaving all captured content in place, so it read as a no-op. Clear now:
+  - Removes strokes whose points fall inside any region polygon,
+  - Removes stamps whose center is inside any region,
+  - Removes canvas objects whose bbox overlaps any region,
+  - Records an undo snapshot (so `Ctrl/Cmd+Z` restores),
+  - Persists via the normal autosave subscription,
+  - Surfaces a `Nothing selected to delete` Notice when the region is empty instead of silently doing nothing.
+- **Lasso Move stops being swallowed by a new lasso draw.** The main lasso drawing listeners on the viewport container ran in capture phase and fired even while Move mode was active, so the user's pointerdown started a fresh lasso instead of grabbing the selection. Added a `moveModeRef` guard to those listeners.
+- **Move now gives visual feedback on entry.** The ghost snapshot canvas is painted at the selection's starting position as soon as Move activates (instead of staying blank until the first `pointermove`), and a `Drag the selection to its new position` Notice fires. Previously the action bar disappeared and the canvas looked idle, which read as "Move does nothing".
+- **Pure selection/mutation helpers extracted.** `src/features/lasso/selection.ts` holds `deleteStrokesInPolygons`, `moveStrokesInPolygon`, `selectionIsEmpty`, world/screen transforms, etc. `handleLassoMoveComplete` was refactored onto these helpers — same math, testable without a DOM.
+- **Tests:** `tests/unit/lassoSelection.test.ts` covers the helpers end-to-end — screen↔world conversion, polygon + bbox selection, pure delete/move semantics on strokes/stamps/objects, multi-region union, preserved relative positions, and the "empty selection" predicate.
+
+Out of scope (hard constraints, untouched): Math v12 prompt, MathML generation, copy-to-Word, clipboard pipeline, right-click context hub. The lasso was not rewritten from scratch — the existing `LassoOverlay`, `useLassoStack`, rasterize/composite pipeline, and stack-based action bar are preserved.
+
 ## 1.6.7 — 2026-04-22
 
 Follow-up pass on v1.6.6 manual-test feedback.
