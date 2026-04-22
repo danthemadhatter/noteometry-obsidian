@@ -49,8 +49,24 @@ export default function ComputeDropin({ cells, resultExpr, onChange }: Props) {
     onChange({ cells: cells.filter((_, j) => j !== i) });
   }, [cells, onChange]);
 
+  const isEmpty = cells.length === 0 && !resultExpr.trim();
+
   return (
     <div style={{ padding: "8px", fontSize: "12px", fontFamily: "var(--nm-font-mono, monospace)" }}>
+      {isEmpty && (
+        <div style={{
+          padding: "6px 8px", marginBottom: "8px",
+          background: "var(--nm-accent-light, rgba(74,144,217,0.12))",
+          border: "1px dashed var(--nm-accent, #4a90d9)",
+          borderRadius: "4px", fontSize: "11px",
+          color: "var(--nm-ink)", fontFamily: "var(--nm-font, sans-serif)",
+          lineHeight: 1.4,
+        }}>
+          <strong>Compute:</strong> scratchpad for named values. Add variables
+          (e.g. <code>R = 1000</code>), then write a result expression using them
+          (e.g. <code>V / R</code>). Math.* functions are available.
+        </div>
+      )}
       <div style={{
         padding: "8px", marginBottom: "8px", background: "var(--nm-faceplate-alt, #F0F0F0)",
         borderRadius: "4px", fontSize: "14px", fontWeight: 700, color: "var(--nm-ink)",

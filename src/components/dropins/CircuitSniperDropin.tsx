@@ -3,6 +3,7 @@ import React, {
   useRef,
   useState,
   useCallback,
+  useEffect,
   type ReactElement,
 } from "react";
 
@@ -354,13 +355,24 @@ function getPinCoords(
 ): { x: number; y: number } {
   const cx = 30,
     cy = 30;
-  const angle = ((el.rotation || 0) * Math.PI) / 180;
+  const rot = ((el.rotation || 0) % 360 + 360) % 360;
+  const angle = (rot * Math.PI) / 180;
   const dx = pin.x - cx;
   const dy = pin.y - cy;
   const rx = dx * Math.cos(angle) - dy * Math.sin(angle);
   const ry = dx * Math.sin(angle) + dy * Math.cos(angle);
-  // Snap to grid so rotated pins align for wire connections
-  return { x: snap(el.x + cx + rx), y: snap(el.y + cy + ry) };
+  const worldX = el.x + cx + rx;
+  const worldY = el.y + cy + ry;
+  // Only snap to grid when the component is axis-aligned (0/90/180/270).
+  // At arbitrary angles (30/45/60…), grid-snapping pulls pins away from
+  // their rendered rotated positions, so two angled components can never
+  // line up. Preserve the exact rotated geometry instead so overlapping
+  // components actually share pin locations.
+  const axisAligned = rot % 90 === 0;
+  if (axisAligned) {
+    return { x: snap(worldX), y: snap(worldY) };
+  }
+  return { x: Math.round(worldX), y: Math.round(worldY) };
 }
 
 function resolveEndpoint(
@@ -698,20 +710,17 @@ export default function CircuitSniperDropin({
     []
   );
 
-  /* For UNDO/REDO, we need to sync after state updates. We use a ref-based
-     approach: check after each render if elements changed. */
-  const lastSyncedRef = useRef(prevJson.current);
-  const currentJson = JSON.stringify(elements);
-  if (currentJson !== lastSyncedRef.current) {
-    lastSyncedRef.current = currentJson;
-    if (currentJson !== prevJson.current) {
-      prevJson.current = currentJson;
-      // Schedule sync outside render via microtask
-      Promise.resolve().then(() => {
-        onChangeRef.current({ circuitData: currentJson });
-      });
+  /* Persist on element change. Moved out of render phase into useEffect
+     in v1.6.6 so React doesn't see side-effects-in-render during
+     reconciliation (previous Promise.resolve().then(...) trick worked
+     but was fragile). */
+  useEffect(() => {
+    const json = JSON.stringify(elements);
+    if (json !== prevJson.current) {
+      prevJson.current = json;
+      onChangeRef.current({ circuitData: json });
     }
-  }
+  }, [elements]);
 
   /* -- Interaction state -- */
   const canvasRef = useRef<HTMLDivElement>(null);

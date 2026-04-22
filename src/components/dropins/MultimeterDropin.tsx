@@ -110,6 +110,7 @@ export default function MultimeterDropin({ mode, inputValue, onChange }: Props) 
         </div>
         <div
           onClick={() => { setEditMode(true); setEditBuf(inputValue); }}
+          title="Click to enter a value"
           style={{
             fontSize: "28px", fontWeight: 700, color: "#1a2a0a",
             fontFamily: "'Courier New', monospace",
@@ -187,6 +188,15 @@ export default function MultimeterDropin({ mode, inputValue, onChange }: Props) 
             </button>
           );
         })}
+      </div>
+
+      {/* Usage hint */}
+      <div style={{
+        padding: "4px 8px", fontSize: "9px", color: "#888",
+        textAlign: "center", fontFamily: "var(--nm-font, sans-serif)",
+        borderTop: "1px solid #333",
+      }}>
+        Pick a mode (top) · click LCD to type value · or tap a preset
       </div>
 
       {/* Probe terminals */}

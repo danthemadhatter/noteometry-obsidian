@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useCallback, useState } from "react";
-import { signalBus, type SignalChannel } from "../../lib/SignalBus";
 
 interface FnDef { expr: string; color: string; enabled: boolean; }
 interface Props {
@@ -14,6 +13,13 @@ interface Props {
 
 const COLORS = ["#7C3AED", "#2563EB", "#DC2626", "#16A34A", "#F59E0B", "#EC4899"];
 
+const panBtn: React.CSSProperties = {
+  width: "22px", height: "20px", padding: 0,
+  border: "1px solid #E0E0E0", borderRadius: "3px",
+  background: "var(--nm-faceplate)", color: "var(--nm-ink)",
+  cursor: "pointer", fontSize: "11px", lineHeight: 1,
+};
+
 function evalExpr(expr: string, x: number): number {
   try {
     const fn = new Function("x", "Math",
@@ -23,18 +29,14 @@ function evalExpr(expr: string, x: number): number {
   } catch { return NaN; }
 }
 
-export default function GraphPlotterDropin({ id, functions, viewX, viewY, viewW, viewH, signalLinked, onChange }: Props) {
+export default function GraphPlotterDropin({ functions, viewX, viewY, viewW, viewH, onChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [addExpr, setAddExpr] = useState("");
 
-  // Signal Bus
-  useEffect(() => {
-    if (!signalLinked) return;
-    const unsub = signalBus.subscribe("frequency", (f) => {
-      // Could update view or highlight
-    }, id);
-    return unsub;
-  }, [signalLinked, id]);
+  // Signal-bus subscription was a stub (empty callback) — removed in
+  // v1.6.6 rather than left as dead wiring. The plotter is now purely
+  // expression-driven; reintroduce when there's an actual signal shape
+  // to consume.
 
   // Draw
   useEffect(() => {
@@ -117,16 +119,112 @@ export default function GraphPlotterDropin({ id, functions, viewX, viewY, viewW,
     onChange({ functions: functions.filter((_, j) => j !== i) });
   }, [functions, onChange]);
 
+  const panBy = useCallback((fracX: number, fracY: number) => {
+    onChange({ viewX: viewX + viewW * fracX, viewY: viewY + viewH * fracY });
+  }, [viewX, viewY, viewW, viewH, onChange]);
+
+  const zoomBy = useCallback((factor: number) => {
+    const cx = viewX + viewW / 2;
+    const cy = viewY + viewH / 2;
+    const nw = viewW * factor;
+    const nh = viewH * factor;
+    onChange({ viewX: cx - nw / 2, viewY: cy - nh / 2, viewW: nw, viewH: nh });
+  }, [viewX, viewY, viewW, viewH, onChange]);
+
+  const resetView = useCallback(() => {
+    onChange({ viewX: -10, viewY: -2, viewW: 20, viewH: 4 });
+  }, [onChange]);
+
+  /* Direct canvas pan/zoom — users expect click-and-drag to pan and
+   * wheel to zoom, in addition to the button row. Button-row fallback
+   * remains for touch/pen. v1.6.6 patch: the view transform buttons
+   * existed but users reported "pan/zoom does not work" because they
+   * reached for mouse/wheel gestures first. */
+  const dragStateRef = useRef<{ startX: number; startY: number; viewX0: number; viewY0: number } | null>(null);
+
+  const onCanvasPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.stopPropagation();
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    dragStateRef.current = { startX: e.clientX, startY: e.clientY, viewX0: viewX, viewY0: viewY };
+  }, [viewX, viewY]);
+
+  const onCanvasPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const st = dragStateRef.current;
+    if (!st) return;
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const dxScreen = e.clientX - st.startX;
+    const dyScreen = e.clientY - st.startY;
+    const worldDx = -(dxScreen / rect.width) * viewW;
+    const worldDy = (dyScreen / rect.height) * viewH;
+    onChange({ viewX: st.viewX0 + worldDx, viewY: st.viewY0 + worldDy });
+  }, [viewW, viewH, onChange]);
+
+  const onCanvasPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragStateRef.current) {
+      try { (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId); } catch { /* empty */ }
+    }
+    dragStateRef.current = null;
+  }, []);
+
+  const onCanvasWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    // Mouse position in world-space → keep it anchored after zoom.
+    const mx = viewX + ((e.clientX - rect.left) / rect.width) * viewW;
+    const my = viewY + (1 - (e.clientY - rect.top) / rect.height) * viewH;
+    // Two-finger trackpad pinch reports ctrlKey=true in Chromium/Electron.
+    // Small steps feel more natural at that granularity.
+    const base = e.ctrlKey ? 0.01 : 0.0015;
+    const factor = Math.exp(e.deltaY * base);
+    const nw = viewW * factor;
+    const nh = viewH * factor;
+    const newViewX = mx - ((e.clientX - rect.left) / rect.width) * nw;
+    const newViewY = my - (1 - (e.clientY - rect.top) / rect.height) * nh;
+    onChange({ viewX: newViewX, viewY: newViewY, viewW: nw, viewH: nh });
+  }, [viewX, viewY, viewW, viewH, onChange]);
+
+  // Prevent passive default handler from swallowing the wheel event.
+  useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const block = (ev: WheelEvent) => { ev.preventDefault(); };
+    cvs.addEventListener("wheel", block, { passive: false });
+    return () => cvs.removeEventListener("wheel", block);
+  }, []);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <canvas
           ref={canvasRef}
           width={400} height={250}
-          style={{ width: "100%", height: "100%", display: "block" }}
+          style={{ width: "100%", height: "100%", display: "block", cursor: dragStateRef.current ? "grabbing" : "grab", touchAction: "none" }}
+          onPointerDown={onCanvasPointerDown}
+          onPointerMove={onCanvasPointerMove}
+          onPointerUp={onCanvasPointerUp}
+          onPointerCancel={onCanvasPointerUp}
+          onWheel={onCanvasWheel}
         />
       </div>
       <div style={{ padding: "4px 8px", fontSize: "11px", borderTop: "1px solid #E0E0E0" }}>
+        <div style={{ display: "flex", gap: "2px", marginBottom: "4px", alignItems: "center" }}>
+          <span style={{ fontWeight: 600, color: "var(--nm-ink)", marginRight: "4px" }}>View</span>
+          <button onClick={() => panBy(-0.25, 0)} style={panBtn} title="Pan left">◀</button>
+          <button onClick={() => panBy(0.25, 0)} style={panBtn} title="Pan right">▶</button>
+          <button onClick={() => panBy(0, 0.25)} style={panBtn} title="Pan up">▲</button>
+          <button onClick={() => panBy(0, -0.25)} style={panBtn} title="Pan down">▼</button>
+          <span style={{ width: "6px" }} />
+          <button onClick={() => zoomBy(0.8)} style={panBtn} title="Zoom in">＋</button>
+          <button onClick={() => zoomBy(1.25)} style={panBtn} title="Zoom out">−</button>
+          <button onClick={resetView} style={{ ...panBtn, width: "auto", padding: "1px 6px" }} title="Reset view">Reset</button>
+        </div>
         <div style={{ fontWeight: 600, marginBottom: "2px", color: "var(--nm-ink)" }}>Functions</div>
         {functions.map((fn, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
