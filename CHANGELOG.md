@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.8 — 2026-04-22
+
+Follow-up on v1.6.7 test feedback: the user reported **"Clear Canvas tool disappeared."**
+
+- **Clear Canvas restored to visible prominence.** The action had never actually left the codebase — it was the last item in the Canvas section of the right-click hub — but after the v1.6.6/v1.6.7 hub repairs it sat immediately below **Export PNG** with no separator, in a ~30-entry menu that scrolls on shorter viewports. With a visually identical neighbour it read as gone. Added a separator above it, pulled the item into a dedicated `buildClearCanvasAction` factory (so a unit test can pin the invariant), and kept the existing safety rails: two-step confirm, `pushUndo()` before state wipe, autosave naturally picks up the post-clear state.
+- **Defensive console error** if a future refactor ever drops Clear Canvas from the assembled menu — silent disappearance is the exact failure mode this release is fixing, so regressions now shout.
+- **Unit test** (`clearCanvasAction.test.ts`) pins the label, the `danger` flag, the onClick wiring, and the distinction from the lasso overlay's "Clear" button.
+
+Hard constraints respected: Math v12 prompt, MathML, copy-to-Word, clipboard pipeline, right-click hub concept, and classic-tools behaviour all untouched.
+
 ## 1.6.7 — 2026-04-22
 
 Follow-up pass on v1.6.6 manual-test feedback.
