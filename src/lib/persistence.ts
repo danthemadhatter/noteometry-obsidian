@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { App, Notice, TFile, TFolder } from "obsidian";
 import type NoteometryPlugin from "../main";
 import type { CanvasObject } from "./canvasObjects";
 import {
@@ -12,6 +12,7 @@ import {
 // Re-export so existing consumers don't have to change their imports.
 export type { CanvasData } from "./pageFormat";
 export {
+  EMPTY_PAGE,
   packToV3,
   unpackFromV3,
   isV3Page,
@@ -26,7 +27,7 @@ export type {
   ImageElementV3,
 } from "./pageFormat";
 
-function rootDir(plugin: NoteometryPlugin): string {
+export function rootDir(plugin: NoteometryPlugin): string {
   return plugin.settings.vaultFolder || "Noteometry";
 }
 
@@ -38,7 +39,6 @@ function naturalCompare(a: string, b: string): number {
   for (let i = 0; i < len; i++) {
     const aPart = ax[i]!;
     const bPart = bx[i]!;
-    // If both parts are numeric, compare numerically
     if (/^\d+$/.test(aPart) && /^\d+$/.test(bPart)) {
       const diff = parseInt(aPart, 10) - parseInt(bPart, 10);
       if (diff !== 0) return diff;
@@ -58,7 +58,13 @@ function pagePath(plugin: NoteometryPlugin, section: string, page: string): stri
   return `${rootDir(plugin)}/${section}/${page}.md`;
 }
 
-/* ── Sections (folders) ──────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+ * Legacy folder-relative API (section/page)
+ *
+ * Retained while Sidebar + usePages are still in the tree. The new
+ * file-bound API below is the target of the tier 3 refactor and
+ * replaces this layer once the Sidebar is dropped.
+ * ══════════════════════════════════════════════════════════════════ */
 
 export async function listSections(plugin: NoteometryPlugin): Promise<string[]> {
   const root = rootDir(plugin);
@@ -89,14 +95,8 @@ export async function deleteSection(plugin: NoteometryPlugin, name: string): Pro
   const path = sectionPath(plugin, name);
   const adapter = plugin.app.vault.adapter;
   if (!(await adapter.exists(path))) return;
-  // Recursive: the section folder contains an `attachments/` subfolder
-  // with images/PDFs. A non-recursive rmdir fails silently if any child
-  // remains, leaving the folder on disk — which then reappears in the
-  // sidebar on next render and looks like "delete didn't work".
   await adapter.rmdir(path, true);
 }
-
-/* ── Pages (files) ───────────────────────────────────── */
 
 export async function listPages(plugin: NoteometryPlugin, section: string): Promise<string[]> {
   const path = sectionPath(plugin, section);
@@ -152,40 +152,8 @@ export async function loadPage(
   try {
     if (await adapter.exists(path)) {
       const raw = await adapter.read(path);
-      const parsed = JSON.parse(raw);
-
-      // v3 format (current) — unpack elements[] to legacy in-memory shape
-      if (isV3Page(parsed)) {
-        return unpackFromV3(parsed);
-      }
-
-      // v2 format (pre-v3) — separate arrays + sidecar dictionaries
-      if (parsed.version === 2 || Array.isArray(parsed.strokes)) {
-        return {
-          strokes: parsed.strokes ?? [],
-          stamps: parsed.stamps ?? [],
-          canvasObjects: parsed.canvasObjects ?? [],
-          viewport: parsed.viewport ?? { scrollX: 0, scrollY: 0 },
-          panelInput: parsed.panelInput ?? "",
-          chatMessages: parsed.chatMessages ?? [],
-          tableData: parsed.tableData ?? {},
-          textBoxData: parsed.textBoxData ?? {},
-          lastSaved: parsed.lastSaved ?? "",
-        };
-      }
-
-      // v1 format (legacy Excalidraw) — keep text-only content
-      return {
-        strokes: [],
-        stamps: [],
-        canvasObjects: [],
-        viewport: { scrollX: 0, scrollY: 0 },
-        panelInput: parsed.panelInput ?? "",
-        chatMessages: parsed.chatMessages ?? [],
-        tableData: parsed.tableData ?? {},
-        textBoxData: parsed.textBoxData ?? {},
-        lastSaved: parsed.lastSaved ?? "",
-      };
+      const decoded = parsePageContent(raw);
+      if (decoded) return decoded;
     }
   } catch (e) {
     console.error("[Noteometry] load failed:", e);
@@ -207,8 +175,6 @@ export async function savePage(
       await adapter.mkdir(secPath);
     }
     const path = pagePath(plugin, section, name);
-    // Always write v3 format to disk. v2 files load correctly because
-    // loadPage has a v2 fallback, and get rewritten to v3 on next save.
     const v3 = packToV3(data);
     await adapter.write(path, JSON.stringify(v3, null, 0));
   } catch (e) {
@@ -217,7 +183,7 @@ export async function savePage(
   }
 }
 
-/* ── Migrate .json → .md (Obsidian Sync only syncs .md) ── */
+/* ── Legacy migrations (pre-tier3) — kept for first-run bootstrap in usePages. ── */
 
 export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
   const root = rootDir(plugin);
@@ -244,8 +210,6 @@ export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
   }
 }
 
-/* ── Migrate .attachments → attachments (dot-folders break sync) ── */
-
 export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<void> {
   const root = rootDir(plugin);
   const adapter = plugin.app.vault.adapter;
@@ -256,7 +220,6 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
       const oldDir = `${root}/${section}/.attachments`;
       const newDir = `${root}/${section}/attachments`;
 
-      // Move PNGs if the dot-folder exists
       if (await adapter.exists(oldDir)) {
         if (!(await adapter.exists(newDir))) await adapter.mkdir(newDir);
         const listing = await adapter.list(oldDir);
@@ -272,7 +235,6 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
         try { await adapter.rmdir(oldDir, false); } catch { /* ignore */ }
       }
 
-      // Rewrite any page JSON that references the old path
       const secPath = `${root}/${section}`;
       if (await adapter.exists(secPath)) {
         const listing = await adapter.list(secPath);
@@ -292,100 +254,6 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
     new Notice("Noteometry: attachment folder migration failed (see console)", 8000);
   }
 }
-
-/* ── Image vault sync ───────────────────────────────── */
-
-export async function saveImageToVault(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  imageId: string,
-  base64Data: string
-): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
-  if (!(await adapter.exists(attachDir))) {
-    await adapter.mkdir(attachDir);
-  }
-  // Strip data URL prefix
-  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
-  // Convert base64 to ArrayBuffer
-  const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-  const vaultPath = `${attachDir}/${imageId}.png`;
-  await adapter.writeBinary(vaultPath, binary.buffer as ArrayBuffer);
-  return vaultPath;
-}
-
-export async function loadImageFromVault(
-  plugin: NoteometryPlugin,
-  vaultPath: string
-): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const buf = await adapter.readBinary(vaultPath);
-  const bytes = new Uint8Array(buf);
-  let binaryStr = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binaryStr += String.fromCharCode(bytes[i]!);
-  }
-  const b64 = btoa(binaryStr);
-  return `data:image/png;base64,${b64}`;
-}
-
-/* ── PDF vault sync ─────────────────────────────────
- * PDFs live next to images in the section's attachments folder. We
- * store raw binary, not base64, because PDFs are typically too big
- * to serialize as data URLs. Loading returns an ArrayBuffer for
- * pdfjs-dist to consume directly. */
-
-export async function savePdfToVault(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  pdfId: string,
-  bytes: ArrayBuffer
-): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
-  if (!(await adapter.exists(attachDir))) {
-    await adapter.mkdir(attachDir);
-  }
-  const vaultPath = `${attachDir}/${pdfId}.pdf`;
-  await adapter.writeBinary(vaultPath, bytes);
-  return vaultPath;
-}
-
-export async function loadPdfFromVault(
-  plugin: NoteometryPlugin,
-  vaultPath: string
-): Promise<ArrayBuffer> {
-  const adapter = plugin.app.vault.adapter;
-  return await adapter.readBinary(vaultPath);
-}
-
-export async function migrateBase64Images(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  canvasObjects: CanvasObject[]
-): Promise<{ objects: CanvasObject[]; changed: boolean }> {
-  let changed = false;
-  const migrated: CanvasObject[] = [];
-  for (const obj of canvasObjects) {
-    if (obj.type === "image" && obj.dataURL.startsWith("data:")) {
-      try {
-        const imageId = obj.id;
-        const vaultPath = await saveImageToVault(plugin, sectionName, imageId, obj.dataURL);
-        migrated.push({ ...obj, dataURL: vaultPath });
-        changed = true;
-      } catch (e) {
-        console.error("[Noteometry] image migration failed:", e);
-        migrated.push(obj);
-      }
-    } else {
-      migrated.push(obj);
-    }
-  }
-  return { objects: migrated, changed };
-}
-
-/* ── Legacy migration ────────────────────────────────── */
 
 export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section: string; page: string } | null> {
   const dir = plugin.manifest.dir ?? `.obsidian/plugins/${plugin.manifest.id}`;
@@ -418,4 +286,278 @@ export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section
     // ignore
   }
   return null;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * File-bound page I/O (tier 3 native explorer)
+ *
+ * Each open page is a FileView bound to a single .nmpage TFile. These
+ * replace loadPage / savePage once the internal Sidebar is dropped.
+ * ══════════════════════════════════════════════════════════════════ */
+
+/** Decode raw page contents (any format) to CanvasData, or null if the
+ *  content isn't a recognizable Noteometry page. */
+export function parsePageContent(raw: string): CanvasData | null {
+  try {
+    const parsed = JSON.parse(raw);
+    if (isV3Page(parsed)) {
+      return unpackFromV3(parsed);
+    }
+    if (parsed && typeof parsed === "object" && (parsed.version === 2 || Array.isArray(parsed.strokes))) {
+      return {
+        strokes: parsed.strokes ?? [],
+        stamps: parsed.stamps ?? [],
+        canvasObjects: parsed.canvasObjects ?? [],
+        viewport: parsed.viewport ?? { scrollX: 0, scrollY: 0 },
+        panelInput: parsed.panelInput ?? "",
+        chatMessages: parsed.chatMessages ?? [],
+        tableData: parsed.tableData ?? {},
+        textBoxData: parsed.textBoxData ?? {},
+        lastSaved: parsed.lastSaved ?? "",
+      };
+    }
+    if (parsed && typeof parsed === "object") {
+      return {
+        strokes: [],
+        stamps: [],
+        canvasObjects: [],
+        viewport: { scrollX: 0, scrollY: 0 },
+        panelInput: parsed.panelInput ?? "",
+        chatMessages: parsed.chatMessages ?? [],
+        tableData: parsed.tableData ?? {},
+        textBoxData: parsed.textBoxData ?? {},
+        lastSaved: parsed.lastSaved ?? "",
+      };
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+export async function loadPageFromFile(app: App, file: TFile): Promise<CanvasData | null> {
+  try {
+    const raw = await app.vault.read(file);
+    if (!raw.trim()) {
+      return { ...EMPTY_PAGE };
+    }
+    return parsePageContent(raw);
+  } catch (e) {
+    console.error("[Noteometry] load failed:", e);
+    new Notice(`Failed to load "${file.path}" — file may be corrupt (see console)`, 10000);
+    return null;
+  }
+}
+
+export async function savePageToFile(app: App, file: TFile, data: CanvasData): Promise<void> {
+  try {
+    const v3 = packToV3(data);
+    await app.vault.modify(file, JSON.stringify(v3, null, 0));
+  } catch (e) {
+    console.error("[Noteometry] save failed:", e);
+    new Notice(`Failed to save "${file.path}" — changes may not persist (see console)`, 10000);
+  }
+}
+
+/** Heuristic: does a .md file's content decode as a v3 Noteometry page?
+ *  Used by the "Convert legacy .md pages" command — we only rename files
+ *  whose first JSON.parse yields a v3 page so we never touch real markdown. */
+export function isLegacyNoteometryMdContent(raw: string): boolean {
+  try {
+    const parsed = JSON.parse(raw);
+    return isV3Page(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Create a new empty .nmpage file under `parentFolderPath`, picking a
+ * non-colliding filename. Returns the created TFile (or null on failure).
+ */
+export async function createNewPageFile(
+  app: App,
+  parentFolderPath: string,
+  baseName = "Untitled",
+): Promise<TFile | null> {
+  try {
+    // Ensure the folder exists.
+    let folder = app.vault.getAbstractFileByPath(parentFolderPath);
+    if (!folder) {
+      folder = await app.vault.createFolder(parentFolderPath);
+    }
+    if (!(folder instanceof TFolder)) {
+      new Notice(`Can't create Noteometry page: "${parentFolderPath}" is not a folder.`, 8000);
+      return null;
+    }
+
+    const base = parentFolderPath.replace(/\/+$/, "");
+    let name = `${baseName}.nmpage`;
+    let n = 1;
+    const candidate = () => (base ? `${base}/${name}` : name);
+    while (app.vault.getAbstractFileByPath(candidate())) {
+      name = `${baseName} ${n}.nmpage`;
+      n += 1;
+    }
+
+    const empty: CanvasData = { ...EMPTY_PAGE, lastSaved: new Date().toISOString() };
+    const v3 = packToV3(empty);
+    return await app.vault.create(candidate(), JSON.stringify(v3, null, 0));
+  } catch (e) {
+    console.error("[Noteometry] create page failed:", e);
+    new Notice("Couldn't create new Noteometry page — see console.", 8000);
+    return null;
+  }
+}
+
+/**
+ * Scan `rootFolder` recursively for .md files whose content decodes as
+ * a v3 Noteometry page and rename them to .nmpage. Returns the count.
+ * No backups — caller has confirmed test data only.
+ */
+export async function convertLegacyMdPagesToNmpage(
+  app: App,
+  rootFolder: string,
+): Promise<number> {
+  const root = app.vault.getAbstractFileByPath(rootFolder);
+  if (!(root instanceof TFolder)) return 0;
+
+  const candidates: TFile[] = [];
+  const walk = (folder: TFolder) => {
+    for (const child of folder.children) {
+      if (child instanceof TFolder) walk(child);
+      else if (child instanceof TFile && child.extension === "md") candidates.push(child);
+    }
+  };
+  walk(root);
+
+  let converted = 0;
+  for (const file of candidates) {
+    try {
+      const raw = await app.vault.read(file);
+      if (!isLegacyNoteometryMdContent(raw)) continue;
+      const parentPath = file.parent?.path ?? "";
+      const newPath = parentPath ? `${parentPath}/${file.basename}.nmpage` : `${file.basename}.nmpage`;
+      if (app.vault.getAbstractFileByPath(newPath)) continue; // collision — skip silently
+      await app.vault.rename(file, newPath);
+      converted += 1;
+    } catch (e) {
+      console.error(`[Noteometry] convert failed for ${file.path}:`, e);
+    }
+  }
+  return converted;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * Attachment I/O (images + PDFs)
+ *
+ * In the tier 3 native explorer model, drop-in binaries are scoped to
+ * the bound page file's parent folder so a single "attachments/" sibling
+ * holds everything for every .nmpage in that folder. The legacy
+ * section-string-based entry points are kept as thin wrappers while
+ * Sidebar/usePages still exist.
+ * ══════════════════════════════════════════════════════════════════ */
+
+async function ensureDir(app: App, dir: string): Promise<void> {
+  const adapter = app.vault.adapter;
+  if (!(await adapter.exists(dir))) {
+    await adapter.mkdir(dir);
+  }
+}
+
+export async function saveImageBytesTo(
+  app: App,
+  parentFolder: string,
+  imageId: string,
+  base64Data: string,
+): Promise<string> {
+  const attachDir = `${parentFolder}/attachments`;
+  await ensureDir(app, attachDir);
+  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+  const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+  const vaultPath = `${attachDir}/${imageId}.png`;
+  await app.vault.adapter.writeBinary(vaultPath, binary.buffer as ArrayBuffer);
+  return vaultPath;
+}
+
+export async function savePdfBytesTo(
+  app: App,
+  parentFolder: string,
+  pdfId: string,
+  bytes: ArrayBuffer,
+): Promise<string> {
+  const attachDir = `${parentFolder}/attachments`;
+  await ensureDir(app, attachDir);
+  const vaultPath = `${attachDir}/${pdfId}.pdf`;
+  await app.vault.adapter.writeBinary(vaultPath, bytes);
+  return vaultPath;
+}
+
+/** Legacy signature (section-named). Kept while Sidebar/usePages still
+ *  drive drop-in asset writes. */
+export async function saveImageToVault(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  imageId: string,
+  base64Data: string,
+): Promise<string> {
+  const parent = `${rootDir(plugin)}/${sectionName}`;
+  return saveImageBytesTo(plugin.app, parent, imageId, base64Data);
+}
+
+export async function loadImageFromVault(
+  plugin: NoteometryPlugin,
+  vaultPath: string,
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const buf = await adapter.readBinary(vaultPath);
+  const bytes = new Uint8Array(buf);
+  let binaryStr = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binaryStr += String.fromCharCode(bytes[i]!);
+  }
+  const b64 = btoa(binaryStr);
+  return `data:image/png;base64,${b64}`;
+}
+
+export async function savePdfToVault(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  pdfId: string,
+  bytes: ArrayBuffer,
+): Promise<string> {
+  const parent = `${rootDir(plugin)}/${sectionName}`;
+  return savePdfBytesTo(plugin.app, parent, pdfId, bytes);
+}
+
+export async function loadPdfFromVault(
+  plugin: NoteometryPlugin,
+  vaultPath: string,
+): Promise<ArrayBuffer> {
+  const adapter = plugin.app.vault.adapter;
+  return await adapter.readBinary(vaultPath);
+}
+
+export async function migrateBase64Images(
+  plugin: NoteometryPlugin,
+  sectionName: string,
+  canvasObjects: CanvasObject[],
+): Promise<{ objects: CanvasObject[]; changed: boolean }> {
+  let changed = false;
+  const migrated: CanvasObject[] = [];
+  for (const obj of canvasObjects) {
+    if (obj.type === "image" && obj.dataURL.startsWith("data:")) {
+      try {
+        const vaultPath = await saveImageToVault(plugin, sectionName, obj.id, obj.dataURL);
+        migrated.push({ ...obj, dataURL: vaultPath });
+        changed = true;
+      } catch (e) {
+        console.error("[Noteometry] image migration failed:", e);
+        migrated.push(obj);
+      }
+    } else {
+      migrated.push(obj);
+    }
+  }
+  return { objects: migrated, changed };
 }
