@@ -14,6 +14,7 @@ import {
   deleteSection,
 } from "../lib/persistence";
 import { revealSection, createSixteenWeekCourse } from "../lib/sidebarActions";
+import { validateRename } from "../lib/renameValidation";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -189,8 +190,23 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
 
   const commitRename = async () => {
     if (submitting.current || !renamingItem) return;
-    const name = renameValue.trim();
-    if (!name || name === renamingItem.name) { cancelRename(); return; }
+
+    // v1.6.11: gather siblings so validateRename can detect collisions,
+    // and surface all rejection reasons through a Notice. Pre-v1.6.11
+    // the rename silently cancelled on any edge (blank, collision, FS
+    // character) and the user reported "rename doesn't work" with no
+    // explanation.
+    const siblings = renamingItem.type === "section"
+      ? sections
+      : (pagesMap[renamingItem.section] ?? []);
+    const v = validateRename(renameValue, renamingItem.name, siblings);
+    if (!v.ok) {
+      if (v.error !== "unchanged") new Notice(`Rename: ${v.error}`, 5000);
+      cancelRename();
+      return;
+    }
+    const name = v.name;
+
     submitting.current = true;
     try {
       const adapter = plugin.app.vault.adapter;
@@ -206,11 +222,40 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
             await adapter.write(`${newPath}/${p}.md`, data);
             await adapter.remove(`${oldPath}/${p}.md`);
           }
-          await adapter.rmdir(oldPath, false);
+          // Move the attachments folder too (v1.6.11): pre-fix, a
+          // section rename left images/PDFs stranded under the old
+          // folder and drop-ins broke with "file not found."
+          const oldAttach = `${oldPath}/attachments`;
+          if (await adapter.exists(oldAttach)) {
+            const newAttach = `${newPath}/attachments`;
+            if (!(await adapter.exists(newAttach))) await adapter.mkdir(newAttach);
+            const listed = await adapter.list(oldAttach);
+            for (const f of listed.files) {
+              const base = f.split("/").pop()!;
+              const buf = await adapter.readBinary(f);
+              await adapter.writeBinary(`${newAttach}/${base}`, buf);
+              await adapter.remove(f);
+            }
+            try { await adapter.rmdir(oldAttach, false); } catch { /* empty */ }
+          }
+          try { await adapter.rmdir(oldPath, false); } catch (e) {
+            console.warn("[Noteometry] could not remove old section folder:", e);
+          }
         }
         await refreshSections();
+        // Refresh the pages map entry keyed under the new name.
+        try {
+          const p = await listPages(plugin, name);
+          setPagesMap((prev) => {
+            const next = { ...prev };
+            delete next[renamingItem.name];
+            next[name] = p;
+            return next;
+          });
+        } catch { /* non-fatal */ }
         setActiveTab(name);
         if (currentSection === renamingItem.name) onSelect(name, currentPage);
+        new Notice(`Renamed section to "${name}"`, 3000);
       } else {
         const sec = renamingItem.section;
         const oldPath = `${root}/${sec}/${renamingItem.name}.md`;
@@ -223,7 +268,11 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
         const p = await listPages(plugin, sec);
         setPagesMap((prev) => ({ ...prev, [sec]: p }));
         if (currentPage === renamingItem.name) onSelect(sec, name);
+        new Notice(`Renamed page to "${name}"`, 3000);
       }
+    } catch (e) {
+      console.error("[Noteometry] rename failed:", e);
+      new Notice("Rename failed — see console", 6000);
     } finally {
       submitting.current = false;
       cancelRename();
@@ -368,6 +417,13 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   <>
                     <span className="nm-sidebar-tab-label">{s}</span>
                     <button
+                      className="nm-sidebar-tab-rename"
+                      onPointerUp={(e) => { e.stopPropagation(); startRename("section", s, s); }}
+                      title={`Rename ${s}`}
+                    >
+                      <IconPen />
+                    </button>
+                    <button
                       className="nm-sidebar-tab-del"
                       onPointerUp={(e) => { e.stopPropagation(); handleDeleteSection(s); }}
                       title={`Delete ${s}`}
@@ -402,6 +458,13 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                     {isRenaming ? renameInput() : (
                       <>
                         <span className="noteometry-sidebar-item-name">{p}</span>
+                        <button
+                          className="noteometry-sidebar-item-rename"
+                          onPointerUp={(e) => { e.stopPropagation(); startRename("page", activeTab, p); }}
+                          title={`Rename ${p}`}
+                        >
+                          <IconPen />
+                        </button>
                         <button
                           className="noteometry-sidebar-item-del"
                           onPointerUp={(e) => { e.stopPropagation(); handleDeletePage(activeTab, p); }}

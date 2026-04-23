@@ -1,10 +1,11 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
+import { Notice } from "obsidian";
 import type { CanvasObject } from "../lib/canvasObjects";
-import { defaultObjectName } from "../lib/canvasObjects";
+import { defaultObjectName, createImageObject } from "../lib/canvasObjects";
 import { shouldStartObjectDrag } from "../lib/objectDragHitTest";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
-import { loadImageFromVault } from "../lib/persistence";
+import { loadImageFromVault, saveImageToVault } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
@@ -35,7 +36,26 @@ function getHtml2Canvas() {
   return _html2canvas!;
 }
 
-async function snapshotElement(el: HTMLElement): Promise<void> {
+/**
+ * v1.6.11: snapshot a drop-in onto the canvas.
+ *
+ * Before v1.6.11 the screenshot button rasterized the drop-in to a PNG
+ * and wrote it to the system clipboard (with a download fallback). The
+ * user's expectation is more direct — "clicking the camera captures
+ * the drop-in and drops the screenshot onto the canvas as an image."
+ * We now rasterize to a data URL, persist it through saveImageToVault
+ * when a section is available, and append an image object offset a
+ * little to the right/down so it doesn't sit directly on top of the
+ * source drop-in. The clipboard-copy path is dropped since users who
+ * need that can use the OS "copy image" gesture.
+ */
+async function snapshotElementToCanvas(
+  el: HTMLElement,
+  source: CanvasObject,
+  plugin: NoteometryPlugin | undefined,
+  section: string | undefined,
+  addObject: (obj: CanvasObject) => void,
+): Promise<void> {
   try {
     const html2canvas = getHtml2Canvas();
     const canvas = await html2canvas(el, {
@@ -44,24 +64,40 @@ async function snapshotElement(el: HTMLElement): Promise<void> {
       logging: false,
       useCORS: true,
     });
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
+    const dataURL = canvas.toDataURL("image/png");
+    if (!dataURL || !dataURL.startsWith("data:image/")) {
+      new Notice("Snapshot failed — couldn't rasterize drop-in", 6000);
+      return;
+    }
+    // Scale the on-canvas image so it matches the drop-in's apparent
+    // width (html2canvas gives us a 2× backing store, so the natural
+    // pixel size is double the DOM width).
+    const targetW = Math.min(Math.round(source.w * 0.9), 520);
+    const aspect = canvas.height / Math.max(1, canvas.width);
+    const targetH = Math.round(targetW * aspect);
+    const newObj = createImageObject(
+      source.x + 40,
+      source.y + source.h + 16,
+      dataURL,
+      targetW,
+      targetH,
+      `${source.name ?? "Snapshot"} · snapshot`,
+    );
+    // Persist to the vault if the plugin + section are available so
+    // the image survives reloads and syncs across devices.
+    if (plugin && section) {
       try {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob }),
-        ]);
-      } catch {
-        // Fallback: download as file
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "snapshot.png";
-        a.click();
-        URL.revokeObjectURL(url);
+        const vaultPath = await saveImageToVault(plugin, section, newObj.id, dataURL);
+        newObj.dataURL = vaultPath;
+      } catch (err) {
+        console.error("[Noteometry] snapshot vault save failed:", err);
+        new Notice("Snapshot saved in-memory only — vault write failed", 6000);
       }
-    }, "image/png");
+    }
+    addObject(newObj);
   } catch (e) {
     console.error("[Noteometry] Snapshot failed:", e);
+    new Notice("Snapshot failed — see console", 6000);
   }
 }
 
@@ -155,6 +191,10 @@ interface Props {
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
   plugin?: NoteometryPlugin;
+  /** Current section name — passed through so snapshot-to-canvas can
+   *  persist the rasterized image via saveImageToVault. When absent
+   *  the snapshot still renders but won't sync to the vault. */
+  section?: string;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -237,7 +277,7 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
   zoom = 1,
-  tool, selectedObjectId, onSelectObject, plugin,
+  tool, selectedObjectId, onSelectObject, plugin, section,
 }: Props) {
   // Mirror zoom into a ref so the drag/resize handlers (which close over
   // stale values) always read the latest scale.
@@ -396,7 +436,13 @@ export default function CanvasObjectLayer({
             onDragStart={(e) => handleDragStart(e, obj)}
             onSnapshot={() => {
               const el = document.querySelector(`[data-dropin-id="${obj.id}"]`) as HTMLElement | null;
-              if (el) snapshotElement(el);
+              if (!el) {
+                new Notice("Snapshot failed — drop-in not found in DOM", 5000);
+                return;
+              }
+              snapshotElementToCanvas(el, obj, plugin, section, (newObj) => {
+                onObjectsChange([...objects, newObj]);
+              });
             }}
           />
 
