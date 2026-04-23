@@ -26,6 +26,7 @@ import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { makePastedObject } from "../lib/objectClipboard";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
+import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
@@ -1057,8 +1058,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
         });
         return;
       }
-      const target = e.target as HTMLElement | null;
-      if (target && target.closest("[data-dropin-id], textarea, .noteometry-object-content")) {
+      // v1.6.12: route wheel events across drop-ins. Previously any target
+      // inside a drop-in was treated as a dead zone (bail without
+      // preventDefault), which made 2-finger scroll stop the moment the
+      // cursor entered a drop-in. Now we yield only when the drop-in's
+      // internal element is genuinely scrollable in the axis the user is
+      // scrolling; otherwise we pan the canvas the same way we would over
+      // empty space. OneNote / MyScript behave the same way.
+      const target = e.target as Element | null;
+      if (shouldYieldToNativeScroll(target, el, { deltaX: e.deltaX, deltaY: e.deltaY })) {
         return;
       }
       e.preventDefault();

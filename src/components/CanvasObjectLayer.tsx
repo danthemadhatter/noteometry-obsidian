@@ -3,6 +3,8 @@ import { Notice } from "obsidian";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { defaultObjectName, createImageObject } from "../lib/canvasObjects";
 import { shouldStartObjectDrag } from "../lib/objectDragHitTest";
+import { sanitizeDownloadName, htmlToPlainText, buildRichTextClipboardBlobs } from "../lib/dropinExport";
+import { getTextBoxData } from "../lib/tableStore";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
 import { loadImageFromVault, saveImageToVault } from "../lib/persistence";
@@ -37,25 +39,14 @@ function getHtml2Canvas() {
 }
 
 /**
- * v1.6.11: snapshot a drop-in onto the canvas.
+ * v1.6.12: rasterize a drop-in DOM subtree to a PNG data URL.
  *
- * Before v1.6.11 the screenshot button rasterized the drop-in to a PNG
- * and wrote it to the system clipboard (with a download fallback). The
- * user's expectation is more direct — "clicking the camera captures
- * the drop-in and drops the screenshot onto the canvas as an image."
- * We now rasterize to a data URL, persist it through saveImageToVault
- * when a section is available, and append an image object offset a
- * little to the right/down so it doesn't sit directly on top of the
- * source drop-in. The clipboard-copy path is dropped since users who
- * need that can use the OS "copy image" gesture.
+ * Returns null (with a Notice) if rasterization fails — html2canvas can
+ * trip on iframes, certain PDF renderers, and cross-origin images. The
+ * caller decides what to do next: drop onto the canvas, download, or
+ * show a pending design note.
  */
-async function snapshotElementToCanvas(
-  el: HTMLElement,
-  source: CanvasObject,
-  plugin: NoteometryPlugin | undefined,
-  section: string | undefined,
-  addObject: (obj: CanvasObject) => void,
-): Promise<void> {
+async function rasterizeDropin(el: HTMLElement): Promise<string | null> {
   try {
     const html2canvas = getHtml2Canvas();
     const canvas = await html2canvas(el, {
@@ -66,14 +57,63 @@ async function snapshotElementToCanvas(
     });
     const dataURL = canvas.toDataURL("image/png");
     if (!dataURL || !dataURL.startsWith("data:image/")) {
-      new Notice("Snapshot failed — couldn't rasterize drop-in", 6000);
-      return;
+      console.warn("[Noteometry] rasterize produced non-image payload");
+      return null;
     }
+    return dataURL;
+  } catch (err) {
+    console.error("[Noteometry] html2canvas failed:", err);
+    return null;
+  }
+}
+
+/** Canvas width/height of the decoded data URL, used to preserve aspect
+ *  when writing the snapshot back into an image object. */
+async function measureDataUrl(dataURL: string): Promise<{ w: number; h: number } | null> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => resolve({ w: img.width, h: img.height });
+    img.onerror = () => resolve(null);
+    img.src = dataURL;
+  });
+}
+
+/**
+ * v1.6.12: Snapshot a drop-in onto the canvas.
+ *
+ * Before v1.6.11 the screenshot button rasterized the drop-in to a PNG
+ * and wrote it to the system clipboard. v1.6.11 switched to "drop an
+ * image object next to the source." The user reported this was still
+ * not working reliably — html2canvas silently returns blank canvases
+ * for iframe-backed drop-ins (PDFs) and certain SVG renderers.
+ *
+ * v1.6.12 wraps the rasterize call in a diagnostic path: on failure we
+ * surface a Notice AND offer the download-PNG fallback when possible.
+ */
+async function snapshotElementToCanvas(
+  el: HTMLElement,
+  source: CanvasObject,
+  plugin: NoteometryPlugin | undefined,
+  section: string | undefined,
+  addObject: (obj: CanvasObject) => void,
+): Promise<void> {
+  const dataURL = await rasterizeDropin(el);
+  if (!dataURL) {
+    new Notice("Snapshot failed — this drop-in can't be rasterized in-place. Try the Download option.", 7000);
+    return;
+  }
+  const measured = await measureDataUrl(dataURL);
+  if (!measured) {
+    new Notice("Snapshot failed — rasterized image was unreadable", 6000);
+    return;
+  }
+  try {
+    {
     // Scale the on-canvas image so it matches the drop-in's apparent
     // width (html2canvas gives us a 2× backing store, so the natural
     // pixel size is double the DOM width).
     const targetW = Math.min(Math.round(source.w * 0.9), 520);
-    const aspect = canvas.height / Math.max(1, canvas.width);
+    const aspect = measured.h / Math.max(1, measured.w);
     const targetH = Math.round(targetW * aspect);
     const newObj = createImageObject(
       source.x + 40,
@@ -95,22 +135,79 @@ async function snapshotElementToCanvas(
       }
     }
     addObject(newObj);
+    }
   } catch (e) {
     console.error("[Noteometry] Snapshot failed:", e);
     new Notice("Snapshot failed — see console", 6000);
   }
 }
 
+/** Download a rasterized drop-in as a .png — works even when the
+ *  in-canvas drop fails (iframe / PDF / CORS drop-ins). */
+async function downloadDropinAsPng(el: HTMLElement, filename: string): Promise<void> {
+  const dataURL = await rasterizeDropin(el);
+  if (!dataURL) {
+    new Notice("Download failed — this drop-in can't be rasterized. Try the OS screenshot tool.", 7000);
+    return;
+  }
+  const link = document.createElement("a");
+  link.download = `${sanitizeDownloadName(filename)}.png`;
+  link.href = dataURL;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/** Download a vault-backed image as-is (preserves original resolution). */
+async function downloadImageDataUrl(dataURL: string, filename: string): Promise<void> {
+  const link = document.createElement("a");
+  // Detect extension from the data URL mime; default to png.
+  const match = /^data:image\/([a-zA-Z0-9+.-]+);/.exec(dataURL);
+  const ext = match?.[1]?.toLowerCase() === "jpeg" ? "jpg" : (match?.[1] ?? "png");
+  link.download = `${sanitizeDownloadName(filename)}.${ext}`;
+  link.href = dataURL;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/** v1.6.12: copy text-box contents to the system clipboard as both
+ *  text/html and text/plain. Falls back to text/plain on browsers that
+ *  don't support rich clipboard writes. */
+async function copyTextBoxToClipboard(html: string): Promise<boolean> {
+  const payload = buildRichTextClipboardBlobs(html);
+  try {
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard && "write" in navigator.clipboard) {
+      await navigator.clipboard.write([new ClipboardItem(payload)]);
+      return true;
+    }
+  } catch (err) {
+    console.warn("[Noteometry] Rich clipboard write failed, falling back to plain text:", err);
+  }
+  try {
+    await navigator.clipboard.writeText(htmlToPlainText(html));
+    return true;
+  } catch (err) {
+    console.error("[Noteometry] Plain clipboard write failed:", err);
+    return false;
+  }
+}
+
+
 function EditableObjectTitle({
   value,
   onChange,
   onDragStart,
   onSnapshot,
+  onDownload,
+  downloadLabel,
 }: {
   value: string;
   onChange: (next: string) => void;
   onDragStart: (e: React.PointerEvent) => void;
   onSnapshot: () => void;
+  onDownload?: () => void;
+  downloadLabel?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -161,20 +258,38 @@ function EditableObjectTitle({
           if (editing) e.stopPropagation();
         }}
       />
-      <button
-        className="noteometry-canvas-action-btn"
-        title="Snapshot to clipboard"
-        onClick={(e) => { e.stopPropagation(); onSnapshot(); }}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: "20px", height: "20px", padding: 0, margin: "0 2px",
-          background: "none", border: "none", cursor: "pointer",
-          fontSize: "13px", opacity: 0.5, flexShrink: 0,
-        }}
-      >
-        📷
-      </button>
+      <div className="nm-object-chrome-icons" onPointerDown={(e) => e.stopPropagation()}>
+        <button
+          className="nm-object-chrome-btn"
+          title="Snapshot to canvas"
+          aria-label="Snapshot to canvas"
+          onClick={(e) => { e.stopPropagation(); onSnapshot(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {/* Camera icon — matches MyScript/OneNote chrome style */}
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
+        {onDownload && (
+          <button
+            className="nm-object-chrome-btn"
+            title={downloadLabel ?? "Download"}
+            aria-label={downloadLabel ?? "Download"}
+            onClick={(e) => { e.stopPropagation(); onDownload(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -425,7 +540,8 @@ export default function CanvasObjectLayer({
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
-          {/* Title bar — editable name that doubles as drag handle + snapshot */}
+          {/* Title bar — editable name that doubles as drag handle +
+           *   snapshot/download chrome (v1.6.12 icon-first pass). */}
           <EditableObjectTitle
             value={defaultObjectName(obj)}
             onChange={(next) => {
@@ -443,6 +559,42 @@ export default function CanvasObjectLayer({
               snapshotElementToCanvas(el, obj, plugin, section, (newObj) => {
                 onObjectsChange([...objects, newObj]);
               });
+            }}
+            downloadLabel={
+              obj.type === "textbox" ? "Copy rich text" :
+              obj.type === "image" ? "Download image" :
+              obj.type === "table" ? "Download table PNG" :
+              "Download PNG"
+            }
+            onDownload={() => {
+              const el = document.querySelector(`[data-dropin-id="${obj.id}"]`) as HTMLElement | null;
+              const name = defaultObjectName(obj);
+              // Text boxes: offer rich-text copy as the primary "export"
+              // path (matches Dan's OneNote/Word ask); fall back to
+              // .txt download when the clipboard is unavailable.
+              if (obj.type === "textbox") {
+                const html = getTextBoxData(obj.id) ?? "";
+                if (!html.trim()) {
+                  new Notice("Text box is empty — nothing to copy", 4000);
+                  return;
+                }
+                void copyTextBoxToClipboard(html).then((ok) => {
+                  if (ok) new Notice("Copied rich text — paste into Word / Google Docs", 4000);
+                  else new Notice("Clipboard unavailable — see console", 6000);
+                });
+                return;
+              }
+              // Images: download the underlying dataURL (preserves the
+              // source resolution instead of re-rasterizing through DOM).
+              if (obj.type === "image" && typeof obj.dataURL === "string" && obj.dataURL.startsWith("data:")) {
+                void downloadImageDataUrl(obj.dataURL, name);
+                return;
+              }
+              if (!el) {
+                new Notice("Download failed — drop-in not found in DOM", 5000);
+                return;
+              }
+              void downloadDropinAsPng(el, name);
             }}
           />
 
@@ -623,26 +775,40 @@ export default function CanvasObjectLayer({
             )}
           </div>
 
-          {/* Resize handles — all 4 edges + 4 corners */}
+          {/* Resize handles — all 4 edges + 4 corners.
+           *
+           * v1.6.12: edges widened from 6px → 10px so they're actually
+           * grabbable on trackpads / stylus without falling off onto the
+           * ink canvas underneath. `touch-action: none` keeps the pen
+           * tool from starting an ink stroke when the user drags a
+           * handle on iPad, and the `data-resize-handle` attribute lets
+           * the ink canvas pointerdown guard recognise handles in the
+           * native event target chain.
+           */}
           {(["n","s","e","w","ne","nw","se","sw"] as ResizeEdge[]).map(edge => {
             const isCorner = edge.length === 2;
             const cursor = ({n:"ns",s:"ns",e:"ew",w:"ew",ne:"nesw",nw:"nwse",se:"nwse",sw:"nesw"} as Record<string,string>)[edge] + "-resize";
             const pos: React.CSSProperties = {};
-            if (edge.includes("n")) { pos.top = -3; pos.height = 6; }
-            if (edge.includes("s")) { pos.bottom = -3; pos.height = 6; }
-            if (edge.includes("e")) { pos.right = -3; pos.width = 6; }
-            if (edge.includes("w")) { pos.left = -3; pos.width = 6; }
-            if (edge === "n" || edge === "s") { pos.left = 6; pos.right = 6; }
-            if (edge === "e" || edge === "w") { pos.top = 6; pos.bottom = 6; }
-            if (isCorner) { pos.width = 10; pos.height = 10; }
+            const edgeSize = 10;
+            const offset = -Math.floor(edgeSize / 2);
+            if (edge.includes("n")) { pos.top = offset; pos.height = edgeSize; }
+            if (edge.includes("s")) { pos.bottom = offset; pos.height = edgeSize; }
+            if (edge.includes("e")) { pos.right = offset; pos.width = edgeSize; }
+            if (edge.includes("w")) { pos.left = offset; pos.width = edgeSize; }
+            if (edge === "n" || edge === "s") { pos.left = 10; pos.right = 10; }
+            if (edge === "e" || edge === "w") { pos.top = 10; pos.bottom = 10; }
+            if (isCorner) { pos.width = 14; pos.height = 14; }
             return (
-              <div key={edge} style={{
-                position: "absolute", ...pos,
-                cursor, zIndex: 60,
-                background: isCorner ? "var(--nm-accent, #4A90D9)" : "transparent",
-                borderRadius: isCorner ? "2px" : 0,
-                opacity: isCorner ? 0.6 : 0,
-              }}
+              <div key={edge}
+                data-resize-handle={edge}
+                style={{
+                  position: "absolute", ...pos,
+                  cursor, zIndex: 60,
+                  background: isCorner ? "var(--nm-accent, #4A90D9)" : "transparent",
+                  borderRadius: isCorner ? "3px" : 0,
+                  opacity: isCorner ? 0.7 : 0,
+                  touchAction: "none",
+                }}
                 onPointerDown={(e) => handleResizeStart(e, obj, edge)}
                 onPointerMove={handleDragMove}
                 onPointerUp={handleDragEnd}

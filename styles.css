@@ -1770,6 +1770,48 @@
   cursor: text;
 }
 
+/* v1.6.12: icon-only chrome row at the right of each drop-in title bar.
+ *  Replaces the previous "📷 emoji" button with a consistent SVG icon pair
+ *  (snapshot + download). Buttons are small, quiet, and show their intent
+ *  on hover — matching OneNote / MyScript object chrome. */
+.nm-object-chrome-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-right: 2px;
+}
+.nm-object-chrome-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--nm-ink-muted, #6B7280);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nm-object-chrome-btn:hover {
+  opacity: 1;
+  color: var(--nm-accent, #4A90D9);
+  background: var(--nm-accent-light, rgba(74, 144, 217, 0.08));
+  border-color: var(--nm-paper-border, #E0E0E0);
+}
+.nm-object-chrome-btn:active {
+  opacity: 1;
+  background: var(--nm-accent-light, rgba(74, 144, 217, 0.16));
+}
+@media (pointer: coarse) {
+  .nm-object-chrome-btn { opacity: 0.8; width: 28px; height: 24px; }
+}
+
 /* ── Signal Bus link button ───────────────────────────── */
 .noteometry-signal-link-btn {
   display: inline-flex;
