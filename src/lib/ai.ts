@@ -1,5 +1,7 @@
 import { requestUrl } from "obsidian";
 import type { NoteometrySettings, ChatMessage, Attachment } from "../types";
+import { toImageMediaType } from "./aiImageFormat";
+export { toImageMediaType };
 
 export interface AIResult {
   ok: boolean;
@@ -95,9 +97,10 @@ function claudeToPerplexityInput(messages: ClaudeMessage[]): PerplexityInputItem
     }
     const parts = m.content.map((p) => {
       if (p.type === "text") return { type: "input_text" as const, text: p.text };
+      const mediaType = toImageMediaType(p.source.media_type);
       return {
         type: "input_image" as const,
-        image_url: `data:${p.source.media_type};base64,${p.source.data}`,
+        image_url: `data:${mediaType};base64,${p.source.data}`,
       };
     });
     return { type: "message", role: m.role, content: parts };
@@ -405,18 +408,27 @@ export async function chat(
   // history if an earlier turn was image-only (attachments are not persisted
   // across reloads, so only the empty text survives). Drop those.
   const lastIdx = messages.length - 1;
+  // For Perplexity we skip non-image attachments entirely (the provider
+  // rejects anything that isn't a `data:image/...` URI); for Claude we
+  // still forward them since callClaude itself will surface an error.
+  const keepOnlyImages = settings.aiProvider === "perplexity";
   const formatted: ClaudeMessage[] = messages.flatMap((m, i): ClaudeMessage[] => {
     const isLastUser = m.role === "user" && i === lastIdx;
     if (isLastUser && attachments.length) {
       const content: ClaudeContentPart[] = [];
       for (const att of attachments) {
+        const mediaType = toImageMediaType(att.mimeType);
+        if (keepOnlyImages && !((att.mimeType || "").toLowerCase().startsWith("image/"))) {
+          continue;
+        }
         const d = att.data.replace(/^data:[^;]+;base64,/, "");
         content.push({
           type: "image",
-          source: { type: "base64", media_type: att.mimeType, data: d },
+          source: { type: "base64", media_type: mediaType, data: d },
         });
       }
       if (m.text?.trim()) content.push({ type: "text", text: m.text.trim() });
+      if (content.length === 0) return [];
       return [{ role: m.role, content }];
     }
     const text = (m.text ?? "").trim();
