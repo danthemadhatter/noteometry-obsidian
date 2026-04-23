@@ -1,9 +1,12 @@
 # Noteometry Features
 
+> Current as of **v1.6.9**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes current behaviour only.
+
 ## Canvas / Drawing
 
 ### Pen Tool
 - Freehand drawing with mouse or Apple Pencil
+- **Pen is the default tool on first open** so the Pencil / mouse can draw immediately — previously the canvas opened in `select` mode, which piped pointer events away from the ink layer and made the canvas look broken
 - Catmull-Rom spline smoothing (removes jitter, preserves natural feel)
 - Uniform stroke width (no pressure sensitivity)
 - Configurable width: Fine (1.5px), Medium (3px), Thick (5px), Marker (8px)
@@ -34,8 +37,8 @@
 
 ### Tool Cycling
 - Toolbar cycle button: Pen → Eraser → Grab → Pen
-- Apple Pencil barrel double-tap cycles the same sequence (< 300ms, < 10px movement)
-- One tap / double-tap to switch between the three most-used tools
+- Mouse / trackpad double-click on empty canvas also cycles the sequence
+- **Apple Pencil double-tap is not exposed to Obsidian plugin JS / WebKit**, so the Pencil cannot cycle tools. Use the toolbar button, the math palette "Canvas" path, or the context-menu hub (opened by Pencil long-press — see Input Methods below).
 
 ### Undo / Redo
 - Tracks strokes and stamps
@@ -75,12 +78,19 @@
 ## Lasso + OCR
 
 ### Lasso Selection
-- Freeform polygon drawing
-- Blue dashed outline with translucent fill
-- After capture, a floating action bar appears with **OCR** and **Move** buttons
+- Freeform polygon drawing (Freehand) and Rectangle modes
+- Blue dashed outline with translucent fill; regions stack so multiple selections compose
+- After capture, a floating action bar appears with **OCR**, **Move**, and **Clear** buttons
 - Tap outside or press Escape to cancel
 - Captures strokes, stamps, AND canvas objects within the selection
 - Minimum 10 points to register (prevents accidental taps)
+
+### Lasso Clear
+- Deletes strokes whose points fall inside any region polygon
+- Deletes stamps whose center is inside any region
+- Deletes canvas objects whose bbox overlaps any region
+- Records an undo snapshot before wiping, persists via autosave
+- `Nothing selected to delete` notice fires on empty regions instead of silently no-op-ing
 
 ### OCR (READ INK)
 - Action bar **OCR** button: renders lasso region to high-resolution image (3x scale)
@@ -91,7 +101,9 @@
 
 ### Move
 - Action bar **Move** button: drag anywhere inside the lasso region
-- Translates all selected strokes and stamps by the drag delta
+- Translates all selected strokes, stamps, and canvas objects by the drag delta
+- Paints a ghost snapshot of the selection at its starting position the instant Move activates (the action used to look idle until the first `pointermove`)
+- Fires a `Drag the selection to its new position` notice so the mode change is visible
 - Supports undo
 
 ## Math Panel (Right Side)
@@ -184,6 +196,7 @@
 | Auto Save | true | Enable auto-save |
 | Auto Save Delay | 2000 | Debounce delay in ms |
 | Finger Drawing | false | Draw with a single finger (enable for Android) |
+| Show Experimental Tools | false | Re-expose Multimeter, Animation Canvas, and Study Gantt in the right-click hub |
 
 ## Responsive Design
 
@@ -212,9 +225,37 @@
 - contentEditable focus on tap for keyboard popup
 - inputMode="text" and enterKeyHint on all inputs
 - Image picker shows photo library (not camera-only)
+- **Apple Pencil long-press (550 ms, 8px movement slop)** opens the right-click context-menu hub at the hold location. Any mid-draw stroke is cancelled so the menu-open isn't also a scribble. Double-tap would be preferred but WebKit does not expose it to web pages.
+- **Two-finger tap** also opens the hub (standard iPadOS right-click)
+- **Clear Canvas** is pinned near the top of the hub behind its own separator so it's reachable on short viewports; the menu `max-height` is 70vh on touch with `touch-action: pan-y` + `-webkit-overflow-scrolling: touch` to stop iOS Safari hijacking the scroll gesture.
 
 ### Desktop
 - Mouse/trackpad drawing
 - HTML5 drag-and-drop from MathPalette to canvas
 - Keyboard shortcuts (Ctrl/Cmd+Z undo, Shift+Z redo, Delete to remove)
-- Mouse wheel for canvas scrolling
+- Mouse wheel for canvas scrolling; plain two-finger scroll pans; trackpad pinch (`ctrlKey`-synthesised wheel) zooms the viewport
+- Right-click opens the context-menu hub at the pointer
+
+## Input Methods (context-menu hub)
+
+The right-click context-menu hub is the single entry point for every insert and canvas action. All three open paths below surface the same menu at the press location:
+
+- **Mouse right-click** (desktop / trackpad)
+- **Two-finger tap** (iPad, desktop touchpads)
+- **Apple Pencil long-press** (550 ms hold, 8 px movement slop) — the mid-draw stroke is cancelled so the hub-open isn't also a scribble
+
+Inside the hub, Clear Canvas is pinned near the top (directly under Undo/Redo, behind its own separator) instead of the bottom of the ~30-item menu, so it's reachable on short iPad viewports without a two-finger scroll.
+
+## Drop-in interaction model
+
+- **Direct drag from any tool.** Drop-in objects (Calculator, Graph Plotter, Unit Converter, Circuit Sniper, etc.) can be moved by tap-dragging the object body no matter which canvas tool is active. This replaces the previous behaviour where the user had to switch to the `select` tool to move a drop-in, which contradicted "every normal app supports direct object dragging."
+- **Inner controls pass through.** Clicks on form inputs, buttons, sliders, `contenteditable` regions, `role="button"` elements, and inner `<canvas>` elements inside a drop-in are not captured as drags — they reach the drop-in's own event handlers. The selector list lives in `src/lib/objectDragHitTest.ts` and is pinned by a jsdom unit test.
+
+## Math Palette Routing
+
+Tapping a palette item either stamps it directly on the canvas or inserts it into the Input textarea, based on whether the token is a pure glyph or structural LaTeX:
+
+- **Pure glyphs** (π, ω, →, ∈, ∞, ⏚ ground marker, circuit DC supply, etc.) arm a **pending stamp** — the next canvas tap drops it at that location.
+- **Structural LaTeX** (`\frac{}{}`, matrices, `\sum_{i=1}^{n}`, `\int_{a}^{b}`, `\begin{pmatrix}…`) goes to the Input textarea, since it needs editing before it can render.
+
+The decision lives in `shouldArmStamp()` in `src/components/MathPalette.tsx` and is pinned by a parameterised unit test covering 20+ symbols across the palette tabs.
