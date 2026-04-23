@@ -1,5 +1,7 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
+import { Notice } from "obsidian";
 import { getTextBoxData, setTextBoxData } from "../lib/tableStore";
+import { buildRichTextClipboardBlobs, htmlToPlainText } from "../lib/dropinExport";
 
 interface Props {
   textBoxId: string;
@@ -40,6 +42,33 @@ export default function RichTextEditor({ textBoxId }: Props) {
     updateFormatState();
     handleInput();
   }, [updateFormatState, handleInput]);
+
+  const handleCopy = useCallback(async () => {
+    const html = editorRef.current?.innerHTML ?? "";
+    if (!html.trim()) {
+      new Notice("Nothing to copy");
+      return;
+    }
+    try {
+      const payload = buildRichTextClipboardBlobs(html);
+      // ClipboardItem may not exist in older WebViews; fall back to text.
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        await navigator.clipboard.write([new ClipboardItem(payload)]);
+        new Notice("Copied as rich text");
+        return;
+      }
+      await navigator.clipboard.writeText(htmlToPlainText(html));
+      new Notice("Copied as plain text (rich-text clipboard unavailable)");
+    } catch (err) {
+      console.warn("[Noteometry] rich-text copy failed", err);
+      try {
+        await navigator.clipboard.writeText(htmlToPlainText(html));
+        new Notice("Copied as plain text");
+      } catch {
+        new Notice("Copy failed");
+      }
+    }
+  }, []);
 
   const handleFontSize = useCallback((size: number) => {
     setFontSize(size);
@@ -126,6 +155,18 @@ export default function RichTextEditor({ textBoxId }: Props) {
             <option key={s} value={s}>{s}px</option>
           ))}
         </select>
+        <span className="noteometry-richtext-sep" />
+        <button
+          className="noteometry-richtext-btn"
+          onPointerDown={(e) => { e.preventDefault(); handleCopy(); }}
+          title="Copy as rich text (paste into Word / Docs)"
+          aria-label="Copy as rich text"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
       </div>
 
       {/* Editable area */}

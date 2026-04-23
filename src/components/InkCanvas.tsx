@@ -3,6 +3,7 @@ import type { Stroke, StrokePoint, Stamp } from "../lib/inkEngine";
 import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from "../lib/inkEngine";
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
 import { nextWheelZoom } from "../lib/wheelZoom";
+import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 
 export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
 
@@ -256,6 +257,23 @@ export default function InkCanvas({
       if (touchesRef.current.size > 0) return;
     }
     if (e.button === 2) return; // right-click — let onContextMenu handle it
+
+    // v1.6.12: defensive guard — never start an ink stroke or eraser hit
+    // inside a canvas object's drag/resize territory. DOM stacking should
+    // already route these events to the object layer (z-index 50+), but
+    // on iPad the native touch target occasionally falls through to the
+    // ink canvas after a React re-render — the user sees a stray ink
+    // line under the drop-in they were resizing. Bailing when the event
+    // target is (or is contained by) an object or resize handle is cheap
+    // insurance.
+    const rawTarget = e.target as Element | null;
+    if (rawTarget && rawTarget !== inkCanvasRef.current) {
+      if (
+        rawTarget.closest?.("[data-resize-handle], .noteometry-canvas-object")
+      ) {
+        return;
+      }
+    }
 
     // Double-tap / double-click detection for pen AND mouse. Fires
     // onCycleTool in the parent, which drives pen → eraser → rect-lasso
@@ -730,6 +748,13 @@ export default function InkCanvas({
         redrawGrid();
         redrawInk();
         onZoomChangeRef.current(next);
+        return;
+      }
+      // v1.6.12: wheel over a drop-in that's actually scrollable should
+      // not hijack the pan — yield to the drop-in's native scroll. See
+      // wheelRouting for the exact predicate.
+      const target = e.target as Element | null;
+      if (shouldYieldToNativeScroll(target, container, { deltaX: e.deltaX, deltaY: e.deltaY })) {
         return;
       }
       e.preventDefault();
