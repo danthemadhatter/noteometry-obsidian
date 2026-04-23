@@ -683,6 +683,30 @@ export default function NoteometryApp({ plugin, app }: Props) {
     } else {
       /* ── Right-clicked on empty canvas — full tool interface ── */
 
+      // v1.6.9: pin Clear Canvas at the TOP of the hub, right next to
+      // Undo/Redo. Previously it was the last item after Export PNG, so
+      // on iPad the menu grew tall enough that reaching Clear required
+      // scrolling — and the menu container rubber-banded on two-finger
+      // scroll, making the action effectively unreachable. Keeping it at
+      // top means the destructive action is always one tap away and
+      // never depends on the container scrolling at all.
+      const clearCanvas = buildClearCanvasAction(() => {
+        if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
+        if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
+        pushUndo();
+        setStrokes([]);
+        setStamps([]);
+        setCanvasObjects([]);
+        setSelectedObjectId(null);
+        setSelectedStampId(null);
+      });
+      items.push(
+        { label: "Undo", icon: "↩️", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
+        { label: "Redo", icon: "↪️", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
+        clearCanvas,
+        { label: "", separator: true },
+      );
+
       // Resolve current color/width labels for display
       const colorEntry = INK_COLORS.find((c) => c.color === activeColor) ?? INK_COLORS[0]!;
       const widthEntry = STROKE_WIDTHS.find((w) => w.width === strokeWidth) ?? STROKE_WIDTHS[1]!;
@@ -785,12 +809,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
       // AI Drop-in removed from menu — Preview + Input remain in the right panel
 
-      // ── Canvas ──
+      // ── Canvas ── (Undo/Redo/Clear live pinned at top; here we keep
+      // the less-critical view-level actions that are fine to scroll to.)
       items.push(
         { label: "\u2500\u2500 Canvas \u2500\u2500", disabled: true },
-        { label: "Undo", icon: "↩️", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
-        { label: "Redo", icon: "↪️", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
-        { label: "", separator: true },
         { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
         { label: "Zoom Out", onClick: zoomOut },
         { label: "Reset Zoom (100%)", onClick: resetZoom },
@@ -803,23 +825,6 @@ export default function NoteometryApp({ plugin, app }: Props) {
           link.href = dataUrl;
           link.click();
         }},
-        { label: "", separator: true },
-        // v1.6.8: Clear Canvas was reported as "disappeared" after the
-        // v1.6.6/v1.6.7 hub repairs. It never actually left, but it was
-        // the last item in a ~30-entry menu with no visual break from
-        // Export PNG. Pulled into a named factory so a registry test
-        // can pin the invariant, and fronted by its own separator so
-        // it reads as a distinct destructive action (not a lasso op).
-        buildClearCanvasAction(() => {
-          if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
-          if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
-          pushUndo();
-          setStrokes([]);
-          setStamps([]);
-          setCanvasObjects([]);
-          setSelectedObjectId(null);
-          setSelectedStampId(null);
-        }),
       );
 
       // Belt-and-braces: if a future refactor ever drops Clear Canvas
@@ -1136,9 +1141,26 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 zoomLocked={zoomLocked}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
                 onCycleTool={handleCycleTool}
+                onRequestContextMenu={(clientX, clientY) => {
+                  // v1.6.9 pen-long-press fallback for Apple Pencil — no
+                  // reliable web event exists for pencil double-tap on
+                  // iPad Safari / Obsidian mobile webview, so we route a
+                  // 550ms pen hold to the same context-menu entry point
+                  // the right-click handler uses. Keeps the "local tool
+                  // hub" concept Dan asked us to preserve.
+                  const fake = new MouseEvent("contextmenu", {
+                    clientX, clientY, bubbles: true,
+                  });
+                  Object.defineProperty(fake, "preventDefault", { value: () => {} });
+                  handleCanvasContextMenu(fake as unknown as React.MouseEvent);
+                }}
                 fingerDrawing={plugin.settings.fingerDrawing}
                 onViewportChange={handleViewportChange}
-                disabled={lassoActive}
+                /* v1.6.9: silence the ink layer while a pending stamp is
+                 * armed so the tap lands as "place symbol" (handled by
+                 * handleCanvasAreaClick) instead of also starting a
+                 * stroke under it. */
+                disabled={lassoActive || pendingSymbol !== null}
                 selectedStampId={selectedStampId}
               />
 
@@ -1319,6 +1341,13 @@ export default function NoteometryApp({ plugin, app }: Props) {
           <MathPalette
             onInsert={handleInsertSymbol}
             onDragStart={(sym) => setPendingSymbol(sym)}
+            onArmStamp={(display) => {
+              // v1.6.9: close the palette so the user immediately sees
+              // where they're about to place, and arm pendingSymbol so
+              // the next canvas tap drops the glyph.
+              setPendingSymbol(display);
+              setMathPaletteOpen(false);
+            }}
             onDropStamp={(display, screenX, screenY) => {
               const rect = canvasAreaRef.current?.getBoundingClientRect();
               if (!rect) return;

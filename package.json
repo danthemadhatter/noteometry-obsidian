@@ -1,7 +1,7 @@
 {
 	"name": "noteometry",
-	"version": "1.6.8",
-	"description": "EE workstation \u2014 canvas, ink, AI, and drop-ins for electrical engineering students",
+	"version": "1.6.9",
+	"description": "EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -30,6 +30,7 @@
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
 		"jiti": "2.6.1",
+		"jsdom": "^29.0.2",
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1",

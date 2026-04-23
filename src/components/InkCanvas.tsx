@@ -30,6 +30,14 @@ interface Props {
    * was previously missing, which left Dan without a keyboard-free tool
    * switcher. */
   onCycleTool?: () => void;
+  /** v1.6.9: pen long-press on empty canvas — fallback for Apple Pencil
+   * double-tap, which no web API surfaces on iPad Safari. Parent opens
+   * the canvas context menu (tool hub) at the given screen coords.
+   * Fires ~550ms after a stationary pen-down if the finger hasn't moved
+   * beyond the slop radius. Also fires for right-click on mouse/desktop
+   * via the standard contextmenu handler (handled at the composition
+   * layer); this prop is only used for the pen path. */
+  onRequestContextMenu?: (clientX: number, clientY: number) => void;
   disabled?: boolean;
   selectedStampId?: string | null;
   onEraseStart?: () => void;
@@ -47,6 +55,7 @@ export default function InkCanvas({
   zoomLocked = false,
   onZoomChange,
   onCycleTool,
+  onRequestContextMenu,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
   fingerDrawing = false,
@@ -87,6 +96,15 @@ export default function InkCanvas({
   const lastTapPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const onCycleToolRef = useRef(onCycleTool);
+  const onRequestContextMenuRef = useRef(onRequestContextMenu);
+
+  // v1.6.9: pen long-press timer. Armed on pen pointerdown, cancelled if
+  // the pen moves more than 8 CSS pixels or lifts before the deadline.
+  // Deadline matches iOS system long-press (~550ms) so the gesture feels
+  // native.
+  const penLongPressTimerRef = useRef<number>(0);
+  const penLongPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const penLongPressFiredRef = useRef(false);
 
   // Touch pan state (shared between touch handler and main)
   const touchesRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -114,6 +132,7 @@ export default function InkCanvas({
   useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
   useEffect(() => { zoomLockedRef.current = zoomLocked; }, [zoomLocked]);
   useEffect(() => { onCycleToolRef.current = onCycleTool; }, [onCycleTool]);
+  useEffect(() => { onRequestContextMenuRef.current = onRequestContextMenu; }, [onRequestContextMenu]);
 
   // ── Canvas sizing ──────────────────────────────────
   const sizeRef = useRef({ w: 0, h: 0 });
@@ -308,6 +327,30 @@ export default function InkCanvas({
     isDrawingRef.current = true;
     activeStrokeRef.current = [{ x, y, pressure }];
     canvas.setPointerCapture(e.pointerId);
+
+    // v1.6.9: arm the pen long-press timer (Apple Pencil context-menu
+    // fallback). Only for pen events — mouse users already have
+    // right-click, finger events own pan/pinch. The timer is cancelled
+    // in handlePointerMove (if the pen drifts) and handlePointerUp.
+    if (e.pointerType === "pen" && onRequestContextMenuRef.current) {
+      penLongPressStartPosRef.current = { x: e.clientX, y: e.clientY };
+      penLongPressFiredRef.current = false;
+      if (penLongPressTimerRef.current) window.clearTimeout(penLongPressTimerRef.current);
+      const cx = e.clientX, cy = e.clientY;
+      penLongPressTimerRef.current = window.setTimeout(() => {
+        // Deadline reached without the pen having moved → treat this as
+        // a long-press. Abort any in-progress stroke (so the tick mark
+        // doesn't get left behind) and open the hub at the original
+        // pen-down coordinates.
+        if (isDrawingRef.current) {
+          isDrawingRef.current = false;
+          activeStrokeRef.current = [];
+          redrawInk();
+        }
+        penLongPressFiredRef.current = true;
+        onRequestContextMenuRef.current?.(cx, cy);
+      }, 550);
+    }
   }, [onStrokesChange, onStampsChange, onToolChange]);
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
@@ -315,6 +358,18 @@ export default function InkCanvas({
       if (!fingerDrawingRef.current) return;
       // A second finger entered → pinch/pan owns the gesture now.
       if (touchesRef.current.size > 1) return;
+    }
+
+    // v1.6.9: cancel the pen long-press timer the moment the pen drifts.
+    // 8px slop matches iOS's own long-press tolerance.
+    if (e.pointerType === "pen" && penLongPressTimerRef.current && penLongPressStartPosRef.current) {
+      const dx = e.clientX - penLongPressStartPosRef.current.x;
+      const dy = e.clientY - penLongPressStartPosRef.current.y;
+      if (dx * dx + dy * dy > 64) {
+        window.clearTimeout(penLongPressTimerRef.current);
+        penLongPressTimerRef.current = 0;
+        penLongPressStartPosRef.current = null;
+      }
     }
 
     if (isGrabbingRef.current && grabLastRef.current) {
@@ -374,6 +429,25 @@ export default function InkCanvas({
     const canvas = inkCanvasRef.current;
     if (canvas && canvas.hasPointerCapture?.(e.pointerId)) {
       canvas.releasePointerCapture(e.pointerId);
+    }
+
+    // v1.6.9: pen lifted before the long-press deadline → cancel the
+    // timer; otherwise it'd fire after the stroke ended and open the
+    // hub on the user's next tap location.
+    if (e.pointerType === "pen") {
+      if (penLongPressTimerRef.current) {
+        window.clearTimeout(penLongPressTimerRef.current);
+        penLongPressTimerRef.current = 0;
+      }
+      penLongPressStartPosRef.current = null;
+      // If the long-press already fired, the stroke was wiped — suppress
+      // the stroke-commit path below.
+      if (penLongPressFiredRef.current) {
+        penLongPressFiredRef.current = false;
+        isDrawingRef.current = false;
+        activeStrokeRef.current = [];
+        return;
+      }
     }
 
     if (e.pointerType === "touch" && !fingerDrawingRef.current) return;

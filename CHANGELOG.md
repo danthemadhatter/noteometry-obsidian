@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.9 — 2026-04-22
+
+Interaction-model repairs from v1.6.8 testing. Scope intentionally narrow — right-click hub concept, math v12 prompt, MathML/clipboard pipeline untouched.
+
+- **Apple Pencil / mouse now draw on an empty canvas.** Root cause: the default tool was `"select"`, which pipes pointer events away from the ink layer (`pointer-events: none` on the canvas element). On first-ever open, stroking with a Pencil produced nothing visible and looked broken. Default tool is now `"pen"` — the canvas is ready to draw the moment the view renders.
+- **Direct object drag restored.** Drop-in objects (calculator, graph, unit converter, circuit…) were only draggable while the user was in the lasso-like `"select"` tool, which contradicted "every normal app supports direct object dragging." Objects are now always interactive: tap-drag on the object body moves it, while clicks on inner controls (inputs, buttons, sliders, contenteditable regions, inner canvases) pass through as normal. Hit test lives in `src/lib/objectDragHitTest.ts` with the selector list documented in code and pinned by a jsdom unit test.
+- **Clear Canvas reachable on iPad.** Pinned at the **top** of the right-click hub (directly under Undo/Redo, behind its own separator) instead of the bottom of a ~30-item menu. Old placement required two-finger scroll to the last row on short iPad viewports and the scroll container rubber-banded away. Also raised `.noteometry-ctx-menu` `max-height` to 80vh (70vh on touch), enabled `-webkit-overflow-scrolling: touch`, and set `touch-action: pan-y` on the scroll container + `manipulation` on rows so iOS Safari stops hijacking the gesture.
+- **Math palette tap routing fixed.** Pure glyphs (π, ω, →, ∈, ∞, ⏚ ground marker, circuit DC supply, etc.) now arm a **pending stamp** — next canvas tap drops it. Structural LaTeX (fractions, matrices, `\sum_{i=1}^{n}`, `\int_{a}^{b}`, `\begin{pmatrix}…`) still goes to the Input textarea where it needs editing before it can render. Routing logic is in `shouldArmStamp()` in `src/components/MathPalette.tsx` and is pinned by a parameterised unit test covering 20+ symbols across tabs.
+- **Apple Pencil long-press opens the tool hub.** Pencil double-tap is NOT exposed to web pages in WebKit/Safari, so a reliable fallback is required. Pressing-and-holding the Pencil tip for 550 ms (with an 8px movement slop) now opens the right-click context menu at the hold location — and if a stroke was mid-draw, it's cancelled so the menu-open isn't also a scribble. Mouse/touch right-click + two-finger tap continue to work as before.
+- **Tests:** added `tests/unit/mathPaletteStamp.test.ts` (22 cases — stamp vs. input routing, circuit markers, per-tab reachability), `tests/unit/contextMenuLayout.test.ts` (3 cases — Clear Canvas is in the first 5 rows, separator below, Undo/Redo precede it), `tests/unit/objectDragHitTest.test.ts` (8 cases — drag starts on body, not on form controls / contenteditable / canvas / role=button). Existing suites untouched. Total: 185 passing, 0 failing.
+
+Out of scope (hard constraints, untouched): Math v12 prompt, MathML generation, copy-to-Word, clipboard pipeline, right-click context hub concept. Lasso stack behaviour from v1.6.8 is preserved — this release only *adds* a direct-drag path for objects; lasso is still the tool for multi-region erase / move / process.
+
 ## 1.6.8 — 2026-04-22
 
 Two narrow repairs from v1.6.7 test feedback: **"Clear Canvas tool disappeared"** and **"Lasso Clear does nothing. Lasso Move does nothing."** Existing architecture — right-click hub, multi-region lasso stack, freehand/rect modes, rasterize/composite pipeline, stack-based action bar — is preserved; these fixes restore classic behaviour without rewriting anything.
