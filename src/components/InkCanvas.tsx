@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect } from "react";
 import type { Stroke, StrokePoint, Stamp } from "../lib/inkEngine";
 import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from "../lib/inkEngine";
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
+import { nextWheelZoom } from "../lib/wheelZoom";
 
 export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
 
@@ -696,19 +697,41 @@ export default function InkCanvas({
     return () => observer.disconnect();
   }, [resizeCanvases]);
 
-  // ── Mouse wheel scrolling — on the CONTAINER (works in all modes) ──
+  // ── Mouse wheel scrolling + pinch zoom — on the CONTAINER ──
   //
-  // Plain wheel → pan. Trackpad two-finger pinch on Mac/Chromium synthesises
-  // wheel events with `ctrlKey: true` (and no metaKey). Cmd+wheel on desktop
-  // is also a zoom gesture. In both cases we must NOT consume the event here —
-  // bail out and let the viewport-level handler in NoteometryApp do the zoom.
-  // Without this early return, pan and zoom fought over the same event and
-  // pinch-to-zoom visibly failed (users reported a jittery pan).
+  // Plain wheel → pan. Cmd/Ctrl+wheel AND trackpad pinch (Chromium
+  // synthesises wheel + ctrlKey for pinch on Mac/Windows) → zoom.
+  //
+  // v1.6.10: handle the zoom directly here instead of bailing out to a
+  // parent listener. Previously we bailed on ctrlKey and relied on the
+  // viewport-level wheel handler in NoteometryApp to catch the pinch,
+  // but on MacBook Pro trackpads the pinch gesture stopped reaching that
+  // parent handler reliably — event propagation order, listener re-binding
+  // on every zoom change, and the canvas pointer capture layer all
+  // conspired to swallow some of the wheel events. Owning the zoom here
+  // keeps the hot path short: same element, same frame, same listener.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) return; // zoom gesture — parent handles it
+      const isZoomGesture = e.ctrlKey || e.metaKey;
+      if (isZoomGesture) {
+        if (zoomLockedRef.current) { e.preventDefault(); return; }
+        if (!onZoomChangeRef.current) return;
+        e.preventDefault();
+        const next = nextWheelZoom({
+          zoom: zoomRef.current,
+          deltaY: e.deltaY,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+        });
+        if (Math.abs(next - zoomRef.current) < 0.0001) return;
+        zoomRef.current = next;
+        redrawGrid();
+        redrawInk();
+        onZoomChangeRef.current(next);
+        return;
+      }
       e.preventDefault();
       const newX = scrollRef.current.x + e.deltaX;
       const newY = scrollRef.current.y + e.deltaY;
