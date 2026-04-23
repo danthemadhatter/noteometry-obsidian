@@ -24,6 +24,7 @@ import type { ContextMenuItem } from "./ContextMenu";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
+import { makePastedObject } from "../lib/objectClipboard";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
@@ -640,13 +641,29 @@ export default function NoteometryApp({ plugin, app }: Props) {
       items.push(
         { label: "Cut", shortcut: "\u2318X", onClick: () => {
           objectClipboardRef.current = { ...hitObj };
+          pushUndo();
           setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
           setSelectedObjectId(null);
         }},
         { label: "Copy", shortcut: "\u2318C", onClick: () => {
           objectClipboardRef.current = { ...hitObj };
         }},
+        // v1.6.11: Paste menu entry. v1.6.10 shipped Copy/Cut but no Paste,
+        // so the internal clipboard filled up and never emptied — users
+        // reported "Copy works but nothing pastes." Pastes onto the
+        // current right-click world point, offset if anchored on the
+        // object itself, with undo + the normal autosave through the
+        // canvasObjects setter.
+        { label: "Paste", shortcut: "\u2318V", disabled: !objectClipboardRef.current, onClick: () => {
+          const src = objectClipboardRef.current;
+          if (!src) return;
+          pushUndo();
+          const pasted = makePastedObject(src, { x: worldX, y: worldY });
+          setCanvasObjects((prev) => [...prev, pasted]);
+          setSelectedObjectId(pasted.id);
+        }},
         { label: "Duplicate", onClick: () => {
+          pushUndo();
           const dup: CanvasObject = { ...hitObj, id: crypto.randomUUID(), x: hitObj.x + 24, y: hitObj.y + 24 };
           setCanvasObjects((prev) => [...prev, dup]);
           setSelectedObjectId(dup.id);
@@ -704,6 +721,17 @@ export default function NoteometryApp({ plugin, app }: Props) {
         { label: "Undo", icon: "↩️", shortcut: "\u2318Z", disabled: !canUndo, onClick: handleUndoWrapped },
         { label: "Redo", icon: "↪️", shortcut: "\u21E7\u2318Z", disabled: !canRedo, onClick: handleRedoWrapped },
         clearCanvas,
+        // v1.6.11: paste the internally-copied object at the right-click point.
+        // Disabled when the clipboard ref is empty so the menu is honest
+        // rather than silently no-op.
+        { label: "Paste", icon: "📋", shortcut: "\u2318V", disabled: !objectClipboardRef.current, onClick: () => {
+          const src = objectClipboardRef.current;
+          if (!src) return;
+          pushUndo();
+          const pasted = makePastedObject(src, { x: worldX, y: worldY });
+          setCanvasObjects((prev) => [...prev, pasted]);
+          setSelectedObjectId(pasted.id);
+        }},
         { label: "", separator: true },
       );
 
@@ -911,13 +939,38 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
   }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
 
-  // Paste listener for images
+  // v1.6.11: paste routing.
+  //
+  // Pre-v1.6.11 the listener attached to the canvas-area <div>, which
+  // never receives `paste` events — divs aren't focusable, so the event
+  // target is always either the document or an inner input. Users
+  // reported "When I paste…" with nothing happening on the canvas.
+  //
+  // The listener now sits on the document. When the paste target is an
+  // editable element (input/textarea/contenteditable) we bow out and
+  // let the browser's default behaviour handle it — so pasting text
+  // into the chat box, a RichTextEditor, or a table cell works as
+  // before. Otherwise we inspect the clipboard: images drop onto the
+  // canvas as image objects (same path as v1.6.10), an internal-object
+  // clipboard entry drops as a canvas object, and text is forwarded to
+  // a stamp so users aren't surprised by "nothing happens."
   useEffect(() => {
-    const el = canvasAreaRef.current;
-    if (!el) return;
     const handler = async (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      // Editable target → let the default happen. This is what keeps
+      // the chat textarea, RichTextEditor, and table cell paste paths
+      // untouched (the Math v12 / clipboard-to-Word pipeline is guarded
+      // upstream and never reached from here).
+      if (target) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target.closest("[contenteditable='true']")) {
+          return;
+        }
+      }
       const items = e.clipboardData?.items;
-      if (!items) return;
+      if (!items || items.length === 0) return;
+
+      // 1) Prefer a system-clipboard image.
       for (const item of Array.from(items)) {
         if (item.type.startsWith("image/")) {
           const blob = item.getAsFile();
@@ -926,30 +979,48 @@ export default function NoteometryApp({ plugin, app }: Props) {
             const reader = new FileReader();
             reader.onload = async (ev) => {
               const dataURL = ev.target?.result as string;
-              if (dataURL) {
-                const obj = createImageObject(scrollX + 150, scrollY + 150, dataURL);
-                const sec = sectionRef.current;
-                if (sec) {
-                  try {
-                    const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
-                    obj.dataURL = vaultPath;
-                  } catch (err) {
-                    console.error("[Noteometry] paste image vault save failed:", err);
-                    new Notice("Pasted image save failed — kept in memory only, may not sync across devices", 8000);
-                  }
+              if (!dataURL) return;
+              const obj = createImageObject(scrollX + 150, scrollY + 150, dataURL);
+              const sec = sectionRef.current;
+              if (sec) {
+                try {
+                  const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                  obj.dataURL = vaultPath;
+                } catch (err) {
+                  console.error("[Noteometry] paste image vault save failed:", err);
+                  new Notice("Pasted image save failed — kept in memory only, may not sync across devices", 8000);
                 }
-                setCanvasObjects((prev) => [...prev, obj]);
               }
+              pushUndo();
+              setCanvasObjects((prev) => [...prev, obj]);
             };
             reader.readAsDataURL(blob);
             return;
           }
         }
       }
+
+      // 2) Fall back to the internal object clipboard (set by right-click Copy).
+      const src = objectClipboardRef.current;
+      if (src) {
+        e.preventDefault();
+        pushUndo();
+        const pasted = makePastedObject(src, null);
+        setCanvasObjects((prev) => [...prev, pasted]);
+        setSelectedObjectId(pasted.id);
+        return;
+      }
+
+      // 3) Plain text paste onto an empty canvas is not currently
+      //    routed — make it explicit instead of silently dropping.
+      const hasText = Array.from(items).some((i) => i.kind === "string");
+      if (hasText) {
+        new Notice("Paste into a text box or chat — canvas-level text paste isn't wired up", 5000);
+      }
     };
-    el.addEventListener("paste", handler);
-    return () => el.removeEventListener("paste", handler);
-  }, [scrollX, scrollY, plugin]);
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [scrollX, scrollY, plugin, pushUndo, setCanvasObjects, setSelectedObjectId]);
 
   /* ── Viewport change ─────────────────────────────────── */
   const handleViewportChange = useCallback((newX: number, newY: number) => {
@@ -1179,6 +1250,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 selectedObjectId={selectedObjectId}
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
+                section={currentSection}
               />
 
               {/* Lasso overlay — operates within the viewport */}

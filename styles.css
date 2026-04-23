@@ -387,6 +387,38 @@
   }
 }
 
+/* Rename button on tab — same treatment as delete but accent-colored */
+.nm-sidebar-tab-rename {
+  opacity: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--nm-ink-muted);
+  flex-shrink: 0;
+  transition: opacity 0.12s;
+  border-radius: 3px;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 0;
+}
+.nm-sidebar-tab-rename svg {
+  width: 10px !important;
+  height: 10px !important;
+}
+.nm-sidebar-tab:hover .nm-sidebar-tab-rename {
+  opacity: 0.5;
+}
+.nm-sidebar-tab-rename:hover {
+  opacity: 1 !important;
+  color: var(--nm-accent);
+  background: var(--nm-accent-light);
+}
+@media (pointer: coarse) {
+  .nm-sidebar-tab-rename {
+    opacity: 0.4;
+  }
+}
+
 /* ── Page list ── */
 
 .nm-sidebar-page-list {
@@ -471,6 +503,37 @@
 /* Show delete on touch devices (no hover) */
 @media (pointer: coarse) {
   .noteometry-sidebar-item-del {
+    opacity: 0.4;
+  }
+}
+
+/* Rename button on page items — matches delete but accent-colored */
+.noteometry-sidebar-item-rename {
+  opacity: 0;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--nm-ink-muted);
+  flex-shrink: 0;
+  transition: all 0.12s;
+  border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.noteometry-sidebar-item-rename svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+.noteometry-sidebar-item:hover .noteometry-sidebar-item-rename {
+  opacity: 0.5;
+}
+.noteometry-sidebar-item-rename:hover {
+  opacity: 1 !important;
+  color: var(--nm-accent);
+  background: var(--nm-accent-light);
+}
+@media (pointer: coarse) {
+  .noteometry-sidebar-item-rename {
     opacity: 0.4;
   }
 }
