@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.13 — 2026-04-23
+
+Diagnostic + visibility pass on top of v1.6.12. Dan's v1.6.12 report was "most updates didn't work, specifically all canvas and canvas tool updates. Screenshot works but is awkward. No GUI changes." Repo audit confirmed v1.6.12 code + release assets were correct and wired into the active runtime — the **chrome was just too subtle to see**. Math v12 prompt semantics, MathML generation, copy-to-Word, Word-clipboard pipeline, right-click/local hub, and every v1.6.9–v1.6.12 pipeline are untouched.
+
+- **Root cause of "no GUI change apparent."** v1.6.12 rendered the new snapshot/download icons at `opacity: 0.55` on a `background: none` button sitting on the paper-colored title bar. On a white/cream drop-in header a 13px stroked glyph at 55% is nearly invisible, especially on touch where there's no hover state to reveal it. The code change landed; the visual change did not.
+- **Drop-in chrome is now unmistakably visible.** Icons render at full strength (`opacity: 1`), sit on a recessed faceplate pill with a soft border, and grow from 2 buttons to 4: **Snapshot**, **Download / Copy rich text** (depending on drop-in type), **Duplicate**, **Delete**. Tap targets widen to 30×26 on coarse-pointer devices. Delete has a danger-tinted hover (red) so destructive intent is honest. Right-click hub still exposes the same actions; the chrome is additive.
+- **Screenshot UX is no longer awkward.** v1.6.12 dropped the rasterized image next to the source with zero visible feedback, so Dan had to hunt for where the result went. v1.6.13: after a successful snapshot the new image object is auto-selected (shows selection ring) and a confirming Notice ("Snapshot added to canvas") fires. Failure modes still surface their specific Notices — the awkwardness was purely missing success feedback.
+- **Version badge in Settings + console banner.** Obsidian aggressively caches plugin JS, so after a GitHub Releases install the user could be looking at a stale `main.js` without realising it. Settings → Noteometry now shows the running version in a highlighted row ("Version **1.6.13** — if this doesn't match the release you installed, restart Obsidian to clear cached plugin code"), and `plugin.onload()` logs `[Noteometry] v1.6.13 loaded` to the console. Pinned by `tests/unit/version.test.ts` — manifest / package.json / versions.json / the constant can never drift apart silently.
+- **Duplicate + Delete icons eliminate the "right-click to do anything common" friction.** Duplicate creates a new copy offset 24/24 and selects it (plus a confirmation Notice). Delete shows a browser confirm dialog before removing the drop-in. Both mirror the right-click-hub entries exactly — just reachable with one click from the title bar.
+
+**Tests & build:** 240 passing (22 files), 0 failing. `npm run build` green (tsc + esbuild). New: `tests/unit/version.test.ts` (3 cases pinning the version constant to all three manifest files).
+
+**If the release assets were right but the design was too subtle:** yes, that's exactly what happened with v1.6.12. The chrome worked and clicked correctly — it just wasn't visible enough to notice. v1.6.13 fixes that at the CSS + component level with no changes to the underlying code paths.
+
+**Out of scope (hard constraints, untouched):** Math v12 prompt semantics, MathML generation, copy-to-Word, Word-clipboard pipeline, right-click/local hub, classic object handling, v1.6.9's default-pen-tool and direct-object-drag behaviour, v1.6.10's pinch-zoom / 16-week template / reveal-in-Finder paths, v1.6.11 paste / rename / Perplexity data-URI fixes, v1.6.12 wheel routing / resize handles / rich-text copy.
+
 ## 1.6.12 — 2026-04-23
 
 Canvas-and-drop-in UX pass on top of v1.6.11. Six of Dan's nine reported issues from the post-1.6.11 checklist addressed; the other three (left-sidebar compact rail, icon-first UI sweep, OCR verification step) are scoped into design notes for a follow-up so they don't ship half-finished. Math v12 prompt, MathML generation, copy-to-Word / clipboard-for-Word pipeline, right-click/local hub, and v1.6.9 direct-drag / default-pen behaviour are all untouched.

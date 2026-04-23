@@ -96,6 +96,7 @@ async function snapshotElementToCanvas(
   plugin: NoteometryPlugin | undefined,
   section: string | undefined,
   addObject: (obj: CanvasObject) => void,
+  onSelect?: (id: string) => void,
 ): Promise<void> {
   const dataURL = await rasterizeDropin(el);
   if (!dataURL) {
@@ -108,7 +109,6 @@ async function snapshotElementToCanvas(
     return;
   }
   try {
-    {
     // Scale the on-canvas image so it matches the drop-in's apparent
     // width (html2canvas gives us a 2× backing store, so the natural
     // pixel size is double the DOM width).
@@ -135,7 +135,12 @@ async function snapshotElementToCanvas(
       }
     }
     addObject(newObj);
-    }
+    // v1.6.13: select the new snapshot and surface an explicit success
+    // Notice. v1.6.12 dropped the image below the source without any
+    // visible feedback, so the user reported "screenshot works but is
+    // awkward — nothing tells me anything happened."
+    if (onSelect) onSelect(newObj.id);
+    new Notice("Snapshot added to canvas", 2500);
   } catch (e) {
     console.error("[Noteometry] Snapshot failed:", e);
     new Notice("Snapshot failed — see console", 6000);
@@ -201,6 +206,8 @@ function EditableObjectTitle({
   onSnapshot,
   onDownload,
   downloadLabel,
+  onDuplicate,
+  onDelete,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -208,6 +215,8 @@ function EditableObjectTitle({
   onSnapshot: () => void;
   onDownload?: () => void;
   downloadLabel?: string;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -258,6 +267,13 @@ function EditableObjectTitle({
           if (editing) e.stopPropagation();
         }}
       />
+      {/* v1.6.13: visible icon chrome. v1.6.12 shipped these at 55%
+       *   opacity with a transparent background, so on a paper-colored
+       *   title bar Dan literally couldn't see them and reported "no
+       *   GUI changes." Now they always render at full strength with a
+       *   subtle faceplate so the icons are immediately visible — plus
+       *   Duplicate and Delete so common operations are one tap away
+       *   instead of requiring a right-click. */}
       <div className="nm-object-chrome-icons" onPointerDown={(e) => e.stopPropagation()}>
         <button
           className="nm-object-chrome-btn"
@@ -266,9 +282,8 @@ function EditableObjectTitle({
           onClick={(e) => { e.stopPropagation(); onSnapshot(); }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Camera icon — matches MyScript/OneNote chrome style */}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
@@ -281,11 +296,43 @@ function EditableObjectTitle({
             onClick={(e) => { e.stopPropagation(); onDownload(); }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        )}
+        {onDuplicate && (
+          <button
+            className="nm-object-chrome-btn"
+            title="Duplicate drop-in"
+            aria-label="Duplicate drop-in"
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+        )}
+        {onDelete && (
+          <button
+            className="nm-object-chrome-btn nm-object-chrome-btn-danger"
+            title="Delete drop-in"
+            aria-label="Delete drop-in"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
             </svg>
           </button>
         )}
@@ -556,9 +603,11 @@ export default function CanvasObjectLayer({
                 new Notice("Snapshot failed — drop-in not found in DOM", 5000);
                 return;
               }
-              snapshotElementToCanvas(el, obj, plugin, section, (newObj) => {
-                onObjectsChange([...objects, newObj]);
-              });
+              snapshotElementToCanvas(
+                el, obj, plugin, section,
+                (newObj) => { onObjectsChange([...objects, newObj]); },
+                (newId) => { onSelectObject(newId); },
+              );
             }}
             downloadLabel={
               obj.type === "textbox" ? "Copy rich text" :
@@ -595,6 +644,25 @@ export default function CanvasObjectLayer({
                 return;
               }
               void downloadDropinAsPng(el, name);
+            }}
+            onDuplicate={() => {
+              // v1.6.13: visible-chrome duplicate. Same semantics as the
+              // right-click Duplicate entry — new id, offset 24/24 — but
+              // reachable from the drop-in header without a right-click.
+              const dup: CanvasObject = {
+                ...obj,
+                id: crypto.randomUUID(),
+                x: obj.x + 24,
+                y: obj.y + 24,
+              };
+              onObjectsChange([...objects, dup]);
+              onSelectObject(dup.id);
+              new Notice("Drop-in duplicated", 2000);
+            }}
+            onDelete={() => {
+              if (!window.confirm(`Delete "${defaultObjectName(obj)}"?`)) return;
+              onObjectsChange(objects.filter((o) => o.id !== obj.id));
+              if (selectedObjectId === obj.id) onSelectObject(null);
             }}
           />
 

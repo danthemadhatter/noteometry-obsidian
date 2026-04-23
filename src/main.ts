@@ -2,11 +2,13 @@ import { Plugin, WorkspaceLeaf } from "obsidian";
 import { NoteometryView, VIEW_TYPE } from "./NoteometryView";
 import { NoteometrySettingTab } from "./settings";
 import { NoteometrySettings, DEFAULT_SETTINGS } from "./types";
+import { logVersionBanner } from "./lib/version";
 
 export default class NoteometryPlugin extends Plugin {
   settings: NoteometrySettings = { ...DEFAULT_SETTINGS };
 
   async onload() {
+    logVersionBanner();
     await this.loadSettings();
     this.addSettingTab(new NoteometrySettingTab(this.app, this));
 

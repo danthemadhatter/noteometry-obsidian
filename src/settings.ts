@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type NoteometryPlugin from "./main";
+import { NOTEOMETRY_VERSION } from "./lib/version";
 
 export class NoteometrySettingTab extends PluginSettingTab {
   plugin: NoteometryPlugin;
@@ -13,6 +14,19 @@ export class NoteometrySettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Noteometry" });
+
+    /* ── About / version badge ────────────────────────────
+     * v1.6.13: surface the running build so the user can confirm
+     * Obsidian didn't restore a stale cached main.js after an
+     * install from GitHub Releases. Previously only findable by
+     * digging into manifest.json inside the plugin folder. */
+    const aboutEl = containerEl.createDiv({ cls: "nm-about-row" });
+    aboutEl.createSpan({ text: "Version " });
+    aboutEl.createEl("strong", { text: NOTEOMETRY_VERSION });
+    aboutEl.createSpan({
+      text: " — if this doesn't match the release you installed, restart Obsidian (⌘Q) to clear cached plugin code.",
+      cls: "nm-about-note",
+    });
 
     /* ── AI Provider ──────────────────────────────────── */
     new Setting(containerEl)
