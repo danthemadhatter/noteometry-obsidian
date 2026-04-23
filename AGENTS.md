@@ -95,9 +95,10 @@ npm run build
 
 ## Versioning & releases
 
-- Bump `version` in `manifest.json` (SemVer) and update `versions.json` to map plugin version → minimum app version.
-- Create a GitHub release whose tag exactly matches `manifest.json`'s `version`. Do not use a leading `v`.
-- Attach `manifest.json`, `main.js`, and `styles.css` (if present) to the release as individual assets.
+- Bump `version` in `manifest.json` *and* `package.json` (SemVer) and update `versions.json` to map plugin version → minimum app version. `scripts/ship.sh` does all three in one step; `package-lock.json` is refreshed by the next `npm install` or `npm ci`.
+- Create a GitHub release whose tag matches the version number. **This repo uses the `v` prefix** (e.g. `v1.6.9`) — the `.github/workflows/main.yml` release workflow fires on any pushed tag and uses `github.ref_name` directly for the release name and tag, so BRAT users must see a release with exactly `v1.6.9` published for `manifest.json` version `1.6.9` to pull through. (Obsidian's own sample plugin guideline uses a bare number; this project diverged for compatibility with the existing release history — do not change the convention without migrating every prior tag.)
+- Attach `manifest.json`, `main.js`, and `styles.css` to the release as individual top-level assets. The workflow enforces this via `fail_on_unmatched_files: true`.
+- See [RELEASE.md](./RELEASE.md) for the full ship checklist.
 - After the initial release, follow the process to add/update your plugin in the community catalog as required.
 
 ## Security, privacy, and compliance

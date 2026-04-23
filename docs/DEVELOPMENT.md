@@ -1,5 +1,7 @@
 # Noteometry Development Guide
 
+> Current as of **v1.6.9**. See [RELEASE.md](../RELEASE.md) for the ship checklist.
+
 ## Setup
 
 ```bash
@@ -83,15 +85,29 @@ npm test              # Run all tests
 npx vitest --watch    # Watch mode
 ```
 
-Current test coverage:
+Current test coverage (see `tests/unit/` for the authoritative list):
 - `canvasObjects.test.ts` — factory functions, ID uniqueness
+- `circuitSniperSnap.test.ts` — proximity pin lookup, angled snap
+- `clearCanvasAction.test.ts` — Clear Canvas factory label / danger flag / onClick wiring
+- `clipboardPayload.test.ts` — copy-to-Word clipboard payload (protected pipeline regression guardrail)
+- `contextMenuInsert.test.ts` — every hub insert factory + quarantined AI drop-in
+- `contextMenuLayout.test.ts` — Clear Canvas sits in the first rows of the hub, behind its own separator
 - `inkEngine.test.ts` — hit-testing, smoothing, polygon intersection
+- `lassoSelection.test.ts` — selection helpers (screen↔world, polygon + bbox selection, pure delete/move semantics, empty-selection predicate)
+- `mathPaletteStamp.test.ts` — `shouldArmStamp()` routing for 20+ symbols across tabs
+- `mathV12Preset.test.ts` — Math v12 DLP prompt preset (protected)
+- `mathml.test.ts` — MathML rendering (protected pipeline)
+- `objectDragHitTest.test.ts` — direct-drag hit test: drag starts on body, passes through on form controls / contenteditable / canvas / role="button"
+- `persistenceV3.test.ts` — v3 pack/unpack round-trips
 - `tableStore.test.ts` — get/set/load/getAll round-trips
 
 To add tests for a new module:
 1. Create `tests/unit/<module>.test.ts`
-2. Import from `../../src/lib/<module>`
+2. Import from the module under test (`../../src/lib/<module>`, `../../src/features/...`, etc.)
 3. Run `npm test`
+
+### Do not break
+- `mathV12Preset.test.ts`, `mathml.test.ts`, and `clipboardPayload.test.ts` cover Math v12 / MathML / copy-to-Word. These are protected pipelines — changes require explicit review, not a drive-by refactor.
 
 ## Build Configuration
 

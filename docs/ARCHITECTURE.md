@@ -1,8 +1,10 @@
 # Noteometry Architecture
 
+> Current as of **v1.6.9**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes the current shape of the codebase.
+
 ## Overview
 
-Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, eraser, lasso OCR, shape tools, and AI-powered math/circuit solving. It renders as a full-screen React app inside an Obsidian ItemView.
+Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, eraser, lasso OCR, shape tools, drop-in engineering tools, and AI-powered math/circuit solving. It renders as a full-screen React app inside an Obsidian ItemView.
 
 ## Tech Stack
 
@@ -10,51 +12,79 @@ Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, era
 - **UI:** React 18 with functional components and hooks
 - **Build:** esbuild (bundles to single `main.js`)
 - **Types:** TypeScript (strict, skipLibCheck)
-- **Math:** KaTeX 0.16 for LaTeX rendering and MathML output
+- **Math:** KaTeX 0.16 for LaTeX rendering and MathML output (Math v12 DLP prompt, MathML generation, copy-to-Word clipboard pipeline — protected, do not modify)
 - **AI:** Perplexity (default, `openai/gpt-5.4`), Claude (`claude-opus-4-6`) via Obsidian's `requestUrl`, and LM Studio (local) as alternatives
 - **Icons:** Custom inline SVGs (no external icon library in the bundle)
-- **Tests:** Vitest
+- **Tests:** Vitest (jsdom environment for DOM-touching suites)
 
 ## Directory Structure
 
 ```
 noteometry-obsidian/
   src/
-    main.ts                  # Plugin entry point (Obsidian lifecycle)
-    NoteometryView.ts        # Obsidian ItemView → React bridge
-    types.ts                 # Shared types and default settings
-    settings.ts              # Obsidian settings tab UI
+    main.ts                    # Plugin entry point (Obsidian lifecycle)
+    NoteometryView.ts          # Obsidian ItemView → React bridge
+    types.ts                   # Shared types and default settings
+    settings.ts                # Obsidian settings tab UI
     lib/
-      ai.ts                  # AI backend (Claude + LM Studio)
-      persistence.ts         # Save/load pages as .md files in vault
-      inkEngine.ts           # Stroke data model, smoothing, hit-testing
-      canvasRenderer.ts      # Canvas 2D drawing (grid, strokes, stamps)
-      canvasObjects.ts       # Canvas object types (textbox, table, image)
-      tableStore.ts          # In-memory store for table/textbox data
+      ai.ts                    # AI backend (Claude / Perplexity / LM Studio)
+      persistence.ts           # Save/load pages as .md files in vault
+      pageFormat.ts            # v3 serialization (single elements[] array)
+      inkEngine.ts             # Stroke data model, smoothing, hit-testing
+      canvasRenderer.ts        # Canvas 2D drawing (grid, strokes, stamps)
+      canvasObjects.ts         # Canvas object types and factories
+      canvasMenuActions.ts     # Right-click hub action factories (incl. buildClearCanvasAction)
+      objectDragHitTest.ts     # Direct-drag hit test — which targets pass through to inner controls
+      mathml.ts                # MathML rendering (protected pipeline)
+      tableStore.ts            # In-memory store for table/textbox data
+      SignalBus.ts             # Pub/sub singleton linking math drop-ins
+    features/
+      ink/                     # Pure ink helpers (no DOM)
+      lasso/                   # selection.ts — pure delete/move/predicates on strokes/stamps/objects
+      objects/                 # Drop-in object helpers
+      pages/                   # Page-level state helpers
+      pipeline/                # Rasterize / composite / clipboard pipeline (protected)
     components/
-      NoteometryApp.tsx      # Root component — all state management
-      InkCanvas.tsx          # HTML5 Canvas drawing surface
-      CanvasToolbar.tsx      # Floating bottom toolbar
-      CanvasObjectLayer.tsx  # DOM overlay for text boxes, tables, images
-      RichTextEditor.tsx     # contentEditable text box editor
-      TableEditor.tsx        # Table grid with input cells
-      LassoOverlay.tsx       # Freeform lasso selection overlay
-      KaTeXRenderer.tsx      # LaTeX → rendered math (HTML output)
-      Panel.tsx              # Right panel: Preview + Input + MathPalette
-      ChatPanel.tsx          # AI chat with MathML rendering
-      Sidebar.tsx            # Section/page navigation (OneNote-style)
-      MathPalette.tsx        # Tabbed math symbol palette (13 tabs)
-      Icons.tsx              # All SVG icons as React components
+      NoteometryApp.tsx        # Root component — all state management
+      InkCanvas.tsx            # HTML5 Canvas drawing surface
+      ContextMenu.tsx          # Right-click context-menu hub (mouse / two-finger / Pencil long-press)
+      CanvasObjectLayer.tsx    # DOM overlay for drop-ins
+      RichTextEditor.tsx       # contentEditable text box editor
+      TableEditor.tsx          # Table grid with input cells
+      LassoOverlay.tsx         # Freehand + rectangle lasso with stacked regions
+      KaTeXRenderer.tsx        # LaTeX → rendered math (HTML output)
+      Panel.tsx                # Right panel: Preview + Input + MathPalette
+      ChatPanel.tsx            # AI chat with MathML rendering
+      Sidebar.tsx              # Section/page navigation
+      MathPalette.tsx          # Tabbed math symbol palette (incl. shouldArmStamp routing)
+      PdfViewer.tsx            # PDF drop-in viewer
+      Icons.tsx                # All SVG icons as React components
+      dropins/                 # Per-drop-in React components (Calculator, GraphPlotter, CircuitSniper, UnitConverter, Oscilloscope, UnitCircle, Multimeter, StudyGantt, AnimationCanvas, AIDropin (quarantined), …)
   tests/
     unit/
       canvasObjects.test.ts
+      circuitSniperSnap.test.ts
+      clearCanvasAction.test.ts
+      clipboardPayload.test.ts
+      contextMenuInsert.test.ts
+      contextMenuLayout.test.ts
       inkEngine.test.ts
+      lassoSelection.test.ts
+      mathPaletteStamp.test.ts
+      mathV12Preset.test.ts
+      mathml.test.ts
+      objectDragHitTest.test.ts
+      persistenceV3.test.ts
       tableStore.test.ts
-  docs/                      # This documentation
-  styles.css                 # All CSS (KaTeX + Noteometry)
-  esbuild.config.mjs         # Build config (auto-deploys to vault)
-  manifest.json              # Obsidian plugin manifest
-  deploy.sh                  # Manual deploy script (backup)
+  docs/                        # This documentation
+  styles.css                   # All CSS (KaTeX + Noteometry)
+  esbuild.config.mjs           # Build config
+  manifest.json                # Obsidian plugin manifest
+  versions.json                # plugin version → minAppVersion map
+  scripts/
+    ship.sh                    # Patch-bump + build + commit + tag + push helper
+  deploy.sh                    # Manual deploy script (backup)
+  RELEASE.md                   # Single source of truth for the ship checklist
 ```
 
 ## Data Flow
@@ -79,7 +109,7 @@ User Input
     │         ├── OCR → AI vision → Input/Chat
     │         └── Move → drag delta → translate selected strokes/stamps
     │
-    └── Chat → send text + attachments → Claude/LM Studio → MathML response
+    └── Chat → send text + attachments → Claude / Perplexity / LM Studio → MathML response
     
 State (all in NoteometryApp)
     │
