@@ -1770,46 +1770,80 @@
   cursor: text;
 }
 
-/* v1.6.12: icon-only chrome row at the right of each drop-in title bar.
- *  Replaces the previous "📷 emoji" button with a consistent SVG icon pair
- *  (snapshot + download). Buttons are small, quiet, and show their intent
- *  on hover — matching OneNote / MyScript object chrome. */
+/* v1.6.13: icon chrome row at the right of each drop-in title bar.
+ *  v1.6.12 shipped these at 55% opacity with a transparent background and
+ *  Dan literally couldn't see them — "no GUI changes apparent." The icons
+ *  are now always visible at full strength, sit on a subtle faceplate pill
+ *  so they separate from the paper-colored title bar, and grow to 4
+ *  entries: snapshot, download/export, duplicate, delete.
+ *
+ *  Hover bumps the background + color so the affordance stays obvious, and
+ *  the danger variant (delete) tints red on hover for the usual "this is
+ *  destructive" signal. Tap targets are comfortable on touch (28×24).
+ */
 .nm-object-chrome-icons {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  padding-right: 2px;
+  padding: 1px 2px;
+  margin-right: 2px;
+  border-radius: 6px;
+  background: var(--nm-faceplate-recessed, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--nm-paper-border, #E0E0E0);
 }
 .nm-object-chrome-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 20px;
+  width: 24px;
+  height: 22px;
   padding: 0;
   margin: 0;
   background: none;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: var(--nm-ink-muted, #6B7280);
+  color: var(--nm-paper-ink, #2a2a35);
   cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  opacity: 1;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
   -webkit-tap-highlight-color: transparent;
 }
 .nm-object-chrome-btn:hover {
-  opacity: 1;
   color: var(--nm-accent, #4A90D9);
-  background: var(--nm-accent-light, rgba(74, 144, 217, 0.08));
-  border-color: var(--nm-paper-border, #E0E0E0);
+  background: var(--nm-accent-light, rgba(74, 144, 217, 0.14));
+  border-color: var(--nm-accent, #4A90D9);
 }
 .nm-object-chrome-btn:active {
-  opacity: 1;
-  background: var(--nm-accent-light, rgba(74, 144, 217, 0.16));
+  background: var(--nm-accent-light, rgba(74, 144, 217, 0.28));
+}
+.nm-object-chrome-btn-danger:hover {
+  color: var(--nm-danger, #c8382c);
+  background: rgba(200, 56, 44, 0.14);
+  border-color: var(--nm-danger, #c8382c);
 }
 @media (pointer: coarse) {
-  .nm-object-chrome-btn { opacity: 0.8; width: 28px; height: 24px; }
+  .nm-object-chrome-btn { width: 30px; height: 26px; }
+}
+
+/* v1.6.13: Settings → About row. Visible version badge so Dan can
+ * confirm a fresh build actually loaded after installing from GitHub
+ * Releases (Obsidian caches plugin JS aggressively). */
+.nm-about-row {
+  padding: 8px 12px;
+  margin: 4px 0 12px;
+  border-left: 3px solid var(--nm-accent, #4A90D9);
+  background: var(--nm-faceplate-recessed, rgba(74, 144, 217, 0.08));
+  border-radius: 4px;
+  font-size: 12px;
+}
+.nm-about-row strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--nm-accent, #4A90D9);
+}
+.nm-about-note {
+  color: var(--nm-ink-muted, #6B7280);
+  font-size: 11px;
 }
 
 /* ── Signal Bus link button ───────────────────────────── */
