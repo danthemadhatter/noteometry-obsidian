@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { App, Notice } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
@@ -10,13 +10,15 @@ import {
   createAnimationCanvas, createStudyGantt,
   createMultimeter,
 } from "../lib/canvasObjects";
-import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
+import {
+  saveImageBytesTo, savePdfBytesTo, rootDir,
+  CanvasData,
+} from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 // CanvasToolbar removed — all tools now live in the right-click context menu
 import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
-import Sidebar from "./Sidebar";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
@@ -32,7 +34,6 @@ import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
 import { usePipeline } from "../features/pipeline/usePipeline";
-import { usePages } from "../features/pages/usePages";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -68,12 +69,34 @@ const STROKE_WIDTHS = [
 interface Props {
   plugin: NoteometryPlugin;
   app: App;
+  /** Bound page file. Null when the view hasn't finished loading yet. */
+  file: TFile | null;
+  /** Decoded CanvasData for the current file (null until loaded). */
+  initialData: CanvasData | null;
+  /** Increments whenever the view binds a new file, so React knows to re-hydrate. */
+  initialDataToken: number;
+  /** Write-callback supplied by the view; persists the current in-memory
+   *  CanvasData to the bound file. */
+  onSaveData: (data: CanvasData) => Promise<void>;
+  /** Callback the view calls on mount so subsequent file-binds can push
+   *  fresh initial data into the React tree without remounting. */
+  registerInitialDataSetter: (
+    setter: (data: CanvasData | null, token: number) => void,
+  ) => void;
 }
 
-/** Called by NoteometryView.onClose to flush pending saves */
+/** Called by NoteometryView.onClose / onUnloadFile to flush pending saves */
 export let flushSave: (() => Promise<void>) | null = null;
 
-export default function NoteometryApp({ plugin, app }: Props) {
+export default function NoteometryApp({
+  plugin,
+  app,
+  file,
+  initialData,
+  initialDataToken,
+  onSaveData,
+  registerInitialDataSetter,
+}: Props) {
   /* ── Ink feature: strokes, stamps, tool, color, width, undo/redo ─── */
   const {
     strokes, stamps, tool, activeColor, strokeWidth,
@@ -279,12 +302,27 @@ export default function NoteometryApp({ plugin, app }: Props) {
    * On wider screens CSS shows both simultaneously. */
   const [mobileRightTab, setMobileRightTab] = useState<"input" | "chat">("input");
 
-  /* ── Persistence coordination ─────────────────────────── */
+  /* ── Persistence coordination (file-bound) ─────────────────
+   *
+   * The bound TFile and its decoded CanvasData are owned by NoteometryView
+   * and pushed in via props. We hydrate the feature hooks whenever the
+   * `initialDataToken` changes (i.e. Obsidian rebinds the leaf to a new
+   * file or the initial file finishes loading). Autosave debounces to
+   * `onSaveData` which the view routes to vault.modify on the bound TFile.
+   */
   const saveTimer = useRef<number>(0);
   const loadingPageRef = useRef(false);
+  const [hydrated, setHydrated] = useState(initialData !== null);
 
-  // Indirection ref: lets flushPendingSave call the latest saveNow without
-  // creating a circular dependency with usePages.
+  // Track the current file + data token via refs so saveNow closes over
+  // the latest values without re-creating on every prop change.
+  const fileRef = useRef<TFile | null>(file);
+  useEffect(() => { fileRef.current = file; }, [file]);
+  const onSaveDataRef = useRef(onSaveData);
+  useEffect(() => { onSaveDataRef.current = onSaveData; }, [onSaveData]);
+
+  // Indirection ref: flushPendingSave calls the latest saveNow without
+  // re-binding autosave on every state update.
   const saveNowRef = useRef<() => Promise<void>>(async () => {});
 
   const flushPendingSave = useCallback(async () => {
@@ -295,7 +333,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     await saveNowRef.current();
   }, []);
 
-  const onPageLoaded = useCallback(async (data: CanvasData) => {
+  const hydrateFromData = useCallback((data: CanvasData) => {
     loadingPageRef.current = true;
     hydratePipeline(data.panelInput ?? "", data.chatMessages ?? []);
     hydrateInk(data.strokes ?? [], data.stamps ?? []);
@@ -304,32 +342,37 @@ export default function NoteometryApp({ plugin, app }: Props) {
     loadAllTextBoxData(data.textBoxData ?? {});
     setScrollX(data.viewport?.scrollX ?? 0);
     setScrollY(data.viewport?.scrollY ?? 0);
-    // Clear loading flag after React processes the state updates
     requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [hydratePipeline, hydrateInk, hydrateObjects]);
 
-  const onEmptyState = useCallback(() => {
-    loadingPageRef.current = true;
-    hydratePipeline("", []);
-    hydrateInk([], []);
-    hydrateObjects([]);
-    setScrollX(0);
-    setScrollY(0);
-    requestAnimationFrame(() => { loadingPageRef.current = false; });
-  }, [hydratePipeline, hydrateInk, hydrateObjects]);
+  // Hydrate on first mount (and when the view pushes a new initial data
+  // token for a newly-bound file).
+  useEffect(() => {
+    if (initialData) {
+      hydrateFromData(initialData);
+      setHydrated(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDataToken]);
 
-  /* ── Pages feature: section/page state + load lifecycle ── */
-  const {
-    currentSection, currentPage, ready,
-    sectionRef, pageRef,
-    selectPage: handleSelect,
-  } = usePages({ plugin, onPageLoaded, onEmptyState, flushPendingSave });
+  // Expose a setter so NoteometryView can push new initial data into this
+  // tree when Obsidian rebinds the leaf to a different file. We flush
+  // any pending save for the OLD file first, then hydrate fresh state.
+  useEffect(() => {
+    registerInitialDataSetter((data: CanvasData | null, _token: number) => {
+      (async () => {
+        await flushPendingSave();
+        if (data) {
+          hydrateFromData(data);
+          setHydrated(true);
+        }
+      })();
+    });
+  }, [registerInitialDataSetter, flushPendingSave, hydrateFromData]);
 
   const saveNow = useCallback(async () => {
-    const sec = sectionRef.current;
-    const pg = pageRef.current;
-    if (!sec || !pg) return;
-
+    const f = fileRef.current;
+    if (!f) return;
     const data: CanvasData = {
       version: 2,
       strokes,
@@ -342,35 +385,38 @@ export default function NoteometryApp({ plugin, app }: Props) {
       textBoxData: getAllTextBoxData(),
       lastSaved: new Date().toISOString(),
     };
-    await savePage(plugin, sec, pg, data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, sectionRef, pageRef]);
+    await onSaveDataRef.current(data);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages]);
 
-  // Keep the indirection ref up to date so flushPendingSave sees the latest saveNow.
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
   const doSave = useCallback(() => {
     if (!plugin.settings.autoSave) return;
-    if (!sectionRef.current || !pageRef.current) return;
+    if (!fileRef.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(async () => {
       await saveNow();
     }, plugin.settings.autoSaveDelay);
-  }, [saveNow, plugin, sectionRef, pageRef]);
+  }, [saveNow, plugin]);
 
   useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
-  // Trigger auto-save when table/textbox store changes
   useEffect(() => {
     setOnChangeCallback(() => doSave());
     return () => setOnChangeCallback(null);
   }, [doSave]);
 
-  // Expose save for view close
   useEffect(() => {
     flushSave = saveNow;
     return () => { flushSave = null; };
   }, [saveNow]);
+
+  /** Parent folder path of the bound file, used to scope attachment writes
+   *  (and handed to CanvasObjectLayer for snapshot-to-canvas image saves). */
+  const parentFolderPath = file?.parent?.path ?? rootDir(plugin);
+  const ready = hydrated;
+  const currentPage = file?.basename ?? "";
 
   /* ── Lasso complete → rasterize + push to stack ── */
   const handleLassoComplete = useCallback(async (bounds: LassoBounds) => {
@@ -580,18 +626,18 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const handleInsertMultimeter = useCallback(() => insertDropin(createMultimeter, "Multimeter"), [insertDropin]);
 
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const picked = e.target.files?.[0];
+    if (!picked) return;
     e.target.value = "";
     try {
-      const bytes = await file.arrayBuffer();
+      const bytes = await picked.arrayBuffer();
       const obj = createPdfObject(scrollX + 80, scrollY + 80, "");
-      const sec = sectionRef.current;
-      if (!sec) {
-        new Notice("Can't insert PDF — no active section. Create or open a page first.", 6000);
+      const f = fileRef.current;
+      if (!f) {
+        new Notice("Can't insert PDF — no Noteometry page is open.", 6000);
         return;
       }
-      const vaultPath = await savePdfToVault(plugin, sec, obj.id, bytes);
+      const vaultPath = await savePdfBytesTo(app, f.parent?.path ?? rootDir(plugin), obj.id, bytes);
       obj.fileRef = vaultPath;
       setCanvasObjects((prev) => [...prev, obj]);
       setTool("select");
@@ -600,7 +646,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       console.error("[Noteometry] PDF insert failed:", err);
       new Notice("PDF insert failed — see console", 8000);
     }
-  }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
+  }, [scrollX, scrollY, plugin, app, setCanvasObjects, setSelectedObjectId]);
 
   /* ── Right-click context menu ──────────────────────────
    * This is now the PRIMARY tool interface — the toolbar has been removed
@@ -878,8 +924,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const picked = e.target.files?.[0];
+    if (!picked) return;
     e.target.value = "";
 
     try {
@@ -896,8 +942,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
         }
         const img = new window.Image();
         img.onerror = () => {
-          console.error("[Noteometry] image decode failed for", file.name);
-          new Notice(`Can't decode image "${file.name}" — unsupported format?`, 8000);
+          console.error("[Noteometry] image decode failed for", picked.name);
+          new Notice(`Can't decode image "${picked.name}" — unsupported format?`, 8000);
         };
         img.onload = async () => {
           try {
@@ -909,12 +955,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
               img.width * scale,
               img.height * scale
             );
-            // Save to vault if we have a section; otherwise the dataURL
-            // stays in memory (still renders, won't sync across devices).
-            const sec = sectionRef.current;
-            if (sec) {
+            // Save to the bound page's attachments folder if we can; otherwise
+            // the dataURL stays in memory (still renders, won't sync).
+            const f = fileRef.current;
+            if (f) {
               try {
-                const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                const vaultPath = await saveImageBytesTo(app, f.parent?.path ?? rootDir(plugin), obj.id, dataURL);
                 obj.dataURL = vaultPath;
               } catch (err) {
                 console.error("[Noteometry] image vault save failed:", err);
@@ -933,12 +979,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
         };
         img.src = dataURL;
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(picked);
     } catch (err) {
       console.error("[Noteometry] image insert outer error:", err);
       new Notice("Couldn't insert Image — see console", 8000);
     }
-  }, [scrollX, scrollY, plugin, setCanvasObjects, setSelectedObjectId]);
+  }, [scrollX, scrollY, plugin, app, setCanvasObjects, setSelectedObjectId]);
 
   // v1.6.11: paste routing.
   //
@@ -982,10 +1028,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
               const dataURL = ev.target?.result as string;
               if (!dataURL) return;
               const obj = createImageObject(scrollX + 150, scrollY + 150, dataURL);
-              const sec = sectionRef.current;
-              if (sec) {
+              const f = fileRef.current;
+              if (f) {
                 try {
-                  const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                  const vaultPath = await saveImageBytesTo(app, f.parent?.path ?? rootDir(plugin), obj.id, dataURL);
                   obj.dataURL = vaultPath;
                 } catch (err) {
                   console.error("[Noteometry] paste image vault save failed:", err);
@@ -1021,7 +1067,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
     };
     document.addEventListener("paste", handler);
     return () => document.removeEventListener("paste", handler);
-  }, [scrollX, scrollY, plugin, pushUndo, setCanvasObjects, setSelectedObjectId]);
+  }, [scrollX, scrollY, plugin, app, pushUndo, setCanvasObjects, setSelectedObjectId]);
 
   /* ── Viewport change ─────────────────────────────────── */
   const handleViewportChange = useCallback((newX: number, newY: number) => {
@@ -1156,16 +1202,8 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }
 
   return (
-    <div ref={containerRef} className="noteometry-container">
-      {/* ── Sidebar ── */}
-      <Sidebar
-        plugin={plugin}
-        currentSection={currentSection}
-        currentPage={currentPage}
-        onSelect={handleSelect}
-      />
-
-      {/* ── Main area ── */}
+    <div ref={containerRef} className="noteometry-container noteometry-container-native-explorer">
+      {/* ── Main area ── (Obsidian's file explorer is the page navigator) */}
       <div className="noteometry-main">
         <div className="noteometry-split">
           {/* ── Canvas area ── */}
@@ -1258,7 +1296,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 selectedObjectId={selectedObjectId}
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
-                section={currentSection}
+                parentFolder={parentFolderPath}
               />
 
               {/* Lasso overlay — operates within the viewport */}

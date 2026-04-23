@@ -7,7 +7,7 @@ import { sanitizeDownloadName, htmlToPlainText, buildRichTextClipboardBlobs } fr
 import { getTextBoxData } from "../lib/tableStore";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
-import { loadImageFromVault, saveImageToVault } from "../lib/persistence";
+import { loadImageFromVault, saveImageBytesTo } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
@@ -94,7 +94,7 @@ async function snapshotElementToCanvas(
   el: HTMLElement,
   source: CanvasObject,
   plugin: NoteometryPlugin | undefined,
-  section: string | undefined,
+  parentFolder: string | undefined,
   addObject: (obj: CanvasObject) => void,
   onSelect?: (id: string) => void,
 ): Promise<void> {
@@ -123,11 +123,11 @@ async function snapshotElementToCanvas(
       targetH,
       `${source.name ?? "Snapshot"} · snapshot`,
     );
-    // Persist to the vault if the plugin + section are available so
-    // the image survives reloads and syncs across devices.
-    if (plugin && section) {
+    // Persist to the vault if we have a plugin + parent folder so the
+    // image survives reloads and syncs across devices.
+    if (plugin && parentFolder) {
       try {
-        const vaultPath = await saveImageToVault(plugin, section, newObj.id, dataURL);
+        const vaultPath = await saveImageBytesTo(plugin.app, parentFolder, newObj.id, dataURL);
         newObj.dataURL = vaultPath;
       } catch (err) {
         console.error("[Noteometry] snapshot vault save failed:", err);
@@ -353,10 +353,10 @@ interface Props {
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
   plugin?: NoteometryPlugin;
-  /** Current section name — passed through so snapshot-to-canvas can
-   *  persist the rasterized image via saveImageToVault. When absent
-   *  the snapshot still renders but won't sync to the vault. */
-  section?: string;
+  /** Vault-relative parent folder path of the bound page file. Used to
+   *  route snapshot-to-canvas image writes into "<parent>/attachments".
+   *  When absent the snapshot still renders but won't sync to the vault. */
+  parentFolder?: string;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -439,7 +439,7 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
   zoom = 1,
-  tool, selectedObjectId, onSelectObject, plugin, section,
+  tool, selectedObjectId, onSelectObject, plugin, parentFolder,
 }: Props) {
   // Mirror zoom into a ref so the drag/resize handlers (which close over
   // stale values) always read the latest scale.
@@ -604,7 +604,7 @@ export default function CanvasObjectLayer({
                 return;
               }
               snapshotElementToCanvas(
-                el, obj, plugin, section,
+                el, obj, plugin, parentFolder,
                 (newObj) => { onObjectsChange([...objects, newObj]); },
                 (newId) => { onSelectObject(newId); },
               );

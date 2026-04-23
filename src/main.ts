@@ -1,8 +1,13 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import { NoteometryView, VIEW_TYPE } from "./NoteometryView";
 import { NoteometrySettingTab } from "./settings";
 import { NoteometrySettings, DEFAULT_SETTINGS } from "./types";
 import { logVersionBanner } from "./lib/version";
+import {
+  createNewPageFile,
+  convertLegacyMdPagesToNmpage,
+  rootDir,
+} from "./lib/persistence";
 
 export default class NoteometryPlugin extends Plugin {
   settings: NoteometrySettings = { ...DEFAULT_SETTINGS };
@@ -17,69 +22,55 @@ export default class NoteometryPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new NoteometryView(leaf, this)
     );
 
-    this.addRibbonIcon("pencil", "Open Noteometry", () => this.activateView());
+    // Tier 3 native-explorer: Obsidian's file explorer is the page
+    // navigator. Clicking a .nmpage file opens NoteometryView for that
+    // file; each page is its own tab.
+    this.registerExtensions(["nmpage"], VIEW_TYPE);
 
     this.addCommand({
-      id: "open-noteometry",
-      name: "Open Noteometry canvas",
-      callback: () => this.activateView(),
+      id: "noteometry-new-page",
+      name: "Noteometry: New page",
+      callback: () => this.createAndOpenNewPage(),
     });
 
-    // On layout ready, auto-open Noteometry and kill empty tabs
-    this.app.workspace.onLayoutReady(() => {
-      // Delay to let Obsidian finish restoring workspace
-      setTimeout(() => this.ensureNoteometryOnly(), 300);
+    this.addCommand({
+      id: "noteometry-convert-legacy-md",
+      name: "Noteometry: Convert legacy .md pages to .nmpage",
+      callback: () => this.runConvertLegacyCommand(),
     });
   }
 
-  async activateView() {
-    const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
-    if (!leaf) {
-      // Find an empty leaf to replace, or create a new one
-      let emptyLeaf: WorkspaceLeaf | null = null;
-      workspace.iterateAllLeaves((l: WorkspaceLeaf) => {
-        if (!emptyLeaf && l.view.getViewType() === "empty") {
-          emptyLeaf = l;
-        }
-      });
-      const target = emptyLeaf ?? workspace.getLeaf(false);
-      if (!target) return;
-      await target.setViewState({ type: VIEW_TYPE, active: true });
-      leaf = target;
+  /** Figure out the best parent folder for a new page: the folder of the
+   *  active file if it's inside the Noteometry tree, else vaultFolder. */
+  private resolveNewPageParentFolder(): string {
+    const active = this.app.workspace.getActiveFile();
+    if (active && active.parent instanceof TFolder) {
+      return active.parent.path;
     }
-    workspace.revealLeaf(leaf);
-    // Kill leftover empties after a tick
-    setTimeout(() => this.ensureNoteometryOnly(), 100);
+    return rootDir(this);
   }
 
-  /** Make sure Noteometry is the only thing in the main area */
-  private async ensureNoteometryOnly() {
-    const { workspace } = this.app;
-    const existing = workspace.getLeavesOfType(VIEW_TYPE);
+  private async createAndOpenNewPage(): Promise<void> {
+    const parent = this.resolveNewPageParentFolder();
+    const file = await createNewPageFile(this.app, parent);
+    if (!file) return;
+    // Open in a new leaf so the user keeps whatever they had open.
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.openFile(file);
+  }
 
-    if (existing.length === 0) {
-      // No Noteometry leaf — find an empty one and convert it
-      let emptyLeaf: WorkspaceLeaf | null = null;
-      workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
-        if (!emptyLeaf && leaf.view.getViewType() === "empty") {
-          emptyLeaf = leaf;
-        }
-      });
-      if (emptyLeaf) {
-        await (emptyLeaf as WorkspaceLeaf).setViewState({ type: VIEW_TYPE, active: true });
-      }
+  private async runConvertLegacyCommand(): Promise<void> {
+    const root = rootDir(this);
+    const adapter = this.app.vault.adapter;
+    if (!(await adapter.exists(root))) {
+      new Notice(`Noteometry: folder "${root}" doesn't exist — nothing to convert.`, 6000);
+      return;
     }
-
-    // Now kill ALL remaining empty leaves
-    const empties: WorkspaceLeaf[] = [];
-    workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
-      if (leaf.view.getViewType() === "empty") {
-        empties.push(leaf);
-      }
-    });
-    for (const leaf of empties) {
-      leaf.detach();
+    const count = await convertLegacyMdPagesToNmpage(this.app, root);
+    if (count === 0) {
+      new Notice("Noteometry: no legacy .md pages found.", 5000);
+    } else {
+      new Notice(`Noteometry: converted ${count} .md page${count === 1 ? "" : "s"} to .nmpage.`, 6000);
     }
   }
 
