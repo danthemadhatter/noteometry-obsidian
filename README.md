@@ -1,8 +1,8 @@
-# Noteometry v1.6.5
+# Noteometry v1.6.9
 
 **EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students.**
 
-An Obsidian plugin that turns your vault into an infinite canvas notebook with handwriting, AI-powered math solving, and 14 interactive engineering drop-ins. Built for iPad Pro + Apple Pencil, works on desktop too.
+An Obsidian plugin that turns your vault into an infinite canvas notebook with handwriting, AI-powered math solving, and interactive engineering drop-ins. Built for iPad Pro + Apple Pencil, works on desktop too.
 
 ---
 
@@ -30,9 +30,9 @@ An Obsidian plugin that turns your vault into an infinite canvas notebook with h
 
 ---
 
-## Drop-ins (14 types)
+## Drop-ins
 
-Right-click anywhere on the canvas to insert any drop-in. All drop-ins are draggable, resizable, and persist with the page.
+Right-click anywhere on the canvas to insert any drop-in. All drop-ins are draggable (direct tap-drag on the object body) and resizable, and persist with the page.
 
 ### Core
 | Drop-in | Description |
@@ -40,33 +40,35 @@ Right-click anywhere on the canvas to insert any drop-in. All drop-ins are dragg
 | **Text Box** | Rich text editor (contenteditable), supports bold/italic/underline |
 | **Table** | Grid editor with cell editing, add/remove rows and columns |
 | **Image** | Insert from vault or paste from clipboard, stored as vault files |
-| **PDF Viewer** | Native Chromium renderer (no pdfjs-dist), page navigation, resizes with pane |
+| **PDF Viewer** | Native Chromium renderer, page navigation, resizes with pane |
 
 ### Engineering
 | Drop-in | Description |
 |---------|-------------|
-| **Circuit Sniper** | Full schematic editor — 10 component types (R, C, L, diode, op-amp, NPN, switch, relay, V-source, ground), pin-based wiring with 45-degree snap, 30/45/60-degree rotation, Bill of Materials editor, CircuiTikz LaTeX export |
+| **Circuit Sniper** | Full schematic editor — 10 component types (R, C, L, diode, op-amp, NPN, switch, relay, V-source, ground), pin-based wiring with 45° snap, 30/45/60° rotation, proximity-based pin lookup for reliable angled snap, Bill of Materials editor, CircuiTikz LaTeX export |
 | **Unit Converter** | 6 categories (Resistance, Capacitance, Inductance, Voltage, Current, Frequency), instant SI prefix conversion |
-| **Multimeter** | Simulated DMM with DC/AC voltage, current, resistance, capacitance, continuity, and diode modes. Auto-ranging LCD display |
 
 ### Math Tools (Signal Bus linked)
 | Drop-in | Description |
 |---------|-------------|
-| **Graph Plotter** | Plot up to 6 math functions, canvas rendering with axes/grid, color-coded toggles |
-| **Unit Circle** | Draggable point, snap to common angles, live trig values (sin/cos/tan/cot/sec/csc), quadrant presets |
+| **Graph Plotter** | Plot up to 6 math functions, click-drag pan, wheel/trackpad pinch zoom |
+| **Unit Circle** | Draggable point, snap to common angles, live trig values (sin/cos/tan/cot/sec/csc) |
 | **Oscilloscope** | Dual-channel, 7 waveform types, green-on-black phosphor display, auto measurements (freq, Vpp, Vrms) |
-| **Compute** | Expression evaluator with named variable cells, $RESULT display |
-| **Animation Canvas** | Frame-based animation with play/pause, drawing, frame navigation |
+| **Calculator** | Expression evaluator with named variable cells, $RESULT display. (Persisted under the legacy `compute` kind for backward compatibility.) |
 
-### Study
+### Experimental (hidden by default)
+Available when **Settings → Show experimental tools** is enabled. Pages that already contain these drop-ins still render normally.
+
 | Drop-in | Description |
 |---------|-------------|
+| **Multimeter** | Simulated DMM with DC/AC voltage, current, resistance, capacitance, continuity, and diode modes |
+| **Animation Canvas** | Frame-based animation with play/pause, drawing, frame navigation |
 | **Study Gantt** | Timeline planner with tasks, color coding, date ranges, progress bars |
 
-### AI
-| Drop-in | Description |
-|---------|-------------|
-| **AI Drop-in** | Canvas-positioned Solve/Chat toggle with input and preview |
+### Quarantined
+| Drop-in | Status |
+|---------|--------|
+| **AI Drop-in** | Deprecated in v1.6.6. The real AI flow lives in the right panel (Input / Chat / Solve). Legacy pages still load the stub. |
 
 ---
 
@@ -78,18 +80,21 @@ The math drop-ins (Graph Plotter, Unit Circle, Oscilloscope) are linked via a pu
 
 ## Canvas Tools
 
-All tools are accessed via **right-click context menu**:
+Tools are accessed via **right-click (mouse), two-finger tap (touch), or Apple Pencil long-press (550 ms)** — all open the context-menu hub at the press location.
 
-- **Drawing**: Pen, Eraser, Color cycling, Width cycling
-- **Select**: Pointer tool, Freehand Lasso, Rectangle Lasso
+- **Drawing**: Pen, Eraser, Color cycling, Width cycling. Default tool on first open is **Pen**, so the Pencil or mouse can draw immediately on a fresh canvas.
+- **Select**: Pointer tool, Freehand Lasso, Rectangle Lasso. Lasso Clear deletes strokes / stamps / objects inside the regions; Lasso Move drags the captured selection.
 - **Insert**: Text Box, Table, Image, PDF
-- **Engineering**: Circuit Sniper, Unit Converter, Multimeter
-- **Math Tools**: Math Palette (floating), Graph Plotter, Unit Circle, Oscilloscope, Compute, Animation Canvas
-- **Study**: Study Gantt
-- **AI**: AI Drop-in
-- **Canvas**: Undo, Redo, Zoom In/Out/Reset, Export PNG, Clear Canvas
+- **Engineering**: Circuit Sniper, Unit Converter
+- **Math Tools**: Math Palette (floating), Graph Plotter, Unit Circle, Oscilloscope, Calculator
+- **Experimental (opt-in)**: Multimeter, Animation Canvas, Study Gantt
+- **Canvas**: Undo, Redo, Zoom In/Out/Reset, Export PNG, **Clear Canvas** (pinned near the top of the hub, behind its own separator, so it's reachable on short iPad viewports)
 
 **Floating widgets**: Undo/Redo + Zoom pill (bottom-right), Math Palette (toggleable)
+
+**Direct object drag**: drop-in objects (calculator, graph, unit converter, circuit, etc.) can be moved by tap-dragging the object body from any tool. Clicks on inner controls (inputs, buttons, sliders, contenteditable regions, inner canvases) pass through as normal.
+
+**Note on Apple Pencil**: Pencil double-tap is not exposed to Obsidian plugins by WebKit/Safari. The context-menu hub is opened instead by a 550 ms long-press with an 8 px movement slop — if a stroke was mid-draw when the hold fires, it is cancelled so the menu-open is not also a scribble.
 
 ---
 
@@ -100,7 +105,7 @@ All tools are accessed via **right-click context menu**:
 2. Add this repository: `danthemadhatter/noteometry-obsidian`
 3. BRAT will pull the latest GitHub release automatically
 
-**Note on updates:** BRAT matches the `version` in the repo's `manifest.json` against a published GitHub release with the same tag. If you're stuck on an older version, check that a release with the tag shown in `manifest.json` exists on the [releases page](https://github.com/danthemadhatter/noteometry-obsidian/releases). The release tag must match exactly (this repo uses the `v` prefix, e.g. `v1.6.5`).
+**Note on updates:** BRAT matches the `version` in the repo's `manifest.json` against a published GitHub release with the same tag. If you're stuck on an older version, check that a release with the tag shown in `manifest.json` exists on the [releases page](https://github.com/danthemadhatter/noteometry-obsidian/releases). The release tag must match exactly — this repo uses the `v` prefix (e.g. `v1.6.9`). See [RELEASE.md](./RELEASE.md) for the full ship checklist.
 
 ### Manual
 1. Download `main.js`, `styles.css`, `manifest.json` from the [latest release](https://github.com/danthemadhatter/noteometry-obsidian/releases)
@@ -132,19 +137,20 @@ npm run build
 | LM Studio Vision Model | Model name for READ INK (default: `qwen2-vl-72b`) |
 | Auto-save | Enable/disable + debounce delay (default: 2000ms) |
 | Finger drawing | Draw with a single finger on touch devices (default: off, enable for Android) |
+| Show experimental tools | Re-expose Multimeter, Animation Canvas, and Study Gantt in the right-click hub (default: off) |
 
 ---
 
 ## Architecture
 
 ```
-Noteometry v1.6.5 — System Architecture
+Noteometry v1.6.9 — System Architecture
 
 Layer 1: Obsidian Plugin API (requestUrl, vault, TFile, WorkspaceLeaf)
 Layer 2: Canvas Engine (infinite canvas, zoom, pan, grid, pointer events)
-Layer 3: Serialization (v3 pack/unpack, pageFormat.ts, .noteometry files)
+Layer 3: Serialization (v3 pack/unpack, pageFormat.ts, .md-wrapped JSON)
 Layer 4: Canvas Object Layer (renders all drop-in instances, layout, z-index)
-Layer 5: Drop-in Instances (14 types, each self-contained React component)
+Layer 5: Drop-in Instances (each self-contained React component)
 
 Signal Bus: pub/sub singleton linking math drop-ins (theta, frequency, amplitude)
 AI Pipeline: User Canvas -> Lasso -> Vision Snapshot -> AI Drop-in -> requestUrl -> Claude/Perplexity/LM Studio

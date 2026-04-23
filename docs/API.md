@@ -1,5 +1,7 @@
 # Noteometry API Reference
 
+> Current as of **v1.6.9**. This is a *public surface* summary — not every internal export. When a detail here disagrees with the source, the source wins; open an issue so this doc can be corrected.
+
 ## Core Types (`src/types.ts`)
 
 ```typescript
