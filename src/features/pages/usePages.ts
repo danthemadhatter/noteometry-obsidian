@@ -4,14 +4,13 @@ import {
   loadPage,
   listSections,
   listPages,
-  createSection,
-  createPage,
   migrateLegacy,
   migrateJsonToMd,
   migrateDotAttachments,
   migrateBase64Images,
   CanvasData,
 } from "../../lib/persistence";
+import { createSixteenWeekCourse } from "../../lib/sidebarActions";
 
 /**
  * Pages feature hook. Owns:
@@ -119,12 +118,14 @@ export function usePages({
         const pages = await listPages(plugin, sec);
         pg = pages[0] ?? "";
       } else {
-        // First run: seed a default course with 16 weekly pages.
-        sec = "My Course";
-        pg = "Week 1";
-        await createSection(plugin, sec);
-        for (let i = 1; i <= 16; i++) {
-          await createPage(plugin, sec, `Week ${i}`);
+        // First run: seed a default 16-week course so new installs have
+        // something to draw on. Shares the helper with the sidebar button
+        // and the command-palette entry so all three produce the same
+        // vault layout.
+        const seeded = await createSixteenWeekCourse(plugin, "My Course");
+        if (seeded) {
+          sec = seeded.section;
+          pg = seeded.firstPage;
         }
       }
 

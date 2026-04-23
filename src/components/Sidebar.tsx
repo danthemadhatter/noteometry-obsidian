@@ -13,6 +13,7 @@ import {
   deletePage,
   deleteSection,
 } from "../lib/persistence";
+import { revealSection, createSixteenWeekCourse } from "../lib/sidebarActions";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -106,21 +107,17 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
 
   const handleAddCourse = async () => {
     if (submitting.current) return;
-    const name = newName.trim();
-    if (!name) return;
     submitting.current = true;
     try {
-      await createSection(plugin, name);
-      for (let i = 1; i <= 16; i++) {
-        await createPage(plugin, name, `Week ${i}`);
-      }
+      const result = await createSixteenWeekCourse(plugin, newName);
+      if (!result) return;
       setNewName("");
       setAddingCourse(false);
       await refreshSections();
-      setActiveTab(name);
-      const p = await listPages(plugin, name);
-      setPagesMap((prev) => ({ ...prev, [name]: p }));
-      onSelect(name, "Week 1");
+      setActiveTab(result.section);
+      const p = await listPages(plugin, result.section);
+      setPagesMap((prev) => ({ ...prev, [result.section]: p }));
+      onSelect(result.section, result.firstPage);
     } finally { submitting.current = false; }
   };
 
@@ -337,6 +334,15 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
         <div className="noteometry-sidebar-hdr">
           {toggleBtn}
           <span className="noteometry-sidebar-title">Notebooks</span>
+          {activeTab && (
+            <button
+              className="nm-sidebar-reveal-btn"
+              title={`Reveal "${activeTab}" folder in system explorer (or copy vault path on mobile)`}
+              onClick={(e) => { e.stopPropagation(); revealSection(plugin, activeTab); }}
+            >
+              <IconFolder />
+            </button>
+          )}
         </div>
 
         {/* ── Section tabs (horizontal, scrollable) ── */}
@@ -463,11 +469,25 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
                   setRenamingItem(null);
                   setNewName("APUS");
                 }}
+                title="Create a new course with Week 1–16 pages"
               >
-                <IconBook /> Course
+                <IconBook /> 16-week course
               </button>
             </div>
           )}
+        </div>
+
+        {/* ── Footer: vault path hint ──
+            Shows the user where pages actually live on disk. This is
+            intentionally always visible so it's obvious each page is a
+            real .md file inside the vault — Obsidian file/folder
+            operations (copy, move, sync) all work on it. */}
+        <div className="nm-sidebar-footer" title="Each page is a .md file in this vault folder">
+          <IconFolder />
+          <span className="nm-sidebar-footer-path">
+            {plugin.settings.vaultFolder || "Noteometry"}/
+            {activeTab ? <strong>{activeTab}</strong> : "…"}
+          </span>
         </div>
 
       </div>

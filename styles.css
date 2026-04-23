@@ -226,14 +226,17 @@
   align-items: flex-start;
   padding-top: 6px;
   background: var(--nm-faceplate-alt);
+  /* v1.6.10: smooth pop-out / retract animation so the retract action
+   * reads as an intentional affordance rather than a flicker. */
+  transition: width 0.18s ease;
 }
 
 .noteometry-sidebar-open {
   display: flex;
   flex-direction: column;
   background: var(--nm-faceplate-alt);
-  width: 200px;
-  transition: width 0.15s ease;
+  width: 220px;
+  transition: width 0.18s ease;
 }
 
 .noteometry-sidebar-backdrop {
@@ -512,6 +515,69 @@
 
 .nm-sidebar-action-course {
   color: var(--nm-accent);
+  font-weight: 600;
+}
+
+/* ── v1.6.10: reveal-folder button in sidebar header ──
+ * Minimal classic icon button that opens the section folder in Finder /
+ * Explorer (desktop) or copies the vault path (mobile). Positioned at
+ * the right edge of the header so it's findable without cluttering the
+ * title. */
+.nm-sidebar-reveal-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--nm-ink-muted);
+  border-radius: var(--nm-radius-sm);
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.12s;
+}
+.nm-sidebar-reveal-btn:hover {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+.nm-sidebar-reveal-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* ── v1.6.10: vault path footer ──
+ * Always-visible line at the bottom of the sidebar that shows the
+ * vault-relative path for the active notebook. Removes the "are these
+ * real files?" ambiguity — the answer is right there and stays accurate
+ * as the user switches sections. */
+.nm-sidebar-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate-alt);
+  font-size: 10px;
+  color: var(--nm-ink-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.nm-sidebar-footer svg {
+  width: 12px !important;
+  height: 12px !important;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.nm-sidebar-footer-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-monospace, ui-monospace, monospace);
+}
+.nm-sidebar-footer-path strong {
+  color: var(--nm-ink);
   font-weight: 600;
 }
 

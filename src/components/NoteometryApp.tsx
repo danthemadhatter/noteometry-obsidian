@@ -958,42 +958,46 @@ export default function NoteometryApp({ plugin, app }: Props) {
   }, []);
 
   /* ── Wheel handler: Cmd/Ctrl+wheel → zoom, plain wheel → pan.
-   * Trackpad two-finger scroll arrives as plain wheel events (no ctrl).
-   * Chromium also synthesizes `ctrlKey: true` for pinch-zoom — handled
-   * as zoom below. Plain 2-finger drag pans the canvas viewport. */
+   *
+   * v1.6.10: InkCanvas now owns Cmd/Ctrl+wheel zoom on its own container,
+   * which fixed the MBP trackpad pinch regression. This viewport-level
+   * handler stays as a backup for wheel events that land on non-ink
+   * regions (overlays, empty areas between the canvas and the panel),
+   * and still owns plain-wheel pan so the user can two-finger scroll
+   * anywhere in the viewport. Using refs for zoom state so re-binding
+   * doesn't race with the pinch event stream. */
+  const zoomLockedStateRef = useRef(zoomLocked);
+  const zoomStateRef = useRef(zoom);
+  useEffect(() => { zoomLockedStateRef.current = zoomLocked; }, [zoomLocked]);
+  useEffect(() => { zoomStateRef.current = zoom; }, [zoom]);
+
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       const zoomGesture = e.metaKey || e.ctrlKey;
       if (zoomGesture) {
-        if (zoomLocked) { e.preventDefault(); return; }
+        if (zoomLockedStateRef.current) { e.preventDefault(); return; }
         e.preventDefault();
         setZoom((z) => {
-          // Pinch-zoom (ctrl synthesized) sends smaller deltas; boost it.
           const scale = e.ctrlKey && !e.metaKey ? 0.01 : 0.005;
           const delta = -e.deltaY * scale;
-          return clampZoom(Math.round((z + delta) * 100) / 100);
+          return clampZoom(Math.round((z + delta) * 1000) / 1000);
         });
         return;
       }
-      // Skip if the wheel event originated inside an internally-scrollable
-      // drop-in (textareas, tables, BOM panels, etc.). Those should scroll
-      // their own content before hijacking canvas pan.
       const target = e.target as HTMLElement | null;
       if (target && target.closest("[data-dropin-id], textarea, .noteometry-object-content")) {
         return;
       }
-      // Pan the canvas. Divide by zoom so the world-space distance matches
-      // the on-screen gesture at any zoom level.
       e.preventDefault();
-      const z = zoom || 1;
+      const z = zoomStateRef.current || 1;
       setScrollX((x) => x + e.deltaX / z);
       setScrollY((y) => y + e.deltaY / z);
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [zoomLocked, clampZoom, zoom]);
+  }, [clampZoom]);
 
   /* ── Drag-and-drop math symbols onto canvas ──────────── */
   const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
