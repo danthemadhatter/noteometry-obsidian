@@ -27,7 +27,7 @@ import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuAct
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { makePastedObject } from "../lib/objectClipboard";
-import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData } from "../lib/tableStore";
+import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData, clearScope } from "../lib/tableStore";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
@@ -83,10 +83,12 @@ interface Props {
   registerInitialDataSetter: (
     setter: (data: CanvasData | null, token: number) => void,
   ) => void;
+  /** Per-view flush bridge. NoteometryApp registers its own saveNow here
+   *  so each open tab flushes to the right file — a module-level singleton
+   *  would cause the most-recently-mounted tab to overwrite sibling tabs
+   *  on unload. */
+  registerFlushSave: (fn: (() => Promise<void>) | null) => void;
 }
-
-/** Called by NoteometryView.onClose / onUnloadFile to flush pending saves */
-export let flushSave: (() => Promise<void>) | null = null;
 
 export default function NoteometryApp({
   plugin,
@@ -96,6 +98,7 @@ export default function NoteometryApp({
   initialDataToken,
   onSaveData,
   registerInitialDataSetter,
+  registerFlushSave,
 }: Props) {
   /* ── Ink feature: strokes, stamps, tool, color, width, undo/redo ─── */
   const {
@@ -318,6 +321,11 @@ export default function NoteometryApp({
   // the latest values without re-creating on every prop change.
   const fileRef = useRef<TFile | null>(file);
   useEffect(() => { fileRef.current = file; }, [file]);
+
+  /** Per-page scope key for the table/textbox store. Falls back to a
+   *  stable "orphan" token before the file is bound so in-memory edits
+   *  on an unbound leaf don't collide with any real file's scope. */
+  const scope = file?.path ?? "__orphan__";
   const onSaveDataRef = useRef(onSaveData);
   useEffect(() => { onSaveDataRef.current = onSaveData; }, [onSaveData]);
 
@@ -338,12 +346,12 @@ export default function NoteometryApp({
     hydratePipeline(data.panelInput ?? "", data.chatMessages ?? []);
     hydrateInk(data.strokes ?? [], data.stamps ?? []);
     hydrateObjects(data.canvasObjects ?? []);
-    loadAllTableData(data.tableData ?? {});
-    loadAllTextBoxData(data.textBoxData ?? {});
+    loadAllTableData(scope, data.tableData ?? {});
+    loadAllTextBoxData(scope, data.textBoxData ?? {});
     setScrollX(data.viewport?.scrollX ?? 0);
     setScrollY(data.viewport?.scrollY ?? 0);
     requestAnimationFrame(() => { loadingPageRef.current = false; });
-  }, [hydratePipeline, hydrateInk, hydrateObjects]);
+  }, [hydratePipeline, hydrateInk, hydrateObjects, scope]);
 
   // Hydrate on first mount (and when the view pushes a new initial data
   // token for a newly-bound file).
@@ -381,12 +389,12 @@ export default function NoteometryApp({
       viewport: { scrollX, scrollY },
       panelInput: inputCode,
       chatMessages,
-      tableData: getAllTableData(),
-      textBoxData: getAllTextBoxData(),
+      tableData: getAllTableData(scope),
+      textBoxData: getAllTextBoxData(scope),
       lastSaved: new Date().toISOString(),
     };
     await onSaveDataRef.current(data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages]);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, scope]);
 
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
@@ -403,14 +411,21 @@ export default function NoteometryApp({
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
   useEffect(() => {
-    setOnChangeCallback(() => doSave());
-    return () => setOnChangeCallback(null);
-  }, [doSave]);
+    setOnChangeCallback(scope, () => doSave());
+    return () => setOnChangeCallback(scope, null);
+  }, [doSave, scope]);
+
+  // When this NoteometryApp unmounts (tab closed or leaf detached), drop
+  // its scope from the store so long-running sessions don't accumulate
+  // Maps for pages the user has closed.
+  useEffect(() => {
+    return () => { clearScope(scope); };
+  }, [scope]);
 
   useEffect(() => {
-    flushSave = saveNow;
-    return () => { flushSave = null; };
-  }, [saveNow]);
+    registerFlushSave(saveNow);
+    return () => { registerFlushSave(null); };
+  }, [saveNow, registerFlushSave]);
 
   /** Parent folder path of the bound file, used to scope attachment writes
    *  (and handed to CanvasObjectLayer for snapshot-to-canvas image saves). */
@@ -563,11 +578,11 @@ export default function NoteometryApp({
     const sized = { ...obj, w: 460, h: 280 };
     // Seed the textbox HTML BEFORE the component mounts, so RichTextEditor
     // reads the content from tableStore on first render and shows it.
-    setTextBoxData(sized.id, html);
+    setTextBoxData(scope, sized.id, html);
     setCanvasObjects((prev) => [...prev, sized]);
     setTool("select");
     setSelectedObjectId(sized.id);
-  }, [scrollX, scrollY, canvasObjects, setCanvasObjects, setSelectedObjectId]);
+  }, [scrollX, scrollY, canvasObjects, setCanvasObjects, setSelectedObjectId, scope, setTool]);
 
   const handleInsertTable = useCallback(() => {
     try {
@@ -1297,6 +1312,7 @@ export default function NoteometryApp({
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
                 parentFolder={parentFolderPath}
+                scope={scope}
               />
 
               {/* Lasso overlay — operates within the viewport */}

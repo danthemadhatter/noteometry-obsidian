@@ -1,65 +1,97 @@
-/** Simple module-level store for table data, keyed by table ID */
+/** Scoped store for table + rich-text-box data.
+ *
+ *  Scope is the bound page's file path (or any stable per-page key).
+ *  Tier 3 allowed multiple .nmpage tabs open at once; before this store
+ *  was module-global, meaning tab A's loadAllTableData(data) would
+ *  clear tab B's tables, and saves from either tab would write a union
+ *  of all scopes' data into its own file. Every operation now takes a
+ *  scope so tabs don't step on each other.
+ */
 
-const tables = new Map<string, string[][]>();
+const tableScopes = new Map<string, Map<string, string[][]>>();
+const textBoxScopes = new Map<string, Map<string, string>>();
 
-/** Change listener — called when any table or textbox data changes */
-let onChangeCallback: (() => void) | null = null;
-export function setOnChangeCallback(cb: (() => void) | null): void {
-  onChangeCallback = cb;
+/** Per-scope change listeners — fire only when data in that scope
+ *  changes, so each tab's autosave only runs for its own edits. */
+const scopeCallbacks = new Map<string, () => void>();
+
+export function setOnChangeCallback(scope: string, cb: (() => void) | null): void {
+  if (cb) scopeCallbacks.set(scope, cb);
+  else scopeCallbacks.delete(scope);
 }
 
-export function getTableData(id: string): string[][] {
-  return tables.get(id) ?? [
+function fireCallback(scope: string): void {
+  scopeCallbacks.get(scope)?.();
+}
+
+function ensureTableScope(scope: string): Map<string, string[][]> {
+  let m = tableScopes.get(scope);
+  if (!m) { m = new Map(); tableScopes.set(scope, m); }
+  return m;
+}
+
+function ensureTextBoxScope(scope: string): Map<string, string> {
+  let m = textBoxScopes.get(scope);
+  if (!m) { m = new Map(); textBoxScopes.set(scope, m); }
+  return m;
+}
+
+export function getTableData(scope: string, id: string): string[][] {
+  return tableScopes.get(scope)?.get(id) ?? [
     ["", "", ""],
     ["", "", ""],
     ["", "", ""],
   ];
 }
 
-export function setTableData(id: string, data: string[][]): void {
-  tables.set(id, data);
-  onChangeCallback?.();
+export function setTableData(scope: string, id: string, data: string[][]): void {
+  ensureTableScope(scope).set(id, data);
+  fireCallback(scope);
 }
 
-export function getAllTableData(): Record<string, string[][]> {
+export function getAllTableData(scope: string): Record<string, string[][]> {
   const result: Record<string, string[][]> = {};
-  for (const [id, data] of tables) {
-    result[id] = data;
-  }
+  const m = tableScopes.get(scope);
+  if (!m) return result;
+  for (const [id, data] of m) result[id] = data;
   return result;
 }
 
-export function loadAllTableData(data: Record<string, string[][]>): void {
-  tables.clear();
-  for (const [id, cells] of Object.entries(data)) {
-    tables.set(id, cells);
-  }
+export function loadAllTableData(scope: string, data: Record<string, string[][]>): void {
+  const m = ensureTableScope(scope);
+  m.clear();
+  for (const [id, cells] of Object.entries(data)) m.set(id, cells);
+}
+
+/** Drop a scope entirely. Called when a NoteometryView tab closes so
+ *  the Maps don't grow unbounded. */
+export function clearScope(scope: string): void {
+  tableScopes.delete(scope);
+  textBoxScopes.delete(scope);
+  scopeCallbacks.delete(scope);
 }
 
 /* ── Rich text box data ──────────────────────────────── */
 
-const textBoxes = new Map<string, string>();
-
-export function getTextBoxData(id: string): string {
-  return textBoxes.get(id) ?? "";
+export function getTextBoxData(scope: string, id: string): string {
+  return textBoxScopes.get(scope)?.get(id) ?? "";
 }
 
-export function setTextBoxData(id: string, html: string): void {
-  textBoxes.set(id, html);
-  onChangeCallback?.();
+export function setTextBoxData(scope: string, id: string, html: string): void {
+  ensureTextBoxScope(scope).set(id, html);
+  fireCallback(scope);
 }
 
-export function getAllTextBoxData(): Record<string, string> {
+export function getAllTextBoxData(scope: string): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [id, html] of textBoxes) {
-    result[id] = html;
-  }
+  const m = textBoxScopes.get(scope);
+  if (!m) return result;
+  for (const [id, html] of m) result[id] = html;
   return result;
 }
 
-export function loadAllTextBoxData(data: Record<string, string>): void {
-  textBoxes.clear();
-  for (const [id, html] of Object.entries(data)) {
-    textBoxes.set(id, html);
-  }
+export function loadAllTextBoxData(scope: string, data: Record<string, string>): void {
+  const m = ensureTextBoxScope(scope);
+  m.clear();
+  for (const [id, html] of Object.entries(data)) m.set(id, html);
 }

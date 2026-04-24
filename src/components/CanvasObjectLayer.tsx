@@ -357,6 +357,9 @@ interface Props {
    *  route snapshot-to-canvas image writes into "<parent>/attachments".
    *  When absent the snapshot still renders but won't sync to the vault. */
   parentFolder?: string;
+  /** Per-page scope for the table/textbox store. Derived from the bound
+   *  file path so multiple .nmpage tabs don't share data. */
+  scope: string;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -439,7 +442,7 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
 export default function CanvasObjectLayer({
   objects, onObjectsChange, scrollX, scrollY,
   zoom = 1,
-  tool, selectedObjectId, onSelectObject, plugin, parentFolder,
+  tool, selectedObjectId, onSelectObject, plugin, parentFolder, scope,
 }: Props) {
   // Mirror zoom into a ref so the drag/resize handlers (which close over
   // stale values) always read the latest scale.
@@ -622,7 +625,7 @@ export default function CanvasObjectLayer({
               // path (matches Dan's OneNote/Word ask); fall back to
               // .txt download when the clipboard is unavailable.
               if (obj.type === "textbox") {
-                const html = getTextBoxData(obj.id) ?? "";
+                const html = getTextBoxData(scope, obj.id) ?? "";
                 if (!html.trim()) {
                   new Notice("Text box is empty — nothing to copy", 4000);
                   return;
@@ -707,8 +710,8 @@ export default function CanvasObjectLayer({
               if (editable) editable.focus();
             }}
           >
-            {obj.type === "textbox" && <RichTextEditor textBoxId={obj.id} />}
-            {obj.type === "table" && <TableEditor tableId={obj.id} />}
+            {obj.type === "textbox" && <RichTextEditor textBoxId={obj.id} scope={scope} />}
+            {obj.type === "table" && <TableEditor tableId={obj.id} scope={scope} />}
             {obj.type === "image" && (
               <VaultImage src={obj.dataURL} plugin={plugin} />
             )}

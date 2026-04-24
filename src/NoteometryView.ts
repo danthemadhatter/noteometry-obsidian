@@ -1,7 +1,7 @@
 import { FileView, TFile, WorkspaceLeaf } from "obsidian";
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
-import NoteometryApp, { flushSave } from "./components/NoteometryApp";
+import NoteometryApp from "./components/NoteometryApp";
 import type { CanvasData } from "./lib/pageFormat";
 import { loadPageFromFile, savePageToFile, EMPTY_PAGE } from "./lib/persistence";
 import type NoteometryPlugin from "./main";
@@ -31,6 +31,9 @@ export class NoteometryView extends FileView {
   private reactSetInitialData:
     | ((data: CanvasData | null, token: number) => void)
     | null = null;
+  /** Per-view flush callback. NoteometryApp registers its own saveNow
+   *  here so each tab flushes to its own bound file. */
+  private flushMyTree: (() => Promise<void>) | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: NoteometryPlugin) {
     super(leaf);
@@ -74,8 +77,8 @@ export class NoteometryView extends FileView {
   /** Flush any pending autosaves for the PREVIOUS file before Obsidian
    *  rebinds the leaf. */
   async onUnloadFile(_file: TFile): Promise<void> {
-    if (flushSave) {
-      try { await flushSave(); } catch { /* best effort */ }
+    if (this.flushMyTree) {
+      try { await this.flushMyTree(); } catch { /* best effort */ }
     }
     this.currentData = null;
   }
@@ -124,15 +127,19 @@ export class NoteometryView extends FileView {
         ) => {
           this.reactSetInitialData = setter;
         },
+        registerFlushSave: (fn: (() => Promise<void>) | null) => {
+          this.flushMyTree = fn;
+        },
       })
     );
   }
 
   async onClose(): Promise<void> {
-    if (flushSave) {
-      try { await flushSave(); } catch { /* best effort */ }
+    if (this.flushMyTree) {
+      try { await this.flushMyTree(); } catch { /* best effort */ }
     }
     this.reactSetInitialData = null;
+    this.flushMyTree = null;
     if (this.root) {
       this.root.unmount();
       this.root = null;

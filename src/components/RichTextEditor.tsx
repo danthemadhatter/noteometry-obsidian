@@ -5,11 +5,12 @@ import { buildRichTextClipboardBlobs, htmlToPlainText } from "../lib/dropinExpor
 
 interface Props {
   textBoxId: string;
+  scope: string;
 }
 
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
 
-export default function RichTextEditor({ textBoxId }: Props) {
+export default function RichTextEditor({ textBoxId, scope }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [fontSize, setFontSize] = useState(16);
   const [isBold, setIsBold] = useState(false);
@@ -18,17 +19,17 @@ export default function RichTextEditor({ textBoxId }: Props) {
   // Load saved content
   useEffect(() => {
     if (editorRef.current) {
-      const saved = getTextBoxData(textBoxId);
+      const saved = getTextBoxData(scope, textBoxId);
       if (saved) editorRef.current.innerHTML = saved;
     }
-  }, [textBoxId]);
+  }, [scope, textBoxId]);
 
   // Save on input
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      setTextBoxData(textBoxId, editorRef.current.innerHTML);
+      setTextBoxData(scope, textBoxId, editorRef.current.innerHTML);
     }
-  }, [textBoxId]);
+  }, [scope, textBoxId]);
 
   // Update formatting state on selection change
   const updateFormatState = useCallback(() => {

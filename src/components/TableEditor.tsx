@@ -3,15 +3,16 @@ import { getTableData, setTableData } from "../lib/tableStore";
 
 interface Props {
   tableId: string;
+  scope: string;
 }
 
-export default function TableEditor({ tableId }: Props) {
-  const [cells, setCells] = useState<string[][]>(() => getTableData(tableId));
+export default function TableEditor({ tableId, scope }: Props) {
+  const [cells, setCells] = useState<string[][]>(() => getTableData(scope, tableId));
 
   // Sync to store on change
   useEffect(() => {
-    setTableData(tableId, cells);
-  }, [tableId, cells]);
+    setTableData(scope, tableId, cells);
+  }, [scope, tableId, cells]);
 
   const updateCell = useCallback((row: number, col: number, value: string) => {
     setCells((prev) => {
