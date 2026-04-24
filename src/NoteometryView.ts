@@ -63,6 +63,12 @@ export class NoteometryView extends FileView {
     if (this.reactSetInitialData) {
       this.reactSetInitialData(this.currentData, this.dataToken);
     }
+    // Re-render so NoteometryApp sees the updated `file` prop. onOpen
+    // often fires with this.file === null (new empty leaf), then
+    // onLoadFile arrives with the real file; without re-rendering here,
+    // drop-ins that key off the bound file (PDF insert, attachments)
+    // think no page is open.
+    this.rerenderReactTree();
   }
 
   /** Flush any pending autosaves for the PREVIOUS file before Obsidian
@@ -96,6 +102,15 @@ export class NoteometryView extends FileView {
     container.addEventListener("touchend", blockSwipe, false);
 
     this.root = createRoot(container);
+    this.rerenderReactTree();
+  }
+
+  /** Single source of truth for rendering the React tree. Called from
+   *  onOpen for the initial mount, and from onLoadFile whenever the
+   *  bound file changes — React reconciles prop changes without
+   *  tearing down the tree. */
+  private rerenderReactTree(): void {
+    if (!this.root) return;
     this.root.render(
       React.createElement(NoteometryApp, {
         plugin: this.plugin,
