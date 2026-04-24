@@ -6,6 +6,7 @@ import { logVersionBanner } from "./lib/version";
 import {
   createNewPageFile,
   convertLegacyMdPagesToNmpage,
+  findLegacyMdPages,
   rootDir,
 } from "./lib/persistence";
 
@@ -27,6 +28,13 @@ export default class NoteometryPlugin extends Plugin {
     // file; each page is its own tab.
     this.registerExtensions(["nmpage"], VIEW_TYPE);
 
+    // Ribbon stays as the entry point — repurposed from "open singleton"
+    // to "create a new page", so users always have a visible hook even
+    // when no .nmpage files exist yet.
+    this.addRibbonIcon("pencil", "New Noteometry page", () => {
+      void this.createAndOpenNewPage();
+    });
+
     this.addCommand({
       id: "noteometry-new-page",
       name: "Noteometry: New page",
@@ -37,6 +45,11 @@ export default class NoteometryPlugin extends Plugin {
       id: "noteometry-convert-legacy-md",
       name: "Noteometry: Convert legacy .md pages to .nmpage",
       callback: () => this.runConvertLegacyCommand(),
+    });
+
+    this.app.workspace.onLayoutReady(() => {
+      this.detachStaleNoteometryLeaves();
+      void this.notifyIfLegacyPagesPresent();
     });
   }
 
@@ -71,6 +84,39 @@ export default class NoteometryPlugin extends Plugin {
       new Notice("Noteometry: no legacy .md pages found.", 5000);
     } else {
       new Notice(`Noteometry: converted ${count} .md page${count === 1 ? "" : "s"} to .nmpage.`, 6000);
+    }
+  }
+
+  /** Tier 3 workspace restoration: the old plugin used a singleton
+   *  ItemView, so saved workspace.json may have noteometry-view leaves
+   *  that Obsidian restores without a bound file. A FileView without a
+   *  file is a broken empty tab — detach them. */
+  private detachStaleNoteometryLeaves(): void {
+    const stale: WorkspaceLeaf[] = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view.getViewType() !== VIEW_TYPE) return;
+      const view = leaf.view as { file?: TFile | null };
+      if (!view.file) stale.push(leaf);
+    });
+    for (const leaf of stale) leaf.detach();
+  }
+
+  /** On load, if the vault still has legacy .md pages containing
+   *  Noteometry-page JSON, tell the user — otherwise they see an empty
+   *  plugin and assume it's broken. Non-blocking, no auto-rename. */
+  private async notifyIfLegacyPagesPresent(): Promise<void> {
+    const root = rootDir(this);
+    const adapter = this.app.vault.adapter;
+    if (!(await adapter.exists(root))) return;
+    try {
+      const legacy = await findLegacyMdPages(this.app, root);
+      if (legacy.length === 0) return;
+      const msg =
+        `Noteometry: ${legacy.length} legacy .md page${legacy.length === 1 ? "" : "s"} found. ` +
+        `Run "Noteometry: Convert legacy .md pages to .nmpage" from the command palette to migrate.`;
+      new Notice(msg, 12000);
+    } catch (e) {
+      console.error("[Noteometry] legacy scan failed:", e);
     }
   }
 

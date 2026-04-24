@@ -161,16 +161,16 @@ export async function createNewPageFile(
 }
 
 /**
- * Scan `rootFolder` recursively for .md files whose content decodes as
- * a v3 Noteometry page and rename them to .nmpage. Returns the count.
- * No backups — caller has confirmed test data only.
+ * Scan `rootFolder` recursively and return every .md file whose content
+ * decodes as a v3 Noteometry page. Non-destructive — caller decides
+ * whether to rename, count for a banner, etc.
  */
-export async function convertLegacyMdPagesToNmpage(
+export async function findLegacyMdPages(
   app: App,
   rootFolder: string,
-): Promise<number> {
+): Promise<TFile[]> {
   const root = app.vault.getAbstractFileByPath(rootFolder);
-  if (!(root instanceof TFolder)) return 0;
+  if (!(root instanceof TFolder)) return [];
 
   const candidates: TFile[] = [];
   const walk = (folder: TFolder) => {
@@ -181,11 +181,31 @@ export async function convertLegacyMdPagesToNmpage(
   };
   walk(root);
 
-  let converted = 0;
+  const legacy: TFile[] = [];
   for (const file of candidates) {
     try {
       const raw = await app.vault.read(file);
-      if (!isLegacyNoteometryMdContent(raw)) continue;
+      if (isLegacyNoteometryMdContent(raw)) legacy.push(file);
+    } catch (e) {
+      console.error(`[Noteometry] legacy-scan read failed for ${file.path}:`, e);
+    }
+  }
+  return legacy;
+}
+
+/**
+ * Rename legacy .md pages in `rootFolder` to .nmpage. Returns the count.
+ * No backups — caller has confirmed test data only.
+ */
+export async function convertLegacyMdPagesToNmpage(
+  app: App,
+  rootFolder: string,
+): Promise<number> {
+  const legacy = await findLegacyMdPages(app, rootFolder);
+
+  let converted = 0;
+  for (const file of legacy) {
+    try {
       const parentPath = file.parent?.path ?? "";
       const newPath = parentPath ? `${parentPath}/${file.basename}.nmpage` : `${file.basename}.nmpage`;
       if (app.vault.getAbstractFileByPath(newPath)) continue; // collision — skip silently
