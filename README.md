@@ -121,6 +121,14 @@ npm install
 npm run build
 ```
 
+### Cross-device updates via Obsidian Sync
+
+If you build Noteometry on one Mac and want every other device (iPad,
+Android, second Mac) to pick up the new bundle automatically — without
+running anything on those devices — see
+[docs/SYNC_WORKFLOW.md](./docs/SYNC_WORKFLOW.md). It walks through the
+one-time Sync toggles and the daily build-on-Mac, sync-everywhere cycle.
+
 ---
 
 ## Settings

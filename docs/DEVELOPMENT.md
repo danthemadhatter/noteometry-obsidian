@@ -18,7 +18,7 @@ npm run dev      # esbuild watch mode (rebuild on file changes)
 npm test         # Run vitest unit tests
 ```
 
-The build automatically deploys `main.js`, `styles.css`, and `manifest.json` to `~/Documents/Noteometry/.obsidian/plugins/noteometry/` (the Obsidian Sync vault).
+The build automatically deploys `main.js`, `styles.css`, and `manifest.json` to `~/Documents/Noteometry/.obsidian/plugins/noteometry/` (the Obsidian Sync vault). From there, Obsidian Sync propagates the bundle to every other device — see [SYNC_WORKFLOW.md](./SYNC_WORKFLOW.md) for the cross-device "build once, sync everywhere" cycle.
 
 ## Development Workflow
 
