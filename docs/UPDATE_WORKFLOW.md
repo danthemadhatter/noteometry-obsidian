@@ -128,23 +128,24 @@ occasional stale `main.js` until BRAT next polls and overwrites it.
 ## Critical: version bump must precede the tag
 
 BRAT compares the GitHub release tag against `manifest.json.version`. If
-they don't match, BRAT silently refuses the install. Sequence:
+they don't match, BRAT silently refuses the install.
 
-```
-1. edit manifest.json:  "version": "1.6.14"
-2. edit versions.json:   add "1.6.14": "1.0.0"
-3. git commit -am "v1.6.14: ..."
-4. git tag v1.6.14
-5. git push --follow-tags
-```
+`npm version patch && git push --follow-tags` does the full sequence in
+one shot:
 
-(Note: `npm version patch` is supposed to do steps 1+2+3+4 in one shot
-via the `version` script in `package.json`, but `version-bump.mjs` has a
-bug — it skips appending to `versions.json` because the
-`if (!Object.values(versions).includes(minAppVersion))` check is always
-false when `minAppVersion` is constant. Until that's fixed, edit
-`versions.json` by hand or run `npm version patch` and then add the new
-entry to `versions.json` manually before pushing the tag.)
+1. Bumps `package.json`.
+2. Runs the `version` hook (`version-bump.mjs`), which mirrors the new
+   version into `manifest.json`, appends it to `versions.json`, and
+   updates `NOTEOMETRY_VERSION` in `src/lib/version.ts`.
+3. Stages those three files.
+4. Creates a commit and a `v1.6.14`-style tag.
+5. `--follow-tags` pushes both the commit and the tag, which fires the
+   release workflow.
+
+`scripts/ship.sh "<commit message>"` is an alternative that does the
+same four-file bump, then runs the build locally, then commits, tags,
+and pushes — useful when you want to confirm the build succeeds before
+shipping.
 
 ## Troubleshooting
 
