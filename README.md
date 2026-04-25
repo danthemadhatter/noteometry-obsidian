@@ -121,13 +121,14 @@ npm install
 npm run build
 ```
 
-### Cross-device updates via Obsidian Sync
+### Cross-device updates (no Terminal)
 
-If you build Noteometry on one Mac and want every other device (iPad,
-Android, second Mac) to pick up the new bundle automatically — without
-running anything on those devices — see
-[docs/SYNC_WORKFLOW.md](./docs/SYNC_WORKFLOW.md). It walks through the
-one-time Sync toggles and the daily build-on-Mac, sync-everywhere cycle.
+For the supported "ask Claude → CI builds → BRAT delivers to every
+device" workflow that ships changes to iPad, Android, and every Mac
+without you running a build, see
+[docs/UPDATE_WORKFLOW.md](./docs/UPDATE_WORKFLOW.md). It walks through
+BRAT setup, the version-bump-and-tag sequence, and what to do when a
+release doesn't land.
 
 ---
 
