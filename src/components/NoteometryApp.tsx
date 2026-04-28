@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { App, Notice, TFile } from "obsidian";
+import { App, Notice, Platform, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEngine";
 import { renderStrokesToImage } from "../lib/canvasRenderer";
@@ -1328,26 +1328,28 @@ export default function NoteometryApp({
                 onMoveComplete={handleLassoMoveComplete}
               />
 
-              {/* ── Mobile-only Tools FAB — opens the canvas context menu
-                      at the button position. Touch devices can't long-press
-                      the canvas because we preventDefault touchstart to
-                      drive drawing, so this is the only reachable entry
-                      point to the tool menu on Android. ── */}
-              <button
-                className="nm-tools-fab"
-                onClick={(e) => {
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  const fake = new MouseEvent("contextmenu", {
-                    clientX: rect.left,
-                    clientY: rect.top,
-                    bubbles: true,
-                  });
-                  Object.defineProperty(fake, "preventDefault", { value: () => {} });
-                  handleCanvasContextMenu(fake as unknown as React.MouseEvent);
-                }}
-                title="Tools"
-                aria-label="Tools"
-              >☰</button>
+              {/* Mobile-only Tools FAB. Gated by Platform.isMobile (runtime,
+                  reliable inside Obsidian's webview) instead of CSS media
+                  queries — those misfire on iPad when an Apple Pencil is paired
+                  (pencil reports as fine pointer; landscape > 768px), leaving
+                  the canvas with no reachable tool entry on touch devices. */}
+              {Platform.isMobile && (
+                <button
+                  className="nm-tools-fab"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const fake = new MouseEvent("contextmenu", {
+                      clientX: rect.left,
+                      clientY: rect.top,
+                      bubbles: true,
+                    });
+                    Object.defineProperty(fake, "preventDefault", { value: () => {} });
+                    handleCanvasContextMenu(fake as unknown as React.MouseEvent);
+                  }}
+                  title="Tools"
+                  aria-label="Tools"
+                >☰</button>
+              )}
 
               {/* ── Floating undo/redo + zoom widget ── */}
               <div className="nm-zoom-widget" style={{
