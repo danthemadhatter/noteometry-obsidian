@@ -194,28 +194,51 @@ export async function findLegacyMdPages(
 }
 
 /**
- * Rename legacy .md pages in `rootFolder` to .nmpage. Returns the count.
+ * Rename legacy .md pages in `rootFolder` to .nmpage. Every legacy file is
+ * always renamed — if `Foo.nmpage` already exists, the legacy `Foo.md` is
+ * renamed to `Foo 1.nmpage` (or the next free suffix) so the convert always
+ * finishes. Otherwise a stale `.md` would survive on disk and the
+ * legacy-page notice would re-fire on every plugin load. Returns counts of
+ * direct renames and suffixed renames so the caller can summarize.
  * No backups — caller has confirmed test data only.
  */
 export async function convertLegacyMdPagesToNmpage(
   app: App,
   rootFolder: string,
-): Promise<number> {
+): Promise<{ converted: number; collisions: number }> {
   const legacy = await findLegacyMdPages(app, rootFolder);
 
   let converted = 0;
+  let collisions = 0;
   for (const file of legacy) {
     try {
       const parentPath = file.parent?.path ?? "";
-      const newPath = parentPath ? `${parentPath}/${file.basename}.nmpage` : `${file.basename}.nmpage`;
-      if (app.vault.getAbstractFileByPath(newPath)) continue; // collision — skip silently
-      await app.vault.rename(file, newPath);
+      const baseTarget = parentPath
+        ? `${parentPath}/${file.basename}.nmpage`
+        : `${file.basename}.nmpage`;
+      let target = baseTarget;
+      if (app.vault.getAbstractFileByPath(target)) {
+        // Name collision with an existing .nmpage. Find the next free
+        // numeric suffix so the rename still happens — silently skipping
+        // would leave the .md on disk and the legacy notice would loop.
+        const stem = parentPath
+          ? `${parentPath}/${file.basename}`
+          : file.basename;
+        let n = 1;
+        while (app.vault.getAbstractFileByPath(`${stem} ${n}.nmpage`)) n += 1;
+        target = `${stem} ${n}.nmpage`;
+        collisions += 1;
+        console.warn(
+          `[Noteometry] legacy convert: ${file.path} collides with ${baseTarget}, renaming to ${target}`,
+        );
+      }
+      await app.vault.rename(file, target);
       converted += 1;
     } catch (e) {
       console.error(`[Noteometry] convert failed for ${file.path}:`, e);
     }
   }
-  return converted;
+  return { converted, collisions };
 }
 
 /* ══════════════════════════════════════════════════════════════════

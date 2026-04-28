@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+import { TFile, TFolder } from "obsidian";
 import {
   isLegacyNoteometryMdContent,
   parsePageContent,
   savePageToFile,
   loadPageFromFile,
+  convertLegacyMdPagesToNmpage,
 } from "../../src/lib/persistence";
 import { packToV3, CanvasData, EMPTY_PAGE } from "../../src/lib/pageFormat";
 
@@ -138,5 +140,116 @@ describe("savePageToFile / loadPageFromFile", () => {
     expect(back).not.toBeNull();
     expect(back!.stamps).toEqual(samplePage.stamps);
     expect(back!.panelInput).toBe(samplePage.panelInput);
+  });
+});
+
+/**
+ * Mini in-memory vault for convert-legacy tests. Mirrors the surface of
+ * Obsidian's Vault that convertLegacyMdPagesToNmpage actually touches:
+ * getAbstractFileByPath, read, rename. Files live in a flat path map; the
+ * root folder's children list is rebuilt from path prefixes so the walk
+ * inside findLegacyMdPages sees the right TFile instances.
+ */
+function buildVault(rootPath: string, files: Record<string, string>) {
+  const root = new TFolder();
+  root.path = rootPath;
+
+  const fileMap: Record<string, TFile> = {};
+  for (const [path, contents] of Object.entries(files)) {
+    const slash = path.lastIndexOf("/");
+    const name = slash >= 0 ? path.slice(slash + 1) : path;
+    const dot = name.lastIndexOf(".");
+    const basename = dot > 0 ? name.slice(0, dot) : name;
+    const extension = dot > 0 ? name.slice(dot + 1) : "";
+    const f = new TFile();
+    f.path = path;
+    f.basename = basename;
+    f.extension = extension;
+    f.parent = root;
+    (f as any).contents = contents;
+    fileMap[path] = f;
+    root.children.push(f);
+  }
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p: string) => {
+        if (p === rootPath) return root;
+        return fileMap[p] ?? null;
+      },
+      read: async (f: TFile) => (f as any).contents as string,
+      rename: async (f: TFile, newPath: string) => {
+        delete fileMap[f.path];
+        f.path = newPath;
+        const slash = newPath.lastIndexOf("/");
+        const name = slash >= 0 ? newPath.slice(slash + 1) : newPath;
+        const dot = name.lastIndexOf(".");
+        f.basename = dot > 0 ? name.slice(0, dot) : name;
+        f.extension = dot > 0 ? name.slice(dot + 1) : "";
+        fileMap[newPath] = f;
+      },
+    },
+  } as any;
+
+  return { app, fileMap, root };
+}
+
+describe("convertLegacyMdPagesToNmpage", () => {
+  it("renames a legacy .md page to .nmpage and reports converted=1", async () => {
+    const v3 = JSON.stringify(packToV3(samplePage));
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Foo.md": v3,
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 0 });
+    expect(fileMap["Noteometry/Foo.md"]).toBeUndefined();
+    expect(fileMap["Noteometry/Foo.nmpage"]).toBeDefined();
+  });
+
+  it("uses a numeric suffix when target .nmpage already exists, instead of skipping", async () => {
+    // The original bug: silent skip left Foo.md on disk, so the legacy
+    // notice fired again on every plugin load forever.
+    const v3 = JSON.stringify(packToV3(samplePage));
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Foo.md": v3,
+      "Noteometry/Foo.nmpage": v3,
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 1 });
+    // The .md is gone — that's the load-bearing assertion.
+    expect(fileMap["Noteometry/Foo.md"]).toBeUndefined();
+    // The pre-existing .nmpage is untouched.
+    expect(fileMap["Noteometry/Foo.nmpage"]).toBeDefined();
+    // The legacy file was renamed with the next free numeric suffix.
+    expect(fileMap["Noteometry/Foo 1.nmpage"]).toBeDefined();
+  });
+
+  it("walks past existing suffixed names to the next free slot", async () => {
+    const v3 = JSON.stringify(packToV3(samplePage));
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Foo.md": v3,
+      "Noteometry/Foo.nmpage": v3,
+      "Noteometry/Foo 1.nmpage": v3,
+      "Noteometry/Foo 2.nmpage": v3,
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 1 });
+    expect(fileMap["Noteometry/Foo 3.nmpage"]).toBeDefined();
+  });
+
+  it("ignores .md files whose content isn't a v3 Noteometry page", async () => {
+    const v3 = JSON.stringify(packToV3(samplePage));
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Foo.md": v3,
+      "Noteometry/Notes.md": "# Just a real markdown note",
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 0 });
+    expect(fileMap["Noteometry/Notes.md"]).toBeDefined();
+    expect(fileMap["Noteometry/Foo.nmpage"]).toBeDefined();
   });
 });

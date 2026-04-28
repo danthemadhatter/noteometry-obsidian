@@ -79,12 +79,16 @@ export default class NoteometryPlugin extends Plugin {
       new Notice(`Noteometry: folder "${root}" doesn't exist — nothing to convert.`, 6000);
       return;
     }
-    const count = await convertLegacyMdPagesToNmpage(this.app, root);
-    if (count === 0) {
+    const { converted, collisions } = await convertLegacyMdPagesToNmpage(this.app, root);
+    if (converted === 0) {
       new Notice("Noteometry: no legacy .md pages found.", 5000);
-    } else {
-      new Notice(`Noteometry: converted ${count} .md page${count === 1 ? "" : "s"} to .nmpage.`, 6000);
+      return;
     }
+    const base = `Noteometry: converted ${converted} .md page${converted === 1 ? "" : "s"} to .nmpage`;
+    const suffix = collisions > 0
+      ? ` (${collisions} renamed with a numeric suffix to avoid collision with existing .nmpage files)`
+      : "";
+    new Notice(`${base}${suffix}.`, 6000);
   }
 
   /** Tier 3 workspace restoration: the old plugin used a singleton
