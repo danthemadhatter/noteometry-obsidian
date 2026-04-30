@@ -1,4 +1,4 @@
-# Noteometry v1.6.9
+# Noteometry v1.7.2
 
 **EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students.**
 
@@ -22,11 +22,12 @@ An Obsidian plugin that turns your vault into an infinite canvas notebook with h
 - **Chat** — conversational AI for follow-up questions
 - **3 AI providers**: Claude (Anthropic), Perplexity, LM Studio (local)
 
-### Notebooks
-- **Sections + Pages** — tab-based sidebar with natural sort (Week 2 before Week 10)
-- **New Course** — creates APUS section with Week 1-16 pages in one click
-- **Auto-save** with 2-second debounce, Obsidian Sync compatible (.md files)
-- **V3 serialization** — single `elements[]` tagged-union array, vault-relative file refs
+### Pages
+- **Native to Obsidian's file explorer** — pages are `.nmpage` files; click one and it opens in the canvas. No internal "Notebooks" sidebar; folder structure is whatever you organize in your vault.
+- **Ribbon icon → "New Noteometry page"** creates a new `.nmpage` in the configured folder and opens it. Same action via command palette.
+- **Auto-save** with 2-second debounce, Obsidian Sync compatible (`.nmpage` is registered as a recognized extension).
+- **V3 serialization** — single `elements[]` tagged-union array, vault-relative file refs.
+- **Legacy migration** — pages from the pre-v1.7 `.md`-wrapped-JSON era are auto-detected; run **Noteometry: Convert legacy .md pages to .nmpage** from the command palette to migrate in bulk.
 
 ---
 
@@ -105,7 +106,7 @@ Tools are accessed via **right-click (mouse), two-finger tap (touch), or Apple P
 2. Add this repository: `danthemadhatter/noteometry-obsidian`
 3. BRAT will pull the latest GitHub release automatically
 
-**Note on updates:** BRAT matches the `version` in the repo's `manifest.json` against a published GitHub release with the same tag. If you're stuck on an older version, check that a release with the tag shown in `manifest.json` exists on the [releases page](https://github.com/danthemadhatter/noteometry-obsidian/releases). The release tag must match exactly — this repo uses the `v` prefix (e.g. `v1.6.9`). See [RELEASE.md](./RELEASE.md) for the full ship checklist.
+**Note on updates:** BRAT matches the `version` in the repo's `manifest.json` against a published GitHub release with the same tag. If you're stuck on an older version, check that a release with the tag shown in `manifest.json` exists on the [releases page](https://github.com/danthemadhatter/noteometry-obsidian/releases). The release tag must match exactly — this repo uses the `v` prefix (e.g. `v1.7.2`). See [RELEASE.md](./RELEASE.md) for the full ship checklist.
 
 ### Manual
 1. Download `main.js`, `styles.css`, `manifest.json` from the [latest release](https://github.com/danthemadhatter/noteometry-obsidian/releases)
@@ -144,11 +145,11 @@ npm run build
 ## Architecture
 
 ```
-Noteometry v1.6.9 — System Architecture
+Noteometry v1.7.2 — System Architecture
 
-Layer 1: Obsidian Plugin API (requestUrl, vault, TFile, WorkspaceLeaf)
+Layer 1: Obsidian Plugin API (FileView, TFile, registerExtensions, requestUrl)
 Layer 2: Canvas Engine (infinite canvas, zoom, pan, grid, pointer events)
-Layer 3: Serialization (v3 pack/unpack, pageFormat.ts, .md-wrapped JSON)
+Layer 3: Serialization (v3 pack/unpack, pageFormat.ts, .nmpage files)
 Layer 4: Canvas Object Layer (renders all drop-in instances, layout, z-index)
 Layer 5: Drop-in Instances (each self-contained React component)
 
@@ -161,17 +162,21 @@ Snapshot Flow: Any Drop-in -> Camera Icon -> html2canvas -> Image on Canvas or C
 
 ## File Hierarchy
 
+`.nmpage` files live wherever you put them in your vault — Obsidian's file explorer is the navigation layer, so folder structure is up to you. The plugin's **Vault folder** setting (default: `Noteometry/`) is just where the ribbon's "New page" lands and where the legacy-migration scan looks; nothing prevents you from moving pages around afterward.
+
 ```
-Notebooks/
-  APUS/
-    Week 1.md      <- page data (v3 JSON)
-    Week 2.md
+<your vault>/
+  Noteometry/                  <- default folder (configurable)
+    Week 1.nmpage              <- page data (v3 JSON in a .nmpage file)
+    Week 2.nmpage
     attachments/
-      img-xxx.png  <- vault-stored images
-      pdf-xxx.pdf  <- vault-stored PDFs
-  MATH303/
-    ...
+      img-xxx.png               <- vault-stored images
+      pdf-xxx.pdf               <- vault-stored PDFs
+  Courses/MATH303/
+    Lecture 4.nmpage            <- pages organize freely; not bound to a folder
 ```
+
+**Migrating from pre-v1.7 vaults:** older releases stored pages as `.md` files containing JSON. On load, the plugin detects these and surfaces a Notice; run **Noteometry: Convert legacy .md pages to .nmpage** from the command palette to rename them in bulk. Collisions get a numeric suffix (`Foo 1.nmpage`, `Foo 2.nmpage`) so nothing is silently skipped.
 
 ---
 

@@ -1,6 +1,6 @@
 # Noteometry Features
 
-> Current as of **v1.6.9**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes current behaviour only.
+> Current as of **v1.7.2**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes current behaviour only.
 
 ## Canvas / Drawing
 
@@ -161,24 +161,25 @@
 - Supports display and inline math
 - Attachments sent as base64 images
 
-## Navigation (OneNote-style)
+## Navigation (Obsidian-native, v1.7+)
 
-### Sidebar
-- Single-column tree: Sections expand to show Pages
-- Create/rename/delete sections and pages
-- Auto-collapses on mobile (<768px)
-- Overlays canvas on mobile with backdrop dimming
-- OK button for name inputs (reliable on iPad)
-- Rename via pen icon on each item
+### Page navigation
+- Pages are `.nmpage` files in the vault — Obsidian's file explorer is the navigation layer (no plugin-owned sidebar)
+- Click any `.nmpage` to open or focus a NoteometryView leaf for that file
+- Rename / move / delete via the file explorer's standard right-click menu
+- Multiple pages can be open in tabs simultaneously; each has its own scoped `tableStore` and `flushSave`
+
+### Page creation
+- **Ribbon icon → "New Noteometry page"** (or the equivalent command palette entry) creates a new `.nmpage` in the configured Vault Folder and opens it
+- The Vault Folder setting is the default landing spot; you can move pages anywhere in the vault afterward
 
 ### Page Persistence
-- Each page saved as `Noteometry/<Section>/<Page>.md` in the vault
-- JSON data inside .md files (Obsidian Sync compatible)
+- Each page saved as a `.nmpage` file (registered extension; opened by NoteometryView, not the markdown editor)
+- File-bound API: `savePage(file)` / `loadPage(file)` operate on a passed `TFile`
 - Auto-save with 2-second debounce
-- Save on page switch (flushes before loading new page)
-- Save on view close (flushes before unmounting)
-- Legacy migration from old canvas.json format
-- Auto-migration from .json to .md on startup
+- Save on file change (`onLoadFile` flushes the prior file before loading the new one)
+- Save on view close (`flushSave` before unmount)
+- Legacy `.md`-wrapped JSON pages are auto-detected on load; **Noteometry: Convert legacy .md pages to .nmpage** renames them in bulk, with numeric-suffix collision handling
 
 ## Settings
 
@@ -201,27 +202,25 @@
 ## Responsive Design
 
 ### Desktop (>1024px)
-- Sidebar permanent, 260px wide
 - Right panel 320px, resizable
 - Toolbar centered at bottom
+- File-explorer navigation lives in Obsidian's left side panel (toggle with the standard Obsidian shortcut)
 
 ### Tablet / iPad (768-1024px)
-- Sidebar permanent, narrower
 - Right panel starts at 240px
 - Toolbar scrollable horizontally
 
 ### Phone (<768px)
-- Sidebar overlays canvas (slide-in with backdrop)
-- Auto-collapses on load
 - Canvas and panel stack vertically
 - Color dots smaller (14px)
 - Toolbar compact with smaller buttons
+- **Mobile tools FAB** (gated on `Platform.isMobile`, v1.7.1+) provides a touch-reachable entry to the canvas tool menu since long-press is reserved for the context-menu hub
 
 ## Platform-Specific
 
 ### iPad
 - Touch always pans (finger = pan, Apple Pencil = draw)
-- Swipe gestures blocked (no accidental sidebar/backlinks opening)
+- Swipe gestures blocked at the view boundary (no accidental Obsidian sidebar/backlinks opening while drawing)
 - contentEditable focus on tap for keyboard popup
 - inputMode="text" and enterKeyHint on all inputs
 - Image picker shows photo library (not camera-only)

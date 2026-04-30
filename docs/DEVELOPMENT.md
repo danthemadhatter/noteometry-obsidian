@@ -1,6 +1,6 @@
 # Noteometry Development Guide
 
-> Current as of **v1.6.9**. See [RELEASE.md](../RELEASE.md) for the ship checklist.
+> Current as of **v1.7.2**. See [RELEASE.md](../RELEASE.md) for the ship checklist.
 
 ## Setup
 
@@ -39,11 +39,11 @@ The build automatically deploys `main.js`, `styles.css`, and `manifest.json` to 
 - Closes empty "New Tab" leaves that Obsidian creates
 
 ### View Bridge: `src/NoteometryView.ts`
-- Extends Obsidian's `ItemView`
-- Mounts React root on `onOpen()`
+- Extends Obsidian's `FileView` (Tier 3, v1.7+) — bound to one `.nmpage` `TFile`
+- Registered for the `nmpage` extension via `registerExtensions(["nmpage"], VIEW_TYPE)` in `main.ts`
+- Mounts React root on `onOpen()`; re-renders on `onLoadFile()` so drop-ins see the bound file
 - Calls `flushSave()` on `onClose()` to prevent data loss
 - Blocks touch swipe gestures (bubble-phase `stopPropagation`)
-- Collapses Obsidian's left/right sidebars on open
 
 ### Root Component: `src/components/NoteometryApp.tsx`
 - ALL state lives here (no global stores except tableStore)
@@ -151,7 +151,7 @@ const response = await requestUrl({
 All styles in a single `styles.css` file:
 1. **KaTeX CSS** (line 1) — bundled inline from katex package
 2. **CSS Variables** (lines 9-24) — design tokens (colors, radii, shadows, fonts)
-3. **Layout** — root container, sidebar, split, canvas area, right panel
+3. **Layout** — root container, split, canvas area, right panel (no plugin-owned sidebar; navigation lives in Obsidian's file explorer)
 4. **Components** — toolbar, objects, palette, chat, etc.
 5. **Responsive** — `@media` queries for tablet (<1024px) and phone (<768px)
 

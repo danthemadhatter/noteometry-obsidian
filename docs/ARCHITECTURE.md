@@ -1,10 +1,10 @@
 # Noteometry Architecture
 
-> Current as of **v1.6.9**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes the current shape of the codebase.
+> Current as of **v1.7.2**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes the current shape of the codebase.
 
 ## Overview
 
-Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, eraser, lasso OCR, shape tools, drop-in engineering tools, and AI-powered math/circuit solving. It renders as a full-screen React app inside an Obsidian ItemView.
+Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, eraser, lasso OCR, shape tools, drop-in engineering tools, and AI-powered math/circuit solving. As of v1.7, it renders as a full-screen React app inside an Obsidian `FileView` registered for the `.nmpage` extension; navigation goes through Obsidian's file explorer rather than a plugin-owned sidebar.
 
 ## Tech Stack
 
@@ -22,13 +22,13 @@ Noteometry is an Obsidian plugin — an ink-first STEM notebook with pencil, era
 ```
 noteometry-obsidian/
   src/
-    main.ts                    # Plugin entry point (Obsidian lifecycle)
-    NoteometryView.ts          # Obsidian ItemView → React bridge
+    main.ts                    # Plugin entry point (Obsidian lifecycle, .nmpage extension registration, legacy migration)
+    NoteometryView.ts          # Obsidian FileView → React bridge (file-bound)
     types.ts                   # Shared types and default settings
     settings.ts                # Obsidian settings tab UI
     lib/
       ai.ts                    # AI backend (Claude / Perplexity / LM Studio)
-      persistence.ts           # Save/load pages as .md files in vault
+      persistence.ts           # Save/load pages as .nmpage files (file-bound API + legacy folder API)
       pageFormat.ts            # v3 serialization (single elements[] array)
       inkEngine.ts             # Stroke data model, smoothing, hit-testing
       canvasRenderer.ts        # Canvas 2D drawing (grid, strokes, stamps)
@@ -120,39 +120,40 @@ State (all in NoteometryApp)
     ├── tool: CanvasTool           → controls which pointer handlers active
     ├── inputCode: string          → Panel Input textarea
     ├── chatMessages: ChatMessage[] → ChatPanel message list
-    └── currentSection/Page        → Sidebar selection → persistence
+    └── boundFile: TFile           → set by NoteometryView.onLoadFile, drives persistence
     
 Persistence
     │
-    ├── Auto-save (2s debounce) → savePage() → vault adapter.write()
-    ├── Page switch → saveNow() current → loadPage() new
-    ├── View close → flushSave()
-    └── Files: Noteometry/<Section>/<Page>.md (JSON inside .md)
-         └── Obsidian Sync picks up .md files automatically
+    ├── Auto-save (2s debounce) → savePage(boundFile) → vault.modify()
+    ├── File switch (new tab/leaf) → onLoadFile() re-renders against new TFile
+    ├── View close → flushSave(boundFile)
+    └── Files: <vault>/<any-folder>/<Page-name>.nmpage (v3 JSON, file extension registered for the view)
+         └── Obsidian Sync handles .nmpage like any other recognized vault file
 ```
 
 ## Component Hierarchy
 
 ```
-NoteometryView (Obsidian ItemView)
-  └── NoteometryApp (React root, all state)
-        ├── Sidebar (section/page navigation)
-        └── Main area
-              └── Split layout
-                    ├── Canvas area
-                    │     ├── CanvasToolbar (floating bottom pill)
-                    │     ├── InkCanvas (2 stacked <canvas>: grid + ink)
-                    │     ├── CanvasObjectLayer (positioned DOM overlays)
-                    │     │     ├── RichTextEditor (contentEditable)
-                    │     │     ├── TableEditor (input grid)
-                    │     │     └── <img> (images)
-                    │     └── LassoOverlay (temporary capture canvas)
-                    └── Right panel (collapsible)
-                          ├── Panel
-                          │     ├── KaTeXRenderer (preview)
-                          │     ├── <textarea> (input)
-                          │     └── MathPalette (13 symbol tabs)
-                          └── ChatPanel (AI chat with MathML)
+NoteometryView (Obsidian FileView, bound to one .nmpage TFile)
+  └── NoteometryApp (React root, all state — receives boundFile)
+        └── Split layout
+              ├── Canvas area
+              │     ├── CanvasToolbar (floating bottom pill)
+              │     ├── InkCanvas (2 stacked <canvas>: grid + ink)
+              │     ├── CanvasObjectLayer (positioned DOM overlays)
+              │     │     ├── RichTextEditor (contentEditable)
+              │     │     ├── TableEditor (input grid)
+              │     │     └── <img> (images)
+              │     └── LassoOverlay (temporary capture canvas)
+              └── Right panel (collapsible)
+                    ├── Panel
+                    │     ├── KaTeXRenderer (preview)
+                    │     ├── <textarea> (input)
+                    │     └── MathPalette (13 symbol tabs)
+                    └── ChatPanel (AI chat with MathML)
+
+Page-to-page navigation: Obsidian's file explorer (clicking a .nmpage opens or
+focuses a NoteometryView leaf for that file). No plugin-owned sidebar.
 ```
 
 ## Key Design Decisions
@@ -163,7 +164,7 @@ NoteometryView (Obsidian ItemView)
 
 3. **Stamps, not text objects for math symbols.** Math symbols from the MathPalette are rendered as `fillText` on the canvas (stamps), not as DOM elements. This means they're captured by lasso OCR and behave like ink.
 
-4. **`.md` extension for data files.** Obsidian Sync only syncs recognized file types. Using `.md` instead of `.json` ensures page data syncs across devices automatically.
+4. **`.nmpage` extension with `registerExtensions`.** Pre-v1.7 the plugin used `.md`-wrapped JSON so Obsidian Sync would pick it up; the cost was that Obsidian's editor tried to render the JSON as markdown if you opened it outside the plugin. v1.7 registers `.nmpage` against `NoteometryView` via `registerExtensions(["nmpage"], VIEW_TYPE)` so clicking the file in the file explorer opens the canvas directly. Sync still works because `.nmpage` is a normal vault file. A bulk-rename migration command handles vaults left over from the `.md` era.
 
 5. **Custom SVG icons.** Lucide-react icons were invisible inside Obsidian's plugin context due to CSS class conflicts (Obsidian uses lucide internally). All icons are hand-written inline SVGs.
 

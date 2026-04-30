@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.2 — 2026-04-28
+
+Bugfix on the legacy migration path that shipped with the v1.7 line. `convertLegacyMdPagesToNmpage` was silently `continue`ing whenever the target `.nmpage` already existed, leaving the legacy `.md` on disk. The next plugin load re-detected the unmigrated `.md` via `findLegacyMdPages` and the legacy notice fired again — every restart, even after the user ran the convert command. The convert command's success counter also excluded the skipped files, so the user had no signal anything went wrong.
+
+- **Walk to the next free numeric suffix on collision.** `Foo.nmpage` exists → rename to `Foo 1.nmpage`. `Foo 1.nmpage` also exists → `Foo 2.nmpage`, etc. Every legacy file is now always renamed and the notice goes silent.
+- **Honest convert-command Notice.** The command now returns `{converted, collisions}` and the Notice surfaces both: "converted N pages (M renamed with a numeric suffix to avoid collision)". Users can compare the original `.nmpage` with the suffixed one and delete whichever they don't want.
+- **Tests pin the migration contract.** `tests/unit/persistenceFileBound.test.ts` covers happy path, single-collision suffix, walk-past-existing-suffixes, and "leave real markdown alone" cases.
+
+## 1.7.1 — 2026-04-28
+
+First tagged release of the **Tier 3 native-explorer line**. The eight commits between v1.6.13 and v1.7.1 (`tier3:` prefix) replaced the plugin's own ItemView + internal Notebooks sidebar with an Obsidian-native `FileView` bound to `.nmpage` files: pages now live anywhere in the vault, navigation goes through Obsidian's file explorer, and there is no longer a duplicated sidebar. The bump-driver for v1.7.1 itself is the mobile-FAB fix below; the architectural shift is the line's headline change.
+
+- **Mobile tools FAB now gated on `Platform.isMobile`** (the v1.7.1 trigger). CSS `@media` gating misfires inside the Obsidian webview — on iPad with an Apple Pencil paired the pencil reports as a fine pointer and landscape exceeds 768px, so the `@media (pointer: coarse)` and `(max-width)` guards both miss and the FAB stayed hidden. Touch users had no reachable entry to the canvas tool menu (long-press is `preventDefault`'d to drive ink). The FAB now renders only when `Platform.isMobile` (runtime, reliable inside the webview) and its full appearance rules moved out of the `@media` block to the base selector so JSX gating is the single switch.
+- **NoteometryView is now a `FileView` bound to a TFile.** Each open page is an Obsidian leaf for one `.nmpage` file. `onLoadFile` re-renders React with the new file so drop-ins see the bound file. Per-page `tableStore` and `flushSave` scoping prevents cross-page bleed when multiple pages are open in different tabs.
+- **`.nmpage` extension registered for the view.** `registerExtensions(["nmpage"], VIEW_TYPE)` makes Obsidian's file explorer the canonical entry point — clicking a `.nmpage` opens the canvas. No more plugin-owned Notebooks sidebar duplicating the navigation.
+- **Ribbon icon repurposed to "New Noteometry page."** Replaces the singleton-canvas opener; creates a new `.nmpage` in the configured vault folder and opens it.
+- **Stale workspace-leaf scrubber on layout-ready.** Obsidian's saved `workspace.json` could hold a `noteometry-view` leaf from the pre-Tier 3 singleton. After upgrade, those leaves had no bound file and rendered as empty/broken panes. The plugin now scans `iterateAllLeaves` on `onLayoutReady` and detaches any unbound `noteometry-view`.
+- **Legacy `.md` page detection + migration command.** `findLegacyMdPages` scans the configured vault folder for legacy noteometry-JSON-in-`.md` files on load and surfaces a Notice prompting migration. `Noteometry: Convert legacy .md pages to .nmpage` runs the rename in bulk. (See v1.7.2 for the collision-handling fix.)
+- **File-bound persistence API alongside legacy folder API.** `savePage` / `loadPage` now operate on a passed `TFile` rather than a folder + section + page name tuple, while the legacy folder-based API stays available for migration and tests.
+- **Build-time guard against unintended vault deploys.** `esbuild.config.mjs` production builds now refuse to copy the bundle into `~/Documents/Noteometry/.obsidian/plugins/noteometry/` unless the current branch is `main`. Override with `NOTEOMETRY_FORCE_DEPLOY=1`. (Landed shortly after the v1.7.2 tag — prevents the "experimental branch stranded my vault" failure mode that the early Tier 3 attempt hit.)
+
 ## 1.6.13 — 2026-04-23
 
 Diagnostic + visibility pass on top of v1.6.12. Dan's v1.6.12 report was "most updates didn't work, specifically all canvas and canvas tool updates. Screenshot works but is awkward. No GUI changes." Repo audit confirmed v1.6.12 code + release assets were correct and wired into the active runtime — the **chrome was just too subtle to see**. Math v12 prompt semantics, MathML generation, copy-to-Word, Word-clipboard pipeline, right-click/local hub, and every v1.6.9–v1.6.12 pipeline are untouched.

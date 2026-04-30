@@ -2,7 +2,7 @@
 
 > Single source of truth for shipping a Noteometry release. Every bump goes through these steps — no exceptions.
 
-Current version: **1.6.9** (see [`manifest.json`](./manifest.json), [`package.json`](./package.json), [`versions.json`](./versions.json), [`CHANGELOG.md`](./CHANGELOG.md)).
+Current version: **1.7.2** (see [`manifest.json`](./manifest.json), [`package.json`](./package.json), [`versions.json`](./versions.json), [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ---
 
@@ -15,6 +15,8 @@ Current version: **1.6.9** (see [`manifest.json`](./manifest.json), [`package.js
 - [ ] `npm run build` passes (tsc + esbuild production bundle)
 
 Lint (`npm run lint`) is currently known to fail on a dependency-side issue; do not block the release on it, but note it in the PR.
+
+**On the deploy gate (v1.7.2+):** `esbuild.config.mjs production` only auto-copies the bundle into `~/Documents/Noteometry/.obsidian/plugins/noteometry/` when the current branch is `main`. On any other branch it logs `[deploy] branch is "..." not "main" — skipping vault deploy` and leaves the vault untouched. Override with `NOTEOMETRY_FORCE_DEPLOY=1 npm run build`. CI is unaffected (the vault path doesn't exist on the runner).
 
 ---
 
@@ -34,7 +36,10 @@ The authoritative version lives in `manifest.json`. Every other copy must follow
 | `docs/ARCHITECTURE.md` header note | "Current as of **vX.Y.Z**" | manual |
 | `docs/DEVELOPMENT.md` header note | "Current as of **vX.Y.Z**" | manual |
 | `docs/API.md` header note | "Current as of **vX.Y.Z**" | manual |
+| `RELEASE.md` "Current version" line (top of this file) | bare `X.Y.Z` | manual |
+| `AGENTS.md` BRAT example | `v` + `X.Y.Z` (in the prose example) | manual |
 | `CHANGELOG.md` | new `## X.Y.Z — YYYY-MM-DD` section at the top | manual |
+| `src/lib/version.ts` `NOTEOMETRY_VERSION` constant | bare `X.Y.Z` | `scripts/ship.sh` (pinned by `tests/unit/version.test.ts`) |
 
 Do **not** edit `V3_SOURCE_TAG` in `src/lib/pageFormat.ts` — it is a persistence format tag (historical `noteometry-1.5.0`), not the plugin version. Changing it is a storage migration.
 
@@ -79,10 +84,10 @@ Preserve every prior entry. Historical changelog entries are not current documen
 
 ## 4. Tag with the `v` prefix
 
-**This repo uses the `v` prefix** — `v1.6.9`, not `1.6.9`. The release workflow fires on any pushed tag and uses `github.ref_name` as both the release name and tag name, so BRAT matches `manifest.json` `"version": "1.6.9"` against a release whose tag is `v1.6.9`.
+**This repo uses the `v` prefix** — `v1.7.2`, not `1.7.2`. The release workflow fires on any pushed tag and uses `github.ref_name` as both the release name and tag name, so BRAT matches `manifest.json` `"version": "1.7.2"` against a release whose tag is `v1.7.2`.
 
 ```bash
-git tag v1.6.9
+git tag vX.Y.Z         # e.g. v1.7.2
 git push origin main --tags
 ```
 
@@ -99,7 +104,7 @@ Obsidian's official sample-plugin guideline recommends a bare-number tag. This p
 1. Installs deps (`npm ci`)
 2. Runs `npm run build`
 3. Verifies `main.js`, `styles.css`, and `manifest.json` exist at repo root (bytes printed to the workflow log)
-4. Creates a GitHub release whose tag and name both equal `github.ref_name` (e.g. `v1.6.9`)
+4. Creates a GitHub release whose tag and name both equal `github.ref_name` (e.g. `v1.7.2`)
 5. Attaches `main.js`, `styles.css`, `manifest.json` as individual top-level release assets; `fail_on_unmatched_files: true` stops the job if any are missing
 
 Open the Actions tab, confirm the green check, then open the Releases page and confirm:
