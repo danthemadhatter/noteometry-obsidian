@@ -3,6 +3,7 @@ import process from "process";
 import { builtinModules } from 'node:module';
 import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 
 // Auto-deploy built files to Dan's single Obsidian Sync vault. Dan's
 // rule: one vault, and that vault is the one connected to Obsidian Sync
@@ -18,6 +19,29 @@ const HOME = process.env.HOME || "";
 const VAULT_PLUGIN_PATHS = [
   join(HOME, "Documents/Noteometry/.obsidian/plugins/noteometry"),
 ];
+
+// Only `main` is allowed to write into the live Obsidian Sync vault.
+// Experimental branches (Tier 3 attempts, refactors, etc.) once stranded
+// the vault on an empty state when they auto-deployed on build. To
+// override locally — `NOTEOMETRY_FORCE_DEPLOY=1 npm run build`.
+function deployAllowed() {
+  if (process.env.NOTEOMETRY_FORCE_DEPLOY === "1") {
+    console.log("[deploy] NOTEOMETRY_FORCE_DEPLOY=1 — bypassing branch gate");
+    return true;
+  }
+  let branch;
+  try {
+    branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    console.log("[deploy] not a git checkout — skipping vault deploy");
+    return false;
+  }
+  if (branch !== "main") {
+    console.log(`[deploy] branch is "${branch}", not "main" — skipping vault deploy (set NOTEOMETRY_FORCE_DEPLOY=1 to override)`);
+    return false;
+  }
+  return true;
+}
 
 function deployToVaults() {
   for (const dest of VAULT_PLUGIN_PATHS) {
@@ -82,7 +106,9 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
-	deployToVaults();
+	if (deployAllowed()) {
+		deployToVaults();
+	}
 	process.exit(0);
 } else {
 	await context.watch();
