@@ -1,28 +1,30 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   COURSE_WEEKS,
+  COURSE_FIRST_PAGE_NAME,
   createSixteenWeekCourseWith,
 } from "../../src/lib/courseTemplate";
 
 /**
- * v1.6.10 regression guardrails.
+ * v1.6.10 / v1.7.2 regression guardrails.
  *
  * Dan reported the 16-week course template as "disappeared" in v1.6.9.
  * Investigation showed the button was still there but ambiguously
- * labelled, and the seeding logic had no unit-test coverage — so a
- * future refactor could quietly drop the 16-page loop and no one would
- * notice until a user tried to start a new semester.
- *
- * These tests pin the contract on the pure helper: always creates a
- * section plus exactly 16 pages named Week 1 … Week 16, trims blanks,
- * refuses empty names. The production wrapper in sidebarActions.ts
- * binds this helper to the real persistence functions.
+ * labelled, and the seeding logic had no unit-test coverage. v1.7.2
+ * reshapes the template from a flat 16-page list into a 3-level tree
+ * (Course → Week N → Lecture) so the SidebarTree can render Course /
+ * Week / Homework. These tests pin the new contract: 16 week folders,
+ * Lecture seed in Week 1, blank-name guard.
  */
 
 function makeDeps() {
-  const createSection = vi.fn().mockResolvedValue(undefined);
-  const createPage = vi.fn().mockResolvedValue(undefined);
-  return { createSection, createPage };
+  const createFolderAt = vi
+    .fn<(plugin: unknown, parent: string, name: string) => Promise<string>>()
+    .mockImplementation(async (_p, parent, name) => (parent ? `${parent}/${name}` : name));
+  const createPageAt = vi
+    .fn<(plugin: unknown, dir: string, name: string) => Promise<string>>()
+    .mockImplementation(async (_p, dir, name) => (dir ? `${dir}/${name}` : name));
+  return { createFolderAt, createPageAt };
 }
 
 describe("createSixteenWeekCourseWith", () => {
@@ -30,44 +32,57 @@ describe("createSixteenWeekCourseWith", () => {
     expect(COURSE_WEEKS).toBe(16);
   });
 
-  it("creates the section plus exactly 16 weekly pages", async () => {
+  it("creates the course folder, 16 week folders, and a Lecture page in Week 1", async () => {
     const deps = makeDeps();
-    const plugin = {} as any;
+    const plugin = {} as never;
     const result = await createSixteenWeekCourseWith(plugin, "EE 301", deps);
-    expect(result).toEqual({ section: "EE 301", firstPage: "Week 1" });
 
-    expect(deps.createSection).toHaveBeenCalledTimes(1);
-    expect(deps.createSection).toHaveBeenCalledWith(plugin, "EE 301");
+    expect(result).toEqual({
+      coursePath: "EE 301",
+      firstPagePath: `EE 301/Week 1/${COURSE_FIRST_PAGE_NAME}`,
+    });
 
-    expect(deps.createPage).toHaveBeenCalledTimes(16);
+    // 1 course folder + 16 week folders = 17 folder creations
+    expect(deps.createFolderAt).toHaveBeenCalledTimes(17);
+    expect(deps.createFolderAt).toHaveBeenNthCalledWith(1, plugin, "", "EE 301");
     for (let i = 1; i <= 16; i++) {
-      expect(deps.createPage).toHaveBeenCalledWith(plugin, "EE 301", `Week ${i}`);
+      expect(deps.createFolderAt).toHaveBeenCalledWith(plugin, "EE 301", `Week ${i}`);
     }
+
+    // Exactly one starter page, inside Week 1
+    expect(deps.createPageAt).toHaveBeenCalledTimes(1);
+    expect(deps.createPageAt).toHaveBeenCalledWith(plugin, "EE 301/Week 1", COURSE_FIRST_PAGE_NAME);
   });
 
   it("trims whitespace around the course name", async () => {
     const deps = makeDeps();
-    const result = await createSixteenWeekCourseWith({} as any, "  Thermo  ", deps);
-    expect(result?.section).toBe("Thermo");
-    expect(deps.createSection).toHaveBeenCalledWith(expect.anything(), "Thermo");
+    const result = await createSixteenWeekCourseWith({} as never, "  Thermo  ", deps);
+    expect(result?.coursePath).toBe("Thermo");
+    expect(deps.createFolderAt).toHaveBeenCalledWith(expect.anything(), "", "Thermo");
   });
 
-  it("returns null for a blank name (no section or pages created)", async () => {
+  it("returns null for a blank name (no folders or pages created)", async () => {
     const deps = makeDeps();
-    const result = await createSixteenWeekCourseWith({} as any, "   ", deps);
+    const result = await createSixteenWeekCourseWith({} as never, "   ", deps);
     expect(result).toBeNull();
-    expect(deps.createSection).not.toHaveBeenCalled();
-    expect(deps.createPage).not.toHaveBeenCalled();
+    expect(deps.createFolderAt).not.toHaveBeenCalled();
+    expect(deps.createPageAt).not.toHaveBeenCalled();
   });
 
-  it("creates the section before any page (so pages land in the right folder)", async () => {
+  it("creates the course folder before any week folder (so weeks land in the right parent)", async () => {
     const order: string[] = [];
-    const deps = {
-      createSection: vi.fn().mockImplementation(async () => { order.push("section"); }),
-      createPage: vi.fn().mockImplementation(async () => { order.push("page"); }),
-    };
-    await createSixteenWeekCourseWith({} as any, "Physics", deps);
-    expect(order[0]).toBe("section");
-    expect(order.slice(1).every(s => s === "page")).toBe(true);
+    const createFolderAt = vi.fn<(plugin: unknown, parent: string, name: string) => Promise<string>>()
+      .mockImplementation(async (_p, parent, name) => {
+        order.push(parent === "" ? "course" : "week");
+        return parent ? `${parent}/${name}` : name;
+      });
+    const createPageAt = vi.fn<(plugin: unknown, dir: string, name: string) => Promise<string>>()
+      .mockImplementation(async (_p, dir, name) => {
+        order.push("page");
+        return dir ? `${dir}/${name}` : name;
+      });
+    await createSixteenWeekCourseWith({} as never, "Physics", { createFolderAt, createPageAt });
+    expect(order[0]).toBe("course");
+    expect(order.slice(1).every(s => s === "week" || s === "page")).toBe(true);
   });
 });

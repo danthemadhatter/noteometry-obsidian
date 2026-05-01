@@ -13,7 +13,7 @@ import {
   deletePage,
   deleteSection,
 } from "../lib/persistence";
-import { revealSection, createSixteenWeekCourse } from "../lib/sidebarActions";
+import { revealFolder, createSixteenWeekCourse } from "../lib/sidebarActions";
 import { validateRename } from "../lib/renameValidation";
 
 interface Props {
@@ -115,10 +115,16 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
       setNewName("");
       setAddingCourse(false);
       await refreshSections();
-      setActiveTab(result.section);
-      const p = await listPages(plugin, result.section);
-      setPagesMap((prev) => ({ ...prev, [result.section]: p }));
-      onSelect(result.section, result.firstPage);
+      // v1.7.2 course template returns 3-level paths
+      // ("Course/Week 1/Lecture"). The legacy 2-level Sidebar doesn't
+      // visualize weeks, so we point active tab at the course root and
+      // fall back to whatever 2-level pages exist directly under it.
+      // The new SidebarTree (replacing this file in step 9) renders
+      // the full tree natively.
+      setActiveTab(result.coursePath);
+      const p = await listPages(plugin, result.coursePath);
+      setPagesMap((prev) => ({ ...prev, [result.coursePath]: p }));
+      onSelect(result.coursePath, result.firstPagePath.split("/").pop() ?? "");
     } finally { submitting.current = false; }
   };
 
@@ -387,7 +393,7 @@ export default function Sidebar({ plugin, currentSection, currentPage, onSelect 
             <button
               className="nm-sidebar-reveal-btn"
               title={`Reveal "${activeTab}" folder in system explorer (or copy vault path on mobile)`}
-              onClick={(e) => { e.stopPropagation(); revealSection(plugin, activeTab); }}
+              onClick={(e) => { e.stopPropagation(); revealFolder(plugin, activeTab); }}
             >
               <IconFolder />
             </button>

@@ -1,51 +1,71 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type NoteometryPlugin from "../../main";
 import {
-  loadPage,
-  listSections,
-  listPages,
+  loadPageByPath,
+  listTree,
   migrateLegacy,
   migrateJsonToMd,
   migrateDotAttachments,
-  migrateBase64Images,
+  migrateBase64ImagesByPath,
   CanvasData,
+  TreeNode,
 } from "../../lib/persistence";
+import { firstLeafPath } from "../../lib/treeHelpers";
 import { createSixteenWeekCourse } from "../../lib/sidebarActions";
 
 /**
- * Pages feature hook. Owns:
- *  - Current section/page selection (state + refs)
- *  - Ready flag (plugin has finished initial load)
- *  - Page selection action (selectPage) with full load sequence
- *  - One-time initial load effect: migrations, section bootstrap, first page load
+ * Pages feature hook (v1.7.2 path-based). Owns:
+ *  - Current page selection as a single relative path string
+ *    (e.g. "Calc III/Week 1/Lecture").
+ *  - Cached tree shape from listTree().
+ *  - Ready flag (plugin has finished initial load).
+ *  - Page selection action (selectPath) with full load sequence.
+ *  - One-time initial load: migrations, tree bootstrap, first leaf load.
  *
- * The composition layer supplies hydration callbacks so usePages can push the
- * loaded CanvasData into the other feature hooks (ink, objects, pipeline) and
- * the tableStore without knowing about them directly.
- *
- * Saving is not owned here — the composition layer has the saveNow/auto-save
- * logic because it needs cross-feature state. selectPage calls flushPendingSave
- * before switching so the previous page's debounced save doesn't hit the new
- * page's slot.
+ * Both the new path-based API (currentPath / selectPath / tree) and the
+ * legacy section+page API (currentSection / currentPage / selectPage)
+ * are returned during the SidebarTree migration. The legacy fields are
+ * derived: currentSection = dirname(currentPath), currentPage =
+ * basename(currentPath). Both NoteometryApp and SidebarTree can read
+ * the shape they need; the legacy fields go away in step 12.
  */
 export interface UsePagesConfig {
   plugin: NoteometryPlugin;
-  /** Called after loadPage + migrateBase64Images finishes for a valid (section, page). */
+  /** Called after the page payload is loaded. */
   onPageLoaded: (data: CanvasData) => void | Promise<void>;
-  /** Called when the selection becomes empty (e.g., after deleting the last page). */
+  /** Called when the selection becomes empty (e.g. last page deleted). */
   onEmptyState: () => void;
-  /** Called before switching pages so pending debounced saves can flush to the OLD page. */
+  /** Called before switching pages so pending debounced saves can flush
+   *  to the OLD page. */
   flushPendingSave: () => Promise<void>;
 }
 
 export interface UsePagesReturn {
+  // New path-based API
+  currentPath: string;
+  pathRef: React.MutableRefObject<string>;
+  tree: TreeNode[];
+  refreshTree: () => Promise<TreeNode[]>;
+  selectPath: (path: string) => Promise<void>;
+
+  // Legacy section/page derivation (kept for NoteometryApp until step 9)
   currentSection: string;
   currentPage: string;
-  ready: boolean;
   sectionRef: React.MutableRefObject<string>;
   pageRef: React.MutableRefObject<string>;
   selectPage: (section: string, page: string) => Promise<void>;
+
+  ready: boolean;
 }
+
+const dirOf = (p: string): string => {
+  const idx = p.lastIndexOf("/");
+  return idx === -1 ? "" : p.slice(0, idx);
+};
+const baseOf = (p: string): string => {
+  const idx = p.lastIndexOf("/");
+  return idx === -1 ? p : p.slice(idx + 1);
+};
 
 export function usePages({
   plugin,
@@ -53,14 +73,16 @@ export function usePages({
   onEmptyState,
   flushPendingSave,
 }: UsePagesConfig): UsePagesReturn {
-  const [currentSection, setCurrentSection] = useState("");
-  const [currentPage, setCurrentPage] = useState("");
+  const [currentPath, setCurrentPath] = useState("");
+  const [tree, setTree] = useState<TreeNode[]>([]);
   const [ready, setReady] = useState(false);
+
+  const pathRef = useRef("");
+  // Legacy mirrors — kept in sync with currentPath for the surviving
+  // 2-level callers in NoteometryApp during the transition.
   const sectionRef = useRef("");
   const pageRef = useRef("");
 
-  // Mirror callbacks in refs so the one-shot init effect can use the latest
-  // versions without re-running, and selectPage's closure stays stable.
   const onPageLoadedRef = useRef(onPageLoaded);
   const onEmptyStateRef = useRef(onEmptyState);
   const flushPendingSaveRef = useRef(flushPendingSave);
@@ -68,77 +90,99 @@ export function usePages({
   onEmptyStateRef.current = onEmptyState;
   flushPendingSaveRef.current = flushPendingSave;
 
-  const selectPage = useCallback(async (section: string, page: string) => {
-    // Flush any pending debounced save so it hits the OLD page, not the new one.
-    await flushPendingSaveRef.current();
-
-    // Normalize: if only section is provided, pick its first page.
-    let resolvedPage = page;
-    if (section && !resolvedPage) {
-      const pages = await listPages(plugin, section);
-      resolvedPage = pages[0] ?? "";
-    }
-
-    sectionRef.current = section;
-    pageRef.current = resolvedPage;
-    setCurrentSection(section);
-    setCurrentPage(resolvedPage);
-
-    if (section && resolvedPage) {
-      const data = await loadPage(plugin, section, resolvedPage);
-      // Migrate base64 images in this page to vault files before handing to
-      // the composition layer.
-      const objs = data.canvasObjects ?? [];
-      const imgResult = await migrateBase64Images(plugin, section, objs);
-      data.canvasObjects = imgResult.objects;
-      await onPageLoadedRef.current(data);
-    } else {
-      onEmptyStateRef.current();
-    }
+  const refreshTree = useCallback(async (): Promise<TreeNode[]> => {
+    const t = await listTree(plugin);
+    setTree(t);
+    return t;
   }, [plugin]);
 
-  // One-time initial load: run migrations, pick starting section/page, load it.
+  const selectPath = useCallback(async (path: string) => {
+    // Flush any pending debounced save so it hits the OLD page.
+    await flushPendingSaveRef.current();
+
+    pathRef.current = path;
+    sectionRef.current = dirOf(path);
+    pageRef.current = baseOf(path);
+    setCurrentPath(path);
+
+    if (!path) {
+      onEmptyStateRef.current();
+      return;
+    }
+
+    const data = await loadPageByPath(plugin, path);
+    const objs = data.canvasObjects ?? [];
+    const imgResult = await migrateBase64ImagesByPath(plugin, path, objs);
+    data.canvasObjects = imgResult.objects;
+    await onPageLoadedRef.current(data);
+  }, [plugin]);
+
+  const selectPage = useCallback(async (section: string, page: string) => {
+    if (!section && !page) {
+      await selectPath("");
+      return;
+    }
+    if (section && !page) {
+      // Legacy "open the section, pick its first page" semantic. Resolve
+      // by walking the tree under the section folder.
+      const t = await listTree(plugin);
+      setTree(t);
+      const sectionNode = t.find((n) => n.path === section);
+      const firstChild = sectionNode?.children?.[0];
+      if (firstChild?.kind === "page") {
+        await selectPath(firstChild.path);
+      } else if (firstChild?.kind === "folder") {
+        const leaf = firstLeafPath([firstChild]);
+        await selectPath(leaf ?? "");
+      } else {
+        await selectPath("");
+      }
+      return;
+    }
+    await selectPath(section ? `${section}/${page}` : page);
+  }, [plugin, selectPath]);
+
+  // One-time initial load.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       await migrateJsonToMd(plugin);
       await migrateDotAttachments(plugin);
       const migrated = await migrateLegacy(plugin);
-      const secs = await listSections(plugin);
+      const t = await listTree(plugin);
       if (cancelled) return;
+      setTree(t);
 
-      let sec = "";
-      let pg = "";
-
+      let path = "";
       if (migrated) {
-        sec = migrated.section;
-        pg = migrated.page;
-      } else if (secs.length > 0) {
-        sec = secs[0]!;
-        const pages = await listPages(plugin, sec);
-        pg = pages[0] ?? "";
+        path = migrated.section ? `${migrated.section}/${migrated.page}` : migrated.page;
       } else {
-        // First run: seed a default 16-week course so new installs have
-        // something to draw on. Shares the helper with the sidebar button
-        // and the command-palette entry so all three produce the same
-        // vault layout.
-        const seeded = await createSixteenWeekCourse(plugin, "My Course");
-        if (seeded) {
-          sec = seeded.section;
-          pg = seeded.firstPage;
+        const leaf = firstLeafPath(t);
+        if (leaf) {
+          path = leaf;
+        } else {
+          // First run: seed a default 16-week course so new installs
+          // have somewhere to draw. Shares the helper with the sidebar
+          // bottom action so all entry points produce the same layout.
+          const seeded = await createSixteenWeekCourse(plugin, "My Course");
+          if (seeded) {
+            path = seeded.firstPagePath;
+            const t2 = await listTree(plugin);
+            if (!cancelled) setTree(t2);
+          }
         }
       }
 
       if (cancelled) return;
-      sectionRef.current = sec;
-      pageRef.current = pg;
-      setCurrentSection(sec);
-      setCurrentPage(pg);
+      pathRef.current = path;
+      sectionRef.current = dirOf(path);
+      pageRef.current = baseOf(path);
+      setCurrentPath(path);
 
-      if (sec && pg) {
-        const data = await loadPage(plugin, sec, pg);
+      if (path) {
+        const data = await loadPageByPath(plugin, path);
         const objs = data.canvasObjects ?? [];
-        const imgResult = await migrateBase64Images(plugin, sec, objs);
+        const imgResult = await migrateBase64ImagesByPath(plugin, path, objs);
         data.canvasObjects = imgResult.objects;
         if (!cancelled) {
           await onPageLoadedRef.current(data);
@@ -152,11 +196,18 @@ export function usePages({
   }, []);
 
   return {
-    currentSection,
-    currentPage,
-    ready,
+    currentPath,
+    pathRef,
+    tree,
+    refreshTree,
+    selectPath,
+
+    currentSection: dirOf(currentPath),
+    currentPage: baseOf(currentPath),
     sectionRef,
     pageRef,
     selectPage,
+
+    ready,
   };
 }
