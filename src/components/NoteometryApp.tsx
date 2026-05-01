@@ -10,13 +10,18 @@ import {
   createAnimationCanvas, createStudyGantt,
   createMultimeter,
 } from "../lib/canvasObjects";
-import { savePage, saveImageToVault, savePdfToVault, CanvasData } from "../lib/persistence";
+import {
+  savePageByPath,
+  saveImageToVaultByPath,
+  savePdfToVaultByPath,
+  CanvasData,
+} from "../lib/persistence";
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 // CanvasToolbar removed — all tools now live in the right-click context menu
 import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
-import Sidebar from "./Sidebar";
+import SidebarTree from "./SidebarTree";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
@@ -318,17 +323,17 @@ export default function NoteometryApp({ plugin, app }: Props) {
     requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [hydratePipeline, hydrateInk, hydrateObjects]);
 
-  /* ── Pages feature: section/page state + load lifecycle ── */
+  /* ── Pages feature: path-based state + load lifecycle ── */
   const {
-    currentSection, currentPage, ready,
-    sectionRef, pageRef,
-    selectPage: handleSelect,
+    currentPath, pathRef, tree, refreshTree,
+    selectPath: handleSelect,
+    currentPage,
+    ready,
   } = usePages({ plugin, onPageLoaded, onEmptyState, flushPendingSave });
 
   const saveNow = useCallback(async () => {
-    const sec = sectionRef.current;
-    const pg = pageRef.current;
-    if (!sec || !pg) return;
+    const path = pathRef.current;
+    if (!path) return;
 
     const data: CanvasData = {
       version: 2,
@@ -342,20 +347,20 @@ export default function NoteometryApp({ plugin, app }: Props) {
       textBoxData: getAllTextBoxData(),
       lastSaved: new Date().toISOString(),
     };
-    await savePage(plugin, sec, pg, data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, sectionRef, pageRef]);
+    await savePageByPath(plugin, path, data);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, pathRef]);
 
   // Keep the indirection ref up to date so flushPendingSave sees the latest saveNow.
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
   const doSave = useCallback(() => {
     if (!plugin.settings.autoSave) return;
-    if (!sectionRef.current || !pageRef.current) return;
+    if (!pathRef.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(async () => {
       await saveNow();
     }, plugin.settings.autoSaveDelay);
-  }, [saveNow, plugin, sectionRef, pageRef]);
+  }, [saveNow, plugin, pathRef]);
 
   useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
@@ -586,12 +591,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
     try {
       const bytes = await file.arrayBuffer();
       const obj = createPdfObject(scrollX + 80, scrollY + 80, "");
-      const sec = sectionRef.current;
-      if (!sec) {
-        new Notice("Can't insert PDF — no active section. Create or open a page first.", 6000);
+      const path = pathRef.current;
+      if (!path) {
+        new Notice("Can't insert PDF — no active page. Create or open a page first.", 6000);
         return;
       }
-      const vaultPath = await savePdfToVault(plugin, sec, obj.id, bytes);
+      const vaultPath = await savePdfToVaultByPath(plugin, path, obj.id, bytes);
       obj.fileRef = vaultPath;
       setCanvasObjects((prev) => [...prev, obj]);
       setTool("select");
@@ -909,12 +914,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
               img.width * scale,
               img.height * scale
             );
-            // Save to vault if we have a section; otherwise the dataURL
-            // stays in memory (still renders, won't sync across devices).
-            const sec = sectionRef.current;
-            if (sec) {
+            // Save to vault if we have an active page; otherwise the
+            // dataURL stays in memory (still renders, won't sync).
+            const path = pathRef.current;
+            if (path) {
               try {
-                const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                const vaultPath = await saveImageToVaultByPath(plugin, path, obj.id, dataURL);
                 obj.dataURL = vaultPath;
               } catch (err) {
                 console.error("[Noteometry] image vault save failed:", err);
@@ -982,10 +987,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
               const dataURL = ev.target?.result as string;
               if (!dataURL) return;
               const obj = createImageObject(scrollX + 150, scrollY + 150, dataURL);
-              const sec = sectionRef.current;
-              if (sec) {
+              const path = pathRef.current;
+              if (path) {
                 try {
-                  const vaultPath = await saveImageToVault(plugin, sec, obj.id, dataURL);
+                  const vaultPath = await saveImageToVaultByPath(plugin, path, obj.id, dataURL);
                   obj.dataURL = vaultPath;
                 } catch (err) {
                   console.error("[Noteometry] paste image vault save failed:", err);
@@ -1157,12 +1162,13 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   return (
     <div ref={containerRef} className="noteometry-container">
-      {/* ── Sidebar ── */}
-      <Sidebar
+      {/* ── Sidebar tree ── */}
+      <SidebarTree
         plugin={plugin}
-        currentSection={currentSection}
-        currentPage={currentPage}
-        onSelect={handleSelect}
+        tree={tree}
+        currentPath={currentPath}
+        onSelect={(p) => { void handleSelect(p); }}
+        onTreeChanged={refreshTree}
       />
 
       {/* ── Main area ── */}
@@ -1258,7 +1264,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 selectedObjectId={selectedObjectId}
                 onSelectObject={setSelectedObjectId}
                 plugin={plugin}
-                section={currentSection}
+                pagePath={currentPath}
               />
 
               {/* Lasso overlay — operates within the viewport */}
