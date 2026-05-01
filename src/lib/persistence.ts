@@ -8,9 +8,11 @@ import {
   unpackFromV3,
   isV3Page,
 } from "./pageFormat";
+import type { TreeNode } from "./treeTypes";
 
 // Re-export so existing consumers don't have to change their imports.
 export type { CanvasData } from "./pageFormat";
+export type { TreeNode } from "./treeTypes";
 export {
   packToV3,
   unpackFromV3,
@@ -383,6 +385,275 @@ export async function migrateBase64Images(
     }
   }
   return { objects: migrated, changed };
+}
+
+/* ── Path-based API (v1.7.2 tree sidebar) ────────────────
+ * The legacy 2-level (section, page) helpers above are kept intact for
+ * back-compat during the SidebarTree migration. New code should use
+ * these path-based functions, which speak in vault-folder-relative
+ * paths like "Calc III/Week 1/Page 1" (no .md suffix in the API).
+ *
+ * Folders named "attachments" hold images/PDFs and are intentionally
+ * filtered out of the navigable tree. */
+
+const ATTACHMENTS_FOLDER = "attachments";
+
+function vaultPathForPage(plugin: NoteometryPlugin, path: string): string {
+  return `${rootDir(plugin)}/${path}.md`;
+}
+
+function vaultPathForFolder(plugin: NoteometryPlugin, path: string): string {
+  return path ? `${rootDir(plugin)}/${path}` : rootDir(plugin);
+}
+
+/** Recursively list the entire Noteometry tree under the vault root.
+ *  Skips `attachments/` folders. Sorts folders before pages, each group
+ *  in natural order ("Week 2" before "Week 10"). Returns [] for an empty
+ *  or missing root. */
+export async function listTree(plugin: NoteometryPlugin): Promise<TreeNode[]> {
+  const root = rootDir(plugin);
+  const adapter = plugin.app.vault.adapter;
+  try {
+    if (!(await adapter.exists(root))) {
+      await adapter.mkdir(root);
+      return [];
+    }
+  } catch {
+    return [];
+  }
+
+  const walk = async (absDir: string, relPath: string, depth: number): Promise<TreeNode[]> => {
+    let listing;
+    try {
+      listing = await adapter.list(absDir);
+    } catch {
+      return [];
+    }
+
+    const folderNodes: TreeNode[] = [];
+    for (const folder of listing.folders) {
+      const name = folder.split("/").pop() ?? "";
+      if (!name || name === ATTACHMENTS_FOLDER) continue;
+      const childRel = relPath ? `${relPath}/${name}` : name;
+      const children = await walk(folder, childRel, depth + 1);
+      folderNodes.push({
+        name,
+        path: childRel,
+        kind: "folder",
+        depth,
+        children,
+      });
+    }
+
+    const pageNodes: TreeNode[] = [];
+    for (const file of listing.files) {
+      if (!file.endsWith(".md")) continue;
+      const fileName = file.split("/").pop() ?? "";
+      const baseName = fileName.replace(/\.md$/, "");
+      if (!baseName) continue;
+      const childRel = relPath ? `${relPath}/${baseName}` : baseName;
+      pageNodes.push({
+        name: baseName,
+        path: childRel,
+        kind: "page",
+        depth,
+      });
+    }
+
+    folderNodes.sort((a, b) => naturalCompare(a.name, b.name));
+    pageNodes.sort((a, b) => naturalCompare(a.name, b.name));
+    return [...folderNodes, ...pageNodes];
+  };
+
+  return walk(root, "", 0);
+}
+
+export async function loadPageByPath(
+  plugin: NoteometryPlugin,
+  path: string
+): Promise<CanvasData> {
+  const adapter = plugin.app.vault.adapter;
+  const filePath = vaultPathForPage(plugin, path);
+  try {
+    if (await adapter.exists(filePath)) {
+      const raw = await adapter.read(filePath);
+      const parsed = JSON.parse(raw);
+
+      if (isV3Page(parsed)) {
+        return unpackFromV3(parsed);
+      }
+
+      if (parsed.version === 2 || Array.isArray(parsed.strokes)) {
+        return {
+          strokes: parsed.strokes ?? [],
+          stamps: parsed.stamps ?? [],
+          canvasObjects: parsed.canvasObjects ?? [],
+          viewport: parsed.viewport ?? { scrollX: 0, scrollY: 0 },
+          panelInput: parsed.panelInput ?? "",
+          chatMessages: parsed.chatMessages ?? [],
+          tableData: parsed.tableData ?? {},
+          textBoxData: parsed.textBoxData ?? {},
+          lastSaved: parsed.lastSaved ?? "",
+        };
+      }
+
+      return {
+        strokes: [],
+        stamps: [],
+        canvasObjects: [],
+        viewport: { scrollX: 0, scrollY: 0 },
+        panelInput: parsed.panelInput ?? "",
+        chatMessages: parsed.chatMessages ?? [],
+        tableData: parsed.tableData ?? {},
+        textBoxData: parsed.textBoxData ?? {},
+        lastSaved: parsed.lastSaved ?? "",
+      };
+    }
+  } catch (e) {
+    console.error("[Noteometry] load failed:", e);
+    new Notice(`Failed to load "${path}" — file may be corrupt (see console)`, 10000);
+  }
+  return { ...EMPTY_PAGE };
+}
+
+export async function savePageByPath(
+  plugin: NoteometryPlugin,
+  path: string,
+  data: CanvasData
+): Promise<void> {
+  const adapter = plugin.app.vault.adapter;
+  try {
+    const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    const parentAbs = vaultPathForFolder(plugin, parent);
+    if (!(await adapter.exists(parentAbs))) {
+      await adapter.mkdir(parentAbs);
+    }
+    const filePath = vaultPathForPage(plugin, path);
+    const v3 = packToV3(data);
+    await adapter.write(filePath, JSON.stringify(v3, null, 0));
+  } catch (e) {
+    console.error("[Noteometry] save failed:", e);
+    new Notice(`Failed to save "${path}" — changes may not persist (see console)`, 10000);
+  }
+}
+
+/** Create an empty page at `${dirPath}/${name}.md`. dirPath="" means
+ *  the page sits directly under the vault folder root. */
+export async function createPageAt(
+  plugin: NoteometryPlugin,
+  dirPath: string,
+  name: string
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const dirAbs = vaultPathForFolder(plugin, dirPath);
+  if (!(await adapter.exists(dirAbs))) {
+    await adapter.mkdir(dirAbs);
+  }
+  const path = dirPath ? `${dirPath}/${name}` : name;
+  const filePath = vaultPathForPage(plugin, path);
+  if (!(await adapter.exists(filePath))) {
+    const empty: CanvasData = { ...EMPTY_PAGE, lastSaved: new Date().toISOString() };
+    const v3 = packToV3(empty);
+    await adapter.write(filePath, JSON.stringify(v3, null, 0));
+  }
+  return path;
+}
+
+/** Create an empty folder at `${parentPath}/${name}`. parentPath="" means
+ *  a top-level folder directly under the vault root. */
+export async function createFolderAt(
+  plugin: NoteometryPlugin,
+  parentPath: string,
+  name: string
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const path = parentPath ? `${parentPath}/${name}` : name;
+  const folderAbs = vaultPathForFolder(plugin, path);
+  if (!(await adapter.exists(folderAbs))) {
+    await adapter.mkdir(folderAbs);
+  }
+  return path;
+}
+
+/** Rename a node (page or folder). For pages, oldPath/newPath are the
+ *  paths WITHOUT the .md suffix. For folders, recursively rewrites
+ *  child page contents that referenced the old attachments folder. */
+export async function renameNode(
+  plugin: NoteometryPlugin,
+  oldPath: string,
+  newPath: string,
+  kind: "folder" | "page"
+): Promise<void> {
+  const adapter = plugin.app.vault.adapter;
+  if (oldPath === newPath) return;
+
+  if (kind === "page") {
+    const oldAbs = vaultPathForPage(plugin, oldPath);
+    const newAbs = vaultPathForPage(plugin, newPath);
+    if (!(await adapter.exists(oldAbs))) return;
+    const data = await adapter.read(oldAbs);
+    await adapter.write(newAbs, data);
+    await adapter.remove(oldAbs);
+    return;
+  }
+
+  // Folder rename: copy whole subtree, then drop the old folder.
+  const oldAbs = vaultPathForFolder(plugin, oldPath);
+  const newAbs = vaultPathForFolder(plugin, newPath);
+  if (!(await adapter.exists(oldAbs))) return;
+  if (!(await adapter.exists(newAbs))) await adapter.mkdir(newAbs);
+
+  const copyDir = async (src: string, dst: string): Promise<void> => {
+    const listing = await adapter.list(src);
+    for (const sub of listing.folders) {
+      const subName = sub.split("/").pop() ?? "";
+      if (!subName) continue;
+      const dstSub = `${dst}/${subName}`;
+      if (!(await adapter.exists(dstSub))) await adapter.mkdir(dstSub);
+      await copyDir(sub, dstSub);
+    }
+    for (const file of listing.files) {
+      const fileName = file.split("/").pop() ?? "";
+      if (!fileName) continue;
+      const target = `${dst}/${fileName}`;
+      // Binary-safe copy. .md files round-trip through readBinary too.
+      const buf = await adapter.readBinary(file);
+      await adapter.writeBinary(target, buf);
+      await adapter.remove(file);
+    }
+    try { await adapter.rmdir(src, false); } catch { /* best-effort */ }
+  };
+  await copyDir(oldAbs, newAbs);
+  try { await adapter.rmdir(oldAbs, false); } catch { /* best-effort */ }
+}
+
+/** Delete a node. For folders, removes recursively (including any
+ *  attachments subfolder). */
+export async function deleteNode(
+  plugin: NoteometryPlugin,
+  path: string,
+  kind: "folder" | "page"
+): Promise<void> {
+  const adapter = plugin.app.vault.adapter;
+  if (kind === "page") {
+    const filePath = vaultPathForPage(plugin, path);
+    if (await adapter.exists(filePath)) {
+      await adapter.remove(filePath);
+    }
+    return;
+  }
+  const folderAbs = vaultPathForFolder(plugin, path);
+  if (await adapter.exists(folderAbs)) {
+    await adapter.rmdir(folderAbs, true);
+  }
+}
+
+/** Resolve the attachments folder for a given page path. The folder is
+ *  always a sibling of the page file: `${dirname(path)}/attachments`. */
+export function attachmentsDirForPage(plugin: NoteometryPlugin, pagePath: string): string {
+  const parent = pagePath.includes("/") ? pagePath.slice(0, pagePath.lastIndexOf("/")) : "";
+  const parentAbs = vaultPathForFolder(plugin, parent);
+  return `${parentAbs}/${ATTACHMENTS_FOLDER}`;
 }
 
 /* ── Legacy migration ────────────────────────────────── */
