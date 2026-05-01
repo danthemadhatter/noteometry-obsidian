@@ -3307,3 +3307,107 @@
     height: 28px;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.7.4 — per-course color band + sidebar header buttons
+   ════════════════════════════════════════════════════════ */
+
+/* Header buttons (settings + sidebar-toggle) */
+.noteometry-tree-hdr-spacer {
+  flex: 1;
+}
+.noteometry-tree-hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  border-radius: var(--nm-radius-sm, 4px);
+  cursor: pointer;
+  color: var(--nm-ink);
+  opacity: 0.65;
+  transition: all 0.12s ease;
+}
+.noteometry-tree-hdr-btn:hover {
+  opacity: 1;
+  background: var(--nm-accent-light, var(--background-modifier-hover, rgba(0, 0, 0, 0.08)));
+  color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+}
+.noteometry-tree-hdr-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* OneNote-style colored band on every row, derived from the course
+ * (root segment of the path). Course rows get a thicker, opaque band;
+ * descendants get a thinner, fainter version so the subtree visually
+ * groups under its parent course. */
+.noteometry-tree-row {
+  position: relative;
+}
+.noteometry-tree-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--noteometry-row-accent, transparent);
+  opacity: 0.35;
+  transition: opacity 0.1s ease, width 0.1s ease;
+}
+.noteometry-tree-row--course::before {
+  width: 4px;
+  opacity: 0.95;
+}
+.noteometry-tree-row--folder:not(.noteometry-tree-row--course)::before {
+  opacity: 0.55;
+}
+.noteometry-tree-row--page::before {
+  opacity: 0.25;
+}
+.noteometry-tree-row--page.noteometry-tree-row--active::before {
+  width: 4px;
+  opacity: 1;
+  background: var(--noteometry-row-accent, var(--nm-accent));
+}
+
+/* Active page now uses the course color instead of a generic accent so
+ * the highlight ties back to the course visually. */
+.noteometry-tree-row--page.noteometry-tree-row--active {
+  background: color-mix(in srgb, var(--noteometry-row-accent, var(--nm-accent)) 18%, transparent);
+  color: var(--nm-ink);
+  font-weight: 600;
+  box-shadow: none;
+}
+.noteometry-tree-row--page.noteometry-tree-row--active:hover {
+  background: color-mix(in srgb, var(--noteometry-row-accent, var(--nm-accent)) 25%, transparent);
+}
+.noteometry-tree-row--page.noteometry-tree-row--active .noteometry-tree-icon,
+.noteometry-tree-row--page.noteometry-tree-row--active .noteometry-tree-twisty {
+  color: var(--noteometry-row-accent);
+  opacity: 1;
+}
+
+/* Course row: pad + heavier visual chrome so it reads as a section
+ * header, OneNote-style. */
+.noteometry-tree-row--course {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-top: 4px;
+  background: color-mix(in srgb, var(--noteometry-row-accent, transparent) 6%, transparent);
+}
+.noteometry-tree-row--course:hover {
+  background: color-mix(in srgb, var(--noteometry-row-accent, transparent) 12%, transparent);
+}
+.noteometry-tree-row--course .noteometry-tree-icon {
+  color: var(--noteometry-row-accent, var(--nm-accent));
+  opacity: 1;
+}
+
+/* Folder rows beneath a course: subtle tint */
+.noteometry-tree-row--folder:not(.noteometry-tree-row--course):hover {
+  background: color-mix(in srgb, var(--noteometry-row-accent, transparent) 8%, var(--nm-accent-light, transparent));
+}

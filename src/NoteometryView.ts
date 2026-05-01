@@ -43,11 +43,11 @@ export class NoteometryView extends ItemView {
     container.addEventListener("touchmove", blockSwipe, false);
     container.addEventListener("touchend", blockSwipe, false);
 
-    // Also collapse sidebars on open
-    try {
-      (this.app.workspace as any).leftSplit?.collapse();
-      (this.app.workspace as any).rightSplit?.collapse();
-    } catch { /* ignore */ }
+    // v1.7.4: do NOT auto-collapse Obsidian's left/right sidebars.
+    // Pre-v1.7.4 we did, which made Noteometry feel like its own app
+    // and hid the rest of the user's Obsidian setup. Now we leave the
+    // sidebars in whatever state the user left them; the SidebarTree
+    // header has explicit toggles to collapse / expand them on demand.
 
     this.root = createRoot(container);
     this.root.render(

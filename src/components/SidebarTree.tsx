@@ -9,6 +9,7 @@ import {
   IconX,
   IconPen,
   IconBook,
+  IconSliders,
 } from "./Icons";
 import type NoteometryPlugin from "../main";
 import {
@@ -66,6 +67,25 @@ function saveExpandedToStorage(plugin: NoteometryPlugin, expanded: Set<string>):
 
 /** Collect sibling names under a given parent path (for rename collision
  *  detection). dirPath="" means top-level. */
+/** OneNote-flavored per-course color band. Hashes the course name into
+ *  one of eight evenly-spaced hues so renames/reorders are stable and
+ *  no two adjacent courses collide on hue by coincidence. */
+const COURSE_HUES = [210, 25, 145, 285, 340, 55, 175, 305];
+function colorForCourse(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  const idx = Math.abs(hash) % COURSE_HUES.length;
+  return `hsl(${COURSE_HUES[idx]}, 62%, 52%)`;
+}
+
+/** Resolve the top-level course color for any node by walking up to the
+ *  root segment of its path. Sub-folders and pages inherit their
+ *  course's color so the whole subtree reads as one OneNote section. */
+function nodeColor(node: TreeNode): string {
+  const root = node.path.split("/")[0] ?? node.name;
+  return colorForCourse(root);
+}
+
 function collectSiblings(tree: TreeNode[], dirPath: string): string[] {
   if (dirPath === "") return tree.map((n) => n.name);
   const parts = dirPath.split("/");
@@ -379,11 +399,19 @@ export default function SidebarTree({
       isActive ? "noteometry-tree-row--active" : "",
     ].filter(Boolean).join(" ");
 
+    const accent = nodeColor(node);
+    const rowStyle: React.CSSProperties = {
+      paddingLeft: `${indent}px`,
+      // Color the inset left bar via a CSS variable so SidebarTree CSS
+      // can render it without per-row inline backgrounds.
+      ["--noteometry-row-accent" as keyof React.CSSProperties]: accent,
+    } as React.CSSProperties;
+
     return (
       <div key={node.path} className="noteometry-tree-node">
         <div
           className={rowClass}
-          style={{ paddingLeft: `${indent}px` }}
+          style={rowStyle}
           onClick={() => {
             if (isRenaming) return;
             if (isFolder) toggleExpand(node.path);
@@ -496,6 +524,41 @@ export default function SidebarTree({
         <div className="noteometry-sidebar-hdr">
           {toggleBtn}
           <span className="noteometry-sidebar-title">Notebooks</span>
+          <span className="noteometry-tree-hdr-spacer" />
+          <button
+            className="noteometry-tree-hdr-btn"
+            title="Toggle Obsidian's left sidebar (file explorer, search, other plugins)"
+            aria-label="Toggle Obsidian sidebar"
+            onClick={() => {
+              try {
+                const ws = plugin.app.workspace as unknown as {
+                  leftSplit?: { toggle?: () => void; collapsed?: boolean; expand?: () => void; collapse?: () => void };
+                };
+                if (ws.leftSplit?.toggle) ws.leftSplit.toggle();
+                else if (ws.leftSplit?.collapsed && ws.leftSplit.expand) ws.leftSplit.expand();
+                else if (ws.leftSplit?.collapse) ws.leftSplit.collapse();
+              } catch (e) {
+                console.warn("[Noteometry] toggle leftSplit failed:", e);
+              }
+            }}
+          >
+            <IconMenu />
+          </button>
+          <button
+            className="noteometry-tree-hdr-btn"
+            title="Open Obsidian Settings"
+            aria-label="Open settings"
+            onClick={() => {
+              try {
+                const app = plugin.app as unknown as { setting?: { open?: () => void } };
+                app.setting?.open?.();
+              } catch (e) {
+                console.warn("[Noteometry] open settings failed:", e);
+              }
+            }}
+          >
+            <IconSliders />
+          </button>
         </div>
 
         {/* Tree */}
