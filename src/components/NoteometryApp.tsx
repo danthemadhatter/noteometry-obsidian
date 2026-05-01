@@ -263,6 +263,15 @@ export default function NoteometryApp({ plugin, app }: Props) {
     setSelectedObjectId(null);
   }, [handleUndo]);
 
+  // v1.7.6: distinct entry point for the two-finger-tap undo so we can
+  // surface a Notice ("↩ Undid") that makes the gesture discoverable.
+  // Without this, the gesture works but is invisible and users had no
+  // way to learn it existed.
+  const handleTwoFingerUndo = useCallback(() => {
+    handleUndoWrapped();
+    new Notice("↩ Undid (two-finger tap)", 1200);
+  }, [handleUndoWrapped]);
+
   const handleRedoWrapped = useCallback(() => {
     handleRedo();
     setSelectedObjectId(null);
@@ -1257,7 +1266,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 zoomLocked={zoomLocked}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
                 onCycleTool={handleCycleTool}
-                onTwoFingerTap={handleUndoWrapped}
+                onTwoFingerTap={handleTwoFingerUndo}
                 onRequestContextMenu={(clientX, clientY) => {
                   // v1.6.9 pen-long-press fallback for Apple Pencil — no
                   // reliable web event exists for pencil double-tap on

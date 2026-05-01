@@ -116,6 +116,12 @@ export default function InkCanvas({
   const twoFingerStartTimeRef = useRef<number | null>(null);
   const twoFingerMovedRef = useRef(false);
   const twoFingerInitialPosRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+
+  // v1.7.6: two-finger pan support. Centroid of the two touches on
+  // every move; scroll moves by the centroid delta. Works in BOTH
+  // default and finger-drawing mode so the user always has a pan
+  // gesture even when single finger is committed to drawing.
+  const twoFingerCentroidRef = useRef<{ x: number; y: number } | null>(null);
   const onRequestContextMenuRef = useRef(onRequestContextMenu);
 
   // v1.6.9: pen long-press timer. Armed on pen pointerdown, cancelled if
@@ -616,13 +622,24 @@ export default function InkCanvas({
       return Math.hypot(b!.x - a!.x, b!.y - a!.y);
     };
 
+    // v1.7.6: centroid of all current touches; used by the two-finger
+    // pan path so the canvas slides with the fingers' average motion
+    // (independent of pinch ratio, which only changes zoom).
+    const getCentroid = (): { x: number; y: number } | null => {
+      const vals = Array.from(touchesRef.current.values());
+      if (vals.length === 0) return null;
+      const sx = vals.reduce((s, v) => s + v.x, 0);
+      const sy = vals.reduce((s, v) => s + v.y, 0);
+      return { x: sx / vals.length, y: sy / vals.length };
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (fingerDrawingRef.current) {
         // Finger-drawing mode: single finger draws via the pen handler;
-        // only arm pan/pinch once a second finger joins.
+        // pan + pinch + tap-undo arm once a second finger joins.
         if (touchesRef.current.size === 2) {
           // Abort any in-progress single-finger stroke so the user can't
           // accidentally leave a tick-mark when they pinch to zoom.
@@ -634,6 +651,10 @@ export default function InkCanvas({
           pinchStartDistRef.current = getPinchDist();
           pinchStartZoomRef.current = zoomRef.current;
           lastPanRef.current = null;
+          twoFingerCentroidRef.current = getCentroid();
+          twoFingerStartTimeRef.current = performance.now();
+          twoFingerMovedRef.current = false;
+          twoFingerInitialPosRef.current = new Map(touchesRef.current);
         }
         return;
       }
@@ -642,11 +663,13 @@ export default function InkCanvas({
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         pinchStartDistRef.current = null;
       } else if (touchesRef.current.size === 2) {
-        // Second finger landed — start a pinch. Freeze the single-finger
-        // pan so pinch and pan don't fight for the same scroll delta.
+        // Second finger landed — start pan + pinch. Freeze the
+        // single-finger pan so 1-finger and 2-finger paths don't
+        // both try to push scroll deltas.
         pinchStartDistRef.current = getPinchDist();
         pinchStartZoomRef.current = zoomRef.current;
         lastPanRef.current = null;
+        twoFingerCentroidRef.current = getCentroid();
 
         // v1.7.5: arm the two-finger tap detector. Movement during the
         // gesture (pinch / pan) will disarm via onMove below; if the
@@ -674,23 +697,49 @@ export default function InkCanvas({
         }
       }
 
-      // Pinch-zoom path (2 fingers)
-      if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
-        if (zoomLockedRef.current) return;
-        const currentDist = getPinchDist();
-        if (currentDist <= 0) return;
-        const ratio = currentDist / pinchStartDistRef.current;
-        // Clamp to [0.5, 4] matching the Cmd+wheel limits in NoteometryApp.
-        const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
-        if (Math.abs(newZoom - zoomRef.current) < 0.001) return;
-        // Update ref + redraw synchronously so the canvas tracks fingers
-        // without waiting for a React re-render round-trip.
-        zoomRef.current = newZoom;
-        redrawGrid();
-        redrawInk();
-        // Tell the parent so object layer, zoom percent readout, and
-        // everything else that mirrors the state stays in sync.
-        onZoomChangeRef.current?.(newZoom);
+      // Two-finger path (zoom + pan). v1.7.6: pan added so the canvas
+      // slides with the finger centroid even while the user is also
+      // pinching — and so finger-drawing mode finally has a usable
+      // pan gesture (single finger is committed to drawing).
+      if (touchesRef.current.size >= 2) {
+        let dirty = false;
+
+        // Pinch zoom from the distance ratio.
+        if (pinchStartDistRef.current !== null && !zoomLockedRef.current) {
+          const currentDist = getPinchDist();
+          if (currentDist > 0) {
+            const ratio = currentDist / pinchStartDistRef.current;
+            const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
+            if (Math.abs(newZoom - zoomRef.current) >= 0.001) {
+              zoomRef.current = newZoom;
+              onZoomChangeRef.current?.(newZoom);
+              dirty = true;
+            }
+          }
+        }
+
+        // Centroid pan: scroll moves by the average finger delta, in
+        // screen pixels divided by zoom (so panning velocity is the
+        // same in world units regardless of how zoomed-in you are).
+        const centroid = getCentroid();
+        if (centroid && twoFingerCentroidRef.current) {
+          const z = zoomRef.current;
+          const dx = (centroid.x - twoFingerCentroidRef.current.x) / z;
+          const dy = (centroid.y - twoFingerCentroidRef.current.y) / z;
+          if (dx !== 0 || dy !== 0) {
+            const newX = scrollRef.current.x - dx;
+            const newY = scrollRef.current.y - dy;
+            scrollRef.current = { x: newX, y: newY };
+            onViewportChange(newX, newY);
+            dirty = true;
+          }
+        }
+        if (centroid) twoFingerCentroidRef.current = centroid;
+
+        if (dirty) {
+          redrawGrid();
+          redrawInk();
+        }
         return;
       }
 
@@ -720,6 +769,7 @@ export default function InkCanvas({
       if (touchesRef.current.size === 0) {
         lastPanRef.current = null;
         pinchStartDistRef.current = null;
+        twoFingerCentroidRef.current = null;
 
         // v1.7.5: fire two-finger tap if the gesture met the criteria
         // (started as a 2-finger touch, no movement past slop, both
@@ -739,6 +789,7 @@ export default function InkCanvas({
         // One finger remains after a pinch — resume pan from where
         // that finger currently is, not from its stale pre-pinch spot.
         pinchStartDistRef.current = null;
+        twoFingerCentroidRef.current = null;
         const r = touchesRef.current.values().next().value;
         if (r) lastPanRef.current = { x: r.x, y: r.y };
       }
