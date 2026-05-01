@@ -47,6 +47,13 @@ interface Props {
   /** If true, a single-finger touch draws instead of pans. Two-finger
    * touch still pans/pinches. Default false (iPad + Apple Pencil flow). */
   fingerDrawing?: boolean;
+  /** v1.7.5: two-finger tap-to-undo. Fires on a clean two-finger tap
+   *  with no movement (>8 px) and short duration (<400 ms). Does NOT
+   *  fire for pinch-zoom or two-finger pan because both involve
+   *  movement past the threshold. Parent typically wires this to
+   *  handleUndo so the canvas gains a quick undo gesture without
+   *  visiting the right-click hub. */
+  onTwoFingerTap?: () => void;
 }
 
 export default function InkCanvas({
@@ -57,6 +64,7 @@ export default function InkCanvas({
   zoomLocked = false,
   onZoomChange,
   onCycleTool,
+  onTwoFingerTap,
   onRequestContextMenu,
   disabled = false, selectedStampId = null,
   onEraseStart, onEraseEnd,
@@ -98,6 +106,16 @@ export default function InkCanvas({
   const lastTapPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const onCycleToolRef = useRef(onCycleTool);
+  const onTwoFingerTapRef = useRef(onTwoFingerTap);
+  useEffect(() => { onTwoFingerTapRef.current = onTwoFingerTap; }, [onTwoFingerTap]);
+
+  // v1.7.5: two-finger tap detection state.
+  // - twoFingerStartTimeRef: timestamp when size first became 2.
+  // - twoFingerMovedRef: any finger moved past 8px during the gesture.
+  // - twoFingerInitialPosRef: per-finger initial positions for movement comparison.
+  const twoFingerStartTimeRef = useRef<number | null>(null);
+  const twoFingerMovedRef = useRef(false);
+  const twoFingerInitialPosRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const onRequestContextMenuRef = useRef(onRequestContextMenu);
 
   // v1.6.9: pen long-press timer. Armed on pen pointerdown, cancelled if
@@ -629,12 +647,32 @@ export default function InkCanvas({
         pinchStartDistRef.current = getPinchDist();
         pinchStartZoomRef.current = zoomRef.current;
         lastPanRef.current = null;
+
+        // v1.7.5: arm the two-finger tap detector. Movement during the
+        // gesture (pinch / pan) will disarm via onMove below; if the
+        // user lifts both fingers cleanly within 400ms, onUp fires
+        // the undo callback.
+        twoFingerStartTimeRef.current = performance.now();
+        twoFingerMovedRef.current = false;
+        twoFingerInitialPosRef.current = new Map(touchesRef.current);
       }
     };
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // v1.7.5: disarm the two-finger tap detector if any finger has
+      // moved past the slop threshold during a 2-finger gesture. This
+      // is what distinguishes a tap from a pinch or a two-finger pan.
+      if (twoFingerStartTimeRef.current !== null && !twoFingerMovedRef.current) {
+        const initial = twoFingerInitialPosRef.current.get(e.pointerId);
+        if (initial) {
+          const dx = e.clientX - initial.x;
+          const dy = e.clientY - initial.y;
+          if (Math.hypot(dx, dy) > 8) twoFingerMovedRef.current = true;
+        }
+      }
 
       // Pinch-zoom path (2 fingers)
       if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
@@ -682,6 +720,21 @@ export default function InkCanvas({
       if (touchesRef.current.size === 0) {
         lastPanRef.current = null;
         pinchStartDistRef.current = null;
+
+        // v1.7.5: fire two-finger tap if the gesture met the criteria
+        // (started as a 2-finger touch, no movement past slop, both
+        // lifted within 400ms). Pinches and pans set twoFingerMovedRef
+        // earlier and will not fire here.
+        if (
+          twoFingerStartTimeRef.current !== null &&
+          !twoFingerMovedRef.current &&
+          performance.now() - twoFingerStartTimeRef.current < 400
+        ) {
+          onTwoFingerTapRef.current?.();
+        }
+        twoFingerStartTimeRef.current = null;
+        twoFingerMovedRef.current = false;
+        twoFingerInitialPosRef.current.clear();
       } else if (touchesRef.current.size === 1) {
         // One finger remains after a pinch — resume pan from where
         // that finger currently is, not from its stale pre-pinch spot.

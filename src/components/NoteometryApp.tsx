@@ -22,6 +22,7 @@ import CanvasObjectLayer from "./CanvasObjectLayer";
 import Panel from "./Panel";
 import ChatPanel from "./ChatPanel";
 import SidebarTree from "./SidebarTree";
+import AiPendingOverlay from "./AiPendingOverlay";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
@@ -95,6 +96,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
     lassoActive, lassoMode, setLassoActive, setLassoMode, regions: lassoRegions,
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
+
+  /* ── v1.7.5: in-canvas AI loading state. While the vision call is
+   * in flight, the previous lasso bounds get pulsed so the user has
+   * ambient feedback on what's being processed. Cleared on success
+   * or failure. */
+  const [aiPendingBounds, setAiPendingBounds] = useState<LassoBounds[]>([]);
 
   /* ── Double-click / double-tap tool cycle ──────────────
    * Used by both Apple Pencil double-tap (iPad) and mouse double-click
@@ -309,6 +316,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     loadAllTextBoxData(data.textBoxData ?? {});
     setScrollX(data.viewport?.scrollX ?? 0);
     setScrollY(data.viewport?.scrollY ?? 0);
+    // v1.7.5: per-page viewport — restore zoom alongside scroll so a
+    // page remembers where you were AND how zoomed-in you were.
+    // Defaults to 1.0 for older pages without zoom in their v3.
+    setZoom(((data.viewport as { zoom?: number } | undefined)?.zoom) ?? 1);
     // Clear loading flag after React processes the state updates
     requestAnimationFrame(() => { loadingPageRef.current = false; });
   }, [hydratePipeline, hydrateInk, hydrateObjects]);
@@ -343,7 +354,9 @@ export default function NoteometryApp({ plugin, app }: Props) {
       strokes,
       stamps,
       canvasObjects,
-      viewport: { scrollX, scrollY },
+      // v1.7.5: persist zoom alongside scroll so per-page viewport
+      // returns intact on reload.
+      viewport: { scrollX, scrollY, zoom },
       panelInput: inputCode,
       chatMessages,
       tableData: getAllTableData(),
@@ -351,7 +364,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
       lastSaved: new Date().toISOString(),
     };
     await savePageByPath(plugin, path, data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, plugin, pathRef]);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, zoom, inputCode, chatMessages, plugin, pathRef]);
 
   // Keep the indirection ref up to date so flushPendingSave sees the latest saveNow.
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
@@ -365,7 +378,10 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }, plugin.settings.autoSaveDelay);
   }, [saveNow, plugin, pathRef]);
 
-  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
+  // v1.7.5: zoom + scroll added to the autosave deps so per-page
+  // viewport changes get persisted (you pan/zoom on a page, switch
+  // away, come back — same viewport).
+  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects, scrollX, scrollY, zoom]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
   // Trigger auto-save when table/textbox store changes
@@ -426,13 +442,21 @@ export default function NoteometryApp({ plugin, app }: Props) {
       return;
     }
 
-    // Clear the stack and deactivate lasso mode before sending to the AI
-    // so the user can't accidentally add more regions mid-flight.
+    // v1.7.5: snapshot the bounds so the loading-state overlay knows
+    // where to render the "AI is reading this" pulse, then clear the
+    // stack and deactivate lasso mode so the user can't accidentally
+    // add more regions mid-flight.
+    const pendingBounds = snapshot.map((r) => r.bounds);
     clearStack();
     setLassoActive(false);
+    setAiPendingBounds(pendingBounds);
 
     // Hand off to the pipeline (OCR + solve + chat with image attached)
-    await processCrop(composite);
+    try {
+      await processCrop(composite);
+    } finally {
+      setAiPendingBounds([]);
+    }
   }, [lassoRegions, clearStack, setLassoActive, processCrop]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
@@ -1233,6 +1257,7 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 zoomLocked={zoomLocked}
                 onZoomChange={(z) => setZoom(clampZoom(z))}
                 onCycleTool={handleCycleTool}
+                onTwoFingerTap={handleUndoWrapped}
                 onRequestContextMenu={(clientX, clientY) => {
                   // v1.6.9 pen-long-press fallback for Apple Pencil — no
                   // reliable web event exists for pencil double-tap on
@@ -1269,6 +1294,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 plugin={plugin}
                 pagePath={currentPath}
               />
+
+              {/* v1.7.5: in-canvas AI loading state. Pulses the
+                  previously lassoed bounds while readInk / solve is in
+                  flight. Pointer-events disabled in the component so
+                  it doesn't intercept canvas interactions. */}
+              <AiPendingOverlay bounds={aiPendingBounds} />
 
               {/* Lasso overlay — operates within the viewport */}
               <LassoOverlay

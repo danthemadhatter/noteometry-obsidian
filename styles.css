@@ -3411,3 +3411,34 @@
 .noteometry-tree-row--folder:not(.noteometry-tree-row--course):hover {
   background: color-mix(in srgb, var(--noteometry-row-accent, transparent) 8%, var(--nm-accent-light, transparent));
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.7.5 — in-canvas AI loading state
+   ════════════════════════════════════════════════════════ */
+
+.noteometry-ai-pending-rect {
+  border: 2px dashed var(--nm-accent, var(--interactive-accent, #4A90D9));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--nm-accent, #4A90D9) 8%, transparent);
+  animation: noteometry-ai-pulse 1.6s ease-in-out infinite;
+  z-index: 14;
+}
+
+@keyframes noteometry-ai-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nm-accent, #4A90D9) 35%, transparent);
+  }
+  50% {
+    opacity: 0.95;
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--nm-accent, #4A90D9) 0%, transparent);
+  }
+}
+
+/* Reduced-motion users: hold the highlighted state without the pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-ai-pending-rect {
+    animation: none;
+    opacity: 0.7;
+  }
+}
