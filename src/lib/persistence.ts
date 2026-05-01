@@ -226,10 +226,16 @@ export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
   const adapter = plugin.app.vault.adapter;
   try {
     if (!(await adapter.exists(root))) return;
-    const sections = await listSections(plugin);
-    for (const section of sections) {
-      const secPath = sectionPath(plugin, section);
-      const listing = await adapter.list(secPath);
+    // Walk the entire tree recursively so 3-level (course/week/page)
+    // structures get migrated the same as legacy 2-level vaults.
+    const walk = async (absDir: string): Promise<void> => {
+      let listing;
+      try { listing = await adapter.list(absDir); } catch { return; }
+      for (const sub of listing.folders) {
+        const name = sub.split("/").pop() ?? "";
+        if (!name || name === ATTACHMENTS_FOLDER) continue;
+        await walk(sub);
+      }
       const jsonFiles = listing.files.filter((f) => f.endsWith(".json"));
       for (const jsonFile of jsonFiles) {
         const mdFile = jsonFile.replace(/\.json$/, ".md");
@@ -239,7 +245,8 @@ export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
         }
         await adapter.remove(jsonFile);
       }
-    }
+    };
+    await walk(root);
   } catch (e) {
     console.error("[Noteometry] json→md migration:", e);
     new Notice("Noteometry: .json → .md migration failed (see console)", 8000);
@@ -253,16 +260,20 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
   const adapter = plugin.app.vault.adapter;
   try {
     if (!(await adapter.exists(root))) return;
-    const sections = await listSections(plugin);
-    for (const section of sections) {
-      const oldDir = `${root}/${section}/.attachments`;
-      const newDir = `${root}/${section}/attachments`;
+    // Walk every folder under root, looking for `.attachments` siblings
+    // of pages. Works for both 2-level (section/.attachments/) and any
+    // deeper layout the tree sidebar may produce.
+    const walk = async (absDir: string): Promise<void> => {
+      let listing;
+      try { listing = await adapter.list(absDir); } catch { return; }
 
-      // Move PNGs if the dot-folder exists
+      const oldDir = `${absDir}/.attachments`;
+      const newDir = `${absDir}/${ATTACHMENTS_FOLDER}`;
       if (await adapter.exists(oldDir)) {
         if (!(await adapter.exists(newDir))) await adapter.mkdir(newDir);
-        const listing = await adapter.list(oldDir);
-        for (const f of listing.files) {
+        let oldListing;
+        try { oldListing = await adapter.list(oldDir); } catch { oldListing = { files: [], folders: [] }; }
+        for (const f of oldListing.files) {
           const name = f.split("/").pop() ?? "";
           const target = `${newDir}/${name}`;
           if (!(await adapter.exists(target))) {
@@ -274,21 +285,24 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
         try { await adapter.rmdir(oldDir, false); } catch { /* ignore */ }
       }
 
-      // Rewrite any page JSON that references the old path
-      const secPath = `${root}/${section}`;
-      if (await adapter.exists(secPath)) {
-        const listing = await adapter.list(secPath);
-        for (const f of listing.files.filter((x) => x.endsWith(".md"))) {
-          try {
-            const raw = await adapter.read(f);
-            if (raw.includes("/.attachments/")) {
-              const fixed = raw.split("/.attachments/").join("/attachments/");
-              await adapter.write(f, fixed);
-            }
-          } catch { /* ignore individual file errors */ }
-        }
+      // Rewrite any .md sibling that references the old dot-path.
+      for (const f of listing.files.filter((x) => x.endsWith(".md"))) {
+        try {
+          const raw = await adapter.read(f);
+          if (raw.includes("/.attachments/")) {
+            const fixed = raw.split("/.attachments/").join("/attachments/");
+            await adapter.write(f, fixed);
+          }
+        } catch { /* ignore individual file errors */ }
       }
-    }
+
+      for (const sub of listing.folders) {
+        const name = sub.split("/").pop() ?? "";
+        if (!name || name === ATTACHMENTS_FOLDER || name === ".attachments") continue;
+        await walk(sub);
+      }
+    };
+    await walk(root);
   } catch (e) {
     console.error("[Noteometry] dot-attachments migration:", e);
     new Notice("Noteometry: attachment folder migration failed (see console)", 8000);
@@ -374,6 +388,69 @@ export async function migrateBase64Images(
       try {
         const imageId = obj.id;
         const vaultPath = await saveImageToVault(plugin, sectionName, imageId, obj.dataURL);
+        migrated.push({ ...obj, dataURL: vaultPath });
+        changed = true;
+      } catch (e) {
+        console.error("[Noteometry] image migration failed:", e);
+        migrated.push(obj);
+      }
+    } else {
+      migrated.push(obj);
+    }
+  }
+  return { objects: migrated, changed };
+}
+
+/* ── Path-based image / PDF helpers (v1.7.2) ───────────────
+ * Mirror the section-keyed helpers above but resolve the attachments
+ * folder from the page path (so a page nested inside a week folder
+ * gets its own week-local attachments dir). */
+
+export async function saveImageToVaultByPath(
+  plugin: NoteometryPlugin,
+  pagePath: string,
+  imageId: string,
+  base64Data: string
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const attachDir = attachmentsDirForPage(plugin, pagePath);
+  if (!(await adapter.exists(attachDir))) {
+    await adapter.mkdir(attachDir);
+  }
+  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
+  const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+  const vaultPath = `${attachDir}/${imageId}.png`;
+  await adapter.writeBinary(vaultPath, binary.buffer as ArrayBuffer);
+  return vaultPath;
+}
+
+export async function savePdfToVaultByPath(
+  plugin: NoteometryPlugin,
+  pagePath: string,
+  pdfId: string,
+  bytes: ArrayBuffer
+): Promise<string> {
+  const adapter = plugin.app.vault.adapter;
+  const attachDir = attachmentsDirForPage(plugin, pagePath);
+  if (!(await adapter.exists(attachDir))) {
+    await adapter.mkdir(attachDir);
+  }
+  const vaultPath = `${attachDir}/${pdfId}.pdf`;
+  await adapter.writeBinary(vaultPath, bytes);
+  return vaultPath;
+}
+
+export async function migrateBase64ImagesByPath(
+  plugin: NoteometryPlugin,
+  pagePath: string,
+  canvasObjects: CanvasObject[]
+): Promise<{ objects: CanvasObject[]; changed: boolean }> {
+  let changed = false;
+  const migrated: CanvasObject[] = [];
+  for (const obj of canvasObjects) {
+    if (obj.type === "image" && obj.dataURL.startsWith("data:")) {
+      try {
+        const vaultPath = await saveImageToVaultByPath(plugin, pagePath, obj.id, obj.dataURL);
         migrated.push({ ...obj, dataURL: vaultPath });
         changed = true;
       } catch (e) {
