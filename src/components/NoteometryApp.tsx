@@ -327,9 +327,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
   const {
     currentPath, pathRef, tree, refreshTree,
     selectPath: handleSelect,
-    currentPage,
     ready,
   } = usePages({ plugin, onPageLoaded, onEmptyState, flushPendingSave });
+  // Filename for "Export PNG" — last segment of the current path.
+  const currentPage = currentPath.includes("/")
+    ? currentPath.slice(currentPath.lastIndexOf("/") + 1)
+    : currentPath;
 
   const saveNow = useCallback(async () => {
     const path = pathRef.current;

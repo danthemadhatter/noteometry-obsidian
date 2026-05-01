@@ -17,17 +17,14 @@ import { createSixteenWeekCourse } from "../../lib/sidebarActions";
  * Pages feature hook (v1.7.2 path-based). Owns:
  *  - Current page selection as a single relative path string
  *    (e.g. "Calc III/Week 1/Lecture").
- *  - Cached tree shape from listTree().
+ *  - Cached tree shape from listTree() and a refresh action.
  *  - Ready flag (plugin has finished initial load).
- *  - Page selection action (selectPath) with full load sequence.
- *  - One-time initial load: migrations, tree bootstrap, first leaf load.
+ *  - selectPath: full load sequence with pending-save flush.
+ *  - One-time initial load: migrations, tree bootstrap, first leaf.
  *
- * Both the new path-based API (currentPath / selectPath / tree) and the
- * legacy section+page API (currentSection / currentPage / selectPage)
- * are returned during the SidebarTree migration. The legacy fields are
- * derived: currentSection = dirname(currentPath), currentPage =
- * basename(currentPath). Both NoteometryApp and SidebarTree can read
- * the shape they need; the legacy fields go away in step 12.
+ * The legacy section/page API is retired here — SidebarTree consumes
+ * paths exclusively, and the surviving 2-level vault structures still
+ * render correctly because listTree treats every folder uniformly.
  */
 export interface UsePagesConfig {
   plugin: NoteometryPlugin;
@@ -41,31 +38,13 @@ export interface UsePagesConfig {
 }
 
 export interface UsePagesReturn {
-  // New path-based API
   currentPath: string;
   pathRef: React.MutableRefObject<string>;
   tree: TreeNode[];
   refreshTree: () => Promise<TreeNode[]>;
   selectPath: (path: string) => Promise<void>;
-
-  // Legacy section/page derivation (kept for NoteometryApp until step 9)
-  currentSection: string;
-  currentPage: string;
-  sectionRef: React.MutableRefObject<string>;
-  pageRef: React.MutableRefObject<string>;
-  selectPage: (section: string, page: string) => Promise<void>;
-
   ready: boolean;
 }
-
-const dirOf = (p: string): string => {
-  const idx = p.lastIndexOf("/");
-  return idx === -1 ? "" : p.slice(0, idx);
-};
-const baseOf = (p: string): string => {
-  const idx = p.lastIndexOf("/");
-  return idx === -1 ? p : p.slice(idx + 1);
-};
 
 export function usePages({
   plugin,
@@ -76,12 +55,7 @@ export function usePages({
   const [currentPath, setCurrentPath] = useState("");
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [ready, setReady] = useState(false);
-
   const pathRef = useRef("");
-  // Legacy mirrors — kept in sync with currentPath for the surviving
-  // 2-level callers in NoteometryApp during the transition.
-  const sectionRef = useRef("");
-  const pageRef = useRef("");
 
   const onPageLoadedRef = useRef(onPageLoaded);
   const onEmptyStateRef = useRef(onEmptyState);
@@ -101,8 +75,6 @@ export function usePages({
     await flushPendingSaveRef.current();
 
     pathRef.current = path;
-    sectionRef.current = dirOf(path);
-    pageRef.current = baseOf(path);
     setCurrentPath(path);
 
     if (!path) {
@@ -117,31 +89,6 @@ export function usePages({
     await onPageLoadedRef.current(data);
   }, [plugin]);
 
-  const selectPage = useCallback(async (section: string, page: string) => {
-    if (!section && !page) {
-      await selectPath("");
-      return;
-    }
-    if (section && !page) {
-      // Legacy "open the section, pick its first page" semantic. Resolve
-      // by walking the tree under the section folder.
-      const t = await listTree(plugin);
-      setTree(t);
-      const sectionNode = t.find((n) => n.path === section);
-      const firstChild = sectionNode?.children?.[0];
-      if (firstChild?.kind === "page") {
-        await selectPath(firstChild.path);
-      } else if (firstChild?.kind === "folder") {
-        const leaf = firstLeafPath([firstChild]);
-        await selectPath(leaf ?? "");
-      } else {
-        await selectPath("");
-      }
-      return;
-    }
-    await selectPath(section ? `${section}/${page}` : page);
-  }, [plugin, selectPath]);
-
   // One-time initial load.
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +102,7 @@ export function usePages({
 
       let path = "";
       if (migrated) {
-        path = migrated.section ? `${migrated.section}/${migrated.page}` : migrated.page;
+        path = migrated.path;
       } else {
         const leaf = firstLeafPath(t);
         if (leaf) {
@@ -175,8 +122,6 @@ export function usePages({
 
       if (cancelled) return;
       pathRef.current = path;
-      sectionRef.current = dirOf(path);
-      pageRef.current = baseOf(path);
       setCurrentPath(path);
 
       if (path) {
@@ -201,13 +146,6 @@ export function usePages({
     tree,
     refreshTree,
     selectPath,
-
-    currentSection: dirOf(currentPath),
-    currentPage: baseOf(currentPath),
-    sectionRef,
-    pageRef,
-    selectPage,
-
     ready,
   };
 }

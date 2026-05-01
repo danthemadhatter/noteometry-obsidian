@@ -52,173 +52,6 @@ function naturalCompare(a: string, b: string): number {
   return ax.length - bx.length;
 }
 
-function sectionPath(plugin: NoteometryPlugin, section: string): string {
-  return `${rootDir(plugin)}/${section}`;
-}
-
-function pagePath(plugin: NoteometryPlugin, section: string, page: string): string {
-  return `${rootDir(plugin)}/${section}/${page}.md`;
-}
-
-/* ── Sections (folders) ──────────────────────────────── */
-
-export async function listSections(plugin: NoteometryPlugin): Promise<string[]> {
-  const root = rootDir(plugin);
-  const adapter = plugin.app.vault.adapter;
-  try {
-    if (!(await adapter.exists(root))) {
-      await adapter.mkdir(root);
-    }
-    const listing = await adapter.list(root);
-    return listing.folders
-      .map((f) => f.split("/").pop() ?? "")
-      .filter((n) => n.length > 0)
-      .sort(naturalCompare);
-  } catch {
-    return [];
-  }
-}
-
-export async function createSection(plugin: NoteometryPlugin, name: string): Promise<void> {
-  const path = sectionPath(plugin, name);
-  const adapter = plugin.app.vault.adapter;
-  if (!(await adapter.exists(path))) {
-    await adapter.mkdir(path);
-  }
-}
-
-export async function deleteSection(plugin: NoteometryPlugin, name: string): Promise<void> {
-  const path = sectionPath(plugin, name);
-  const adapter = plugin.app.vault.adapter;
-  if (!(await adapter.exists(path))) return;
-  // Recursive: the section folder contains an `attachments/` subfolder
-  // with images/PDFs. A non-recursive rmdir fails silently if any child
-  // remains, leaving the folder on disk — which then reappears in the
-  // sidebar on next render and looks like "delete didn't work".
-  await adapter.rmdir(path, true);
-}
-
-/* ── Pages (files) ───────────────────────────────────── */
-
-export async function listPages(plugin: NoteometryPlugin, section: string): Promise<string[]> {
-  const path = sectionPath(plugin, section);
-  const adapter = plugin.app.vault.adapter;
-  try {
-    if (!(await adapter.exists(path))) return [];
-    const listing = await adapter.list(path);
-    return listing.files
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => {
-        const name = f.split("/").pop() ?? "";
-        return name.replace(/\.md$/, "");
-      })
-      .sort(naturalCompare);
-  } catch {
-    return [];
-  }
-}
-
-export async function createPage(
-  plugin: NoteometryPlugin,
-  section: string,
-  name: string
-): Promise<void> {
-  const path = pagePath(plugin, section, name);
-  const adapter = plugin.app.vault.adapter;
-  if (!(await adapter.exists(path))) {
-    const empty: CanvasData = { ...EMPTY_PAGE, lastSaved: new Date().toISOString() };
-    const v3 = packToV3(empty);
-    await adapter.write(path, JSON.stringify(v3, null, 0));
-  }
-}
-
-export async function deletePage(
-  plugin: NoteometryPlugin,
-  section: string,
-  name: string
-): Promise<void> {
-  const path = pagePath(plugin, section, name);
-  const adapter = plugin.app.vault.adapter;
-  if (await adapter.exists(path)) {
-    await adapter.remove(path);
-  }
-}
-
-export async function loadPage(
-  plugin: NoteometryPlugin,
-  section: string,
-  name: string
-): Promise<CanvasData> {
-  const path = pagePath(plugin, section, name);
-  const adapter = plugin.app.vault.adapter;
-  try {
-    if (await adapter.exists(path)) {
-      const raw = await adapter.read(path);
-      const parsed = JSON.parse(raw);
-
-      // v3 format (current) — unpack elements[] to legacy in-memory shape
-      if (isV3Page(parsed)) {
-        return unpackFromV3(parsed);
-      }
-
-      // v2 format (pre-v3) — separate arrays + sidecar dictionaries
-      if (parsed.version === 2 || Array.isArray(parsed.strokes)) {
-        return {
-          strokes: parsed.strokes ?? [],
-          stamps: parsed.stamps ?? [],
-          canvasObjects: parsed.canvasObjects ?? [],
-          viewport: parsed.viewport ?? { scrollX: 0, scrollY: 0 },
-          panelInput: parsed.panelInput ?? "",
-          chatMessages: parsed.chatMessages ?? [],
-          tableData: parsed.tableData ?? {},
-          textBoxData: parsed.textBoxData ?? {},
-          lastSaved: parsed.lastSaved ?? "",
-        };
-      }
-
-      // v1 format (legacy Excalidraw) — keep text-only content
-      return {
-        strokes: [],
-        stamps: [],
-        canvasObjects: [],
-        viewport: { scrollX: 0, scrollY: 0 },
-        panelInput: parsed.panelInput ?? "",
-        chatMessages: parsed.chatMessages ?? [],
-        tableData: parsed.tableData ?? {},
-        textBoxData: parsed.textBoxData ?? {},
-        lastSaved: parsed.lastSaved ?? "",
-      };
-    }
-  } catch (e) {
-    console.error("[Noteometry] load failed:", e);
-    new Notice(`Failed to load "${section}/${name}" — file may be corrupt (see console)`, 10000);
-  }
-  return { ...EMPTY_PAGE };
-}
-
-export async function savePage(
-  plugin: NoteometryPlugin,
-  section: string,
-  name: string,
-  data: CanvasData
-): Promise<void> {
-  try {
-    const secPath = sectionPath(plugin, section);
-    const adapter = plugin.app.vault.adapter;
-    if (!(await adapter.exists(secPath))) {
-      await adapter.mkdir(secPath);
-    }
-    const path = pagePath(plugin, section, name);
-    // Always write v3 format to disk. v2 files load correctly because
-    // loadPage has a v2 fallback, and get rewritten to v3 on next save.
-    const v3 = packToV3(data);
-    await adapter.write(path, JSON.stringify(v3, null, 0));
-  } catch (e) {
-    console.error("[Noteometry] save failed:", e);
-    new Notice(`Failed to save "${section}/${name}" — changes may not persist (see console)`, 10000);
-  }
-}
-
 /* ── Migrate .json → .md (Obsidian Sync only syncs .md) ── */
 
 export async function migrateJsonToMd(plugin: NoteometryPlugin): Promise<void> {
@@ -309,27 +142,12 @@ export async function migrateDotAttachments(plugin: NoteometryPlugin): Promise<v
   }
 }
 
-/* ── Image vault sync ───────────────────────────────── */
-
-export async function saveImageToVault(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  imageId: string,
-  base64Data: string
-): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
-  if (!(await adapter.exists(attachDir))) {
-    await adapter.mkdir(attachDir);
-  }
-  // Strip data URL prefix
-  const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
-  // Convert base64 to ArrayBuffer
-  const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-  const vaultPath = `${attachDir}/${imageId}.png`;
-  await adapter.writeBinary(vaultPath, binary.buffer as ArrayBuffer);
-  return vaultPath;
-}
+/* ── Image / PDF vault sync ───────────────────────────────
+ * Attachments live next to their page in an `attachments/` folder
+ * sibling, regardless of nesting depth. Images are PNGs (small enough
+ * to round-trip through base64 data URLs). PDFs are raw binary.
+ * loadImageFromVault / loadPdfFromVault read by absolute vault path
+ * (the value canvas objects store after migration). */
 
 export async function loadImageFromVault(
   plugin: NoteometryPlugin,
@@ -346,28 +164,6 @@ export async function loadImageFromVault(
   return `data:image/png;base64,${b64}`;
 }
 
-/* ── PDF vault sync ─────────────────────────────────
- * PDFs live next to images in the section's attachments folder. We
- * store raw binary, not base64, because PDFs are typically too big
- * to serialize as data URLs. Loading returns an ArrayBuffer for
- * pdfjs-dist to consume directly. */
-
-export async function savePdfToVault(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  pdfId: string,
-  bytes: ArrayBuffer
-): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const attachDir = `${rootDir(plugin)}/${sectionName}/attachments`;
-  if (!(await adapter.exists(attachDir))) {
-    await adapter.mkdir(attachDir);
-  }
-  const vaultPath = `${attachDir}/${pdfId}.pdf`;
-  await adapter.writeBinary(vaultPath, bytes);
-  return vaultPath;
-}
-
 export async function loadPdfFromVault(
   plugin: NoteometryPlugin,
   vaultPath: string
@@ -376,35 +172,9 @@ export async function loadPdfFromVault(
   return await adapter.readBinary(vaultPath);
 }
 
-export async function migrateBase64Images(
-  plugin: NoteometryPlugin,
-  sectionName: string,
-  canvasObjects: CanvasObject[]
-): Promise<{ objects: CanvasObject[]; changed: boolean }> {
-  let changed = false;
-  const migrated: CanvasObject[] = [];
-  for (const obj of canvasObjects) {
-    if (obj.type === "image" && obj.dataURL.startsWith("data:")) {
-      try {
-        const imageId = obj.id;
-        const vaultPath = await saveImageToVault(plugin, sectionName, imageId, obj.dataURL);
-        migrated.push({ ...obj, dataURL: vaultPath });
-        changed = true;
-      } catch (e) {
-        console.error("[Noteometry] image migration failed:", e);
-        migrated.push(obj);
-      }
-    } else {
-      migrated.push(obj);
-    }
-  }
-  return { objects: migrated, changed };
-}
-
-/* ── Path-based image / PDF helpers (v1.7.2) ───────────────
- * Mirror the section-keyed helpers above but resolve the attachments
- * folder from the page path (so a page nested inside a week folder
- * gets its own week-local attachments dir). */
+/* Save / migrate helpers (path-based). The section-keyed variants from
+ * v1.6 were dropped in v1.7.2 — the SidebarTree exclusively addresses
+ * pages by relative path. */
 
 export async function saveImageToVaultByPath(
   plugin: NoteometryPlugin,
@@ -735,7 +505,10 @@ export function attachmentsDirForPage(plugin: NoteometryPlugin, pagePath: string
 
 /* ── Legacy migration ────────────────────────────────── */
 
-export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section: string; page: string } | null> {
+/** Rescue a pre-v1.6 single-canvas plugin folder by lifting its
+ *  canvas.md into a Course/Page-shaped vault entry. Returns the
+ *  newly-created path so the initial-load lifecycle can land on it. */
+export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ path: string } | null> {
   const dir = plugin.manifest.dir ?? `.obsidian/plugins/${plugin.manifest.id}`;
   const legacyPath = `${dir}/canvas.md`;
   const adapter = plugin.app.vault.adapter;
@@ -743,9 +516,8 @@ export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section
     if (await adapter.exists(legacyPath)) {
       const raw = await adapter.read(legacyPath);
       const parsed = JSON.parse(raw);
-      const section = "General";
-      const page = "Untitled";
-      await createSection(plugin, section);
+      const coursePath = await createFolderAt(plugin, "", "General");
+      const pagePath = await createPageAt(plugin, coursePath, "Untitled");
       const data: CanvasData = {
         version: 2,
         strokes: [],
@@ -758,9 +530,9 @@ export async function migrateLegacy(plugin: NoteometryPlugin): Promise<{ section
         textBoxData: parsed.textBoxData ?? {},
         lastSaved: parsed.lastSaved ?? "",
       };
-      await savePage(plugin, section, page, data);
+      await savePageByPath(plugin, pagePath, data);
       await adapter.remove(legacyPath);
-      return { section, page };
+      return { path: pagePath };
     }
   } catch {
     // ignore
