@@ -1,9 +1,9 @@
 {
 	"id": "noteometry",
 	"name": "Noteometry",
-	"version": "1.6.13",
+	"version": "1.7.2",
 	"minAppVersion": "1.0.0",
-	"description": "EE workstation \u2014 canvas, ink, AI, and drop-ins for electrical engineering students",
+	"description": "EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students",
 	"author": "Dan",
 	"authorUrl": "https://github.com/danthemadhatter",
 	"isDesktopOnly": false
