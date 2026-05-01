@@ -3010,3 +3010,300 @@
     pointer-events: auto !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.7.2 — OneNote-style tree sidebar
+   ════════════════════════════════════════════════════════ */
+
+.noteometry-sidebar--tree {
+  width: 240px;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .noteometry-sidebar--tree {
+    width: 220px;
+  }
+}
+
+.noteometry-tree-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0 6px;
+  scrollbar-width: thin;
+}
+
+.noteometry-tree-empty {
+  padding: 16px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--nm-ink);
+  opacity: 0.65;
+}
+
+.noteometry-tree-node {
+  display: contents;
+}
+
+.noteometry-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding-right: 4px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--nm-ink);
+  border-radius: 0;
+  position: relative;
+  transition: background-color 0.08s ease;
+}
+
+.noteometry-tree-row:hover {
+  background: var(--nm-accent-light, var(--background-modifier-hover, rgba(0, 0, 0, 0.05)));
+}
+
+.noteometry-tree-row--course {
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
+  border-top: 1px solid var(--nm-paper-border);
+  margin-top: 2px;
+}
+
+.noteometry-tree-row--course:first-child,
+.noteometry-tree-node:first-child > .noteometry-tree-row--course {
+  border-top: none;
+  margin-top: 0;
+}
+
+.noteometry-tree-row--folder:not(.noteometry-tree-row--course) {
+  font-weight: 500;
+  font-size: 12.5px;
+  opacity: 0.92;
+}
+
+.noteometry-tree-row--page {
+  font-size: 12.5px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.noteometry-tree-row--page.noteometry-tree-row--active {
+  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  color: var(--nm-paper, var(--text-on-accent, #fff));
+  opacity: 1;
+  font-weight: 500;
+  box-shadow: inset 3px 0 0 var(--nm-accent-strong, #2c6db3);
+}
+
+.noteometry-tree-row--page.noteometry-tree-row--active:hover {
+  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
+}
+
+.noteometry-tree-twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.noteometry-tree-twisty svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
+}
+
+.noteometry-tree-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.78;
+}
+
+.noteometry-tree-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.noteometry-tree-row--course .noteometry-tree-icon {
+  opacity: 0.95;
+  color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+}
+
+.noteometry-tree-row--page.noteometry-tree-row--active .noteometry-tree-icon,
+.noteometry-tree-row--page.noteometry-tree-row--active .noteometry-tree-twisty {
+  opacity: 1;
+}
+
+.noteometry-tree-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 2px;
+}
+
+.noteometry-tree-row-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  border-radius: var(--nm-radius-sm, 4px);
+  cursor: pointer;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.08s ease, background-color 0.08s ease;
+  flex-shrink: 0;
+}
+
+.noteometry-tree-row-menu svg {
+  width: 14px;
+  height: 14px;
+}
+
+.noteometry-tree-row:hover .noteometry-tree-row-menu,
+.noteometry-tree-row--active .noteometry-tree-row-menu {
+  opacity: 0.65;
+}
+
+.noteometry-tree-row-menu:hover {
+  background: rgba(0, 0, 0, 0.08);
+  opacity: 1;
+}
+
+.noteometry-tree-row--active .noteometry-tree-row-menu:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@media (pointer: coarse) {
+  .noteometry-tree-row-menu {
+    opacity: 0.5;
+  }
+}
+
+.noteometry-tree-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--nm-paper, var(--background-primary, #fff));
+  color: var(--nm-ink);
+  border: 1px solid var(--nm-accent, var(--interactive-accent, #4A90D9));
+  border-radius: var(--nm-radius-sm, 4px);
+  padding: 4px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+}
+
+.noteometry-tree-new-input {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.noteometry-tree-bottom-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--nm-paper-border);
+  padding: 6px 8px;
+  background: var(--nm-faceplate-alt);
+}
+
+.noteometry-tree-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.noteometry-tree-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--nm-paper, var(--background-primary, #fff));
+  color: var(--nm-ink);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: var(--nm-radius-sm, 4px);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.noteometry-tree-action-btn:hover {
+  background: var(--nm-accent-light, var(--background-modifier-hover, rgba(0, 0, 0, 0.05)));
+  border-color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+}
+
+.noteometry-tree-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.noteometry-tree-action-course {
+  background: var(--nm-accent-light, rgba(74, 144, 217, 0.12));
+  color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  border-color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+}
+
+.noteometry-tree-action-course:hover {
+  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  color: var(--nm-paper, var(--text-on-accent, #fff));
+}
+
+.noteometry-tree-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--nm-paper-border);
+  background: var(--nm-faceplate-alt);
+  color: var(--nm-ink);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.noteometry-tree-footer svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.noteometry-tree-footer-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-monospace, ui-monospace, SFMono-Regular, monospace);
+  font-size: 10.5px;
+}
+
+.noteometry-tree-footer-path strong {
+  color: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  font-weight: 600;
+}
+
+/* Touch — bigger row targets, always-visible menu button */
+@media (pointer: coarse) {
+  .noteometry-tree-row {
+    min-height: 36px;
+  }
+  .noteometry-tree-row-menu {
+    width: 28px;
+    height: 28px;
+  }
+}
