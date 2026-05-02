@@ -3563,3 +3563,94 @@
     opacity: 0.7;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.8.2 — Typography pass (Death Stranding type-system)
+
+   Death Stranding's signature: tracked-uppercase micro-labels above
+   condensed display headers, mono for IDs/paths/equations, neutral
+   sans for body. This pass applies that ramp to the sidebar tree
+   (the most-visible surface). Subsequent passes propagate it to the
+   panel headers, AI overlay, and right-click hub.
+   ════════════════════════════════════════════════════════ */
+
+/* "NOTEBOOKS" header — tracked uppercase micro-label, the BRIDGES /
+ * BB-pod move. Smaller and quieter than the v1.8.1 default so it
+ * reads as a label, not a heading. */
+.noteometry-sidebar--tree .noteometry-sidebar-title {
+  font-family: var(--ds-font-display);
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+/* Course rows — display-font (condensed sans) section identifiers,
+ * tracked slightly. Falls through the system stack on devices
+ * without Bebas Neue / Oswald installed. */
+.noteometry-sidebar--tree .noteometry-tree-row--course .noteometry-tree-label {
+  font-family: var(--ds-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: var(--ds-tracking-display);
+  text-transform: uppercase;
+}
+
+/* Folder rows below depth 0 (e.g., "Week 1", "Week 2") — body sans,
+ * uppercase + tracked + slightly muted so they read as sub-section
+ * dividers, mirroring the BRIDGES inventory rail. */
+.noteometry-sidebar--tree .noteometry-tree-row--folder:not(.noteometry-tree-row--course) .noteometry-tree-label {
+  font-family: var(--ds-font-body);
+  font-size: var(--ds-text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Page rows — neutral body sans, default tracking. The leaves are
+ * the *content*, not the chrome, so they read normally. */
+.noteometry-sidebar--tree .noteometry-tree-row--page .noteometry-tree-label {
+  font-family: var(--ds-font-body);
+  font-size: var(--ds-text-sm);
+  font-weight: 400;
+  letter-spacing: var(--ds-tracking-body);
+  text-transform: none;
+}
+
+.noteometry-sidebar--tree .noteometry-tree-row--page.noteometry-tree-row--active .noteometry-tree-label {
+  font-weight: 600;
+}
+
+/* Footer path — mono, ID-card style. Tracked to match the BRIDGES
+ * delivery-code typography. */
+.noteometry-sidebar--tree .noteometry-tree-footer {
+  font-family: var(--ds-font-mono);
+  letter-spacing: 0.03em;
+}
+
+.noteometry-sidebar--tree .noteometry-tree-footer-path {
+  font-family: var(--ds-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Bottom action buttons — tracked-uppercase labels for the "+ NEW
+ * COURSE" / "+ 16-WEEK COURSE" buttons. Letter-spacing + uppercase
+ * is what gives the chrome its tactical-readout feel. */
+.noteometry-sidebar--tree .noteometry-tree-action-btn {
+  font-family: var(--ds-font-display);
+  font-size: var(--ds-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+
+/* Inline rename / new-input placeholders — paper feel even on dark
+ * chrome; mono so the path you're editing reads as an ID. */
+.noteometry-sidebar--tree .noteometry-tree-rename-input {
+  font-family: var(--ds-font-body);
+  font-size: var(--ds-text-sm);
+  letter-spacing: 0.01em;
+}
