@@ -8,8 +8,110 @@
 
 :root {
   /* ══════════════════════════════════════════════════════════════════
-   * Noteometry v1.2 — Document-style color scheme
+   * Noteometry v1.8.0 — Death Stranding design tokens (--ds-*)
+   *
+   * Brand-language layer introduced as a pure additive refactor:
+   * v1.8.0 defines these tokens at v1.6.13-equivalent values so there
+   * is zero visible diff. v1.8.1 redefines them at the actual Bridges/
+   * BB-pod palette and swaps the legacy --nm-* aliases through.
+   *
+   * Naming taxonomy:
+   *   --ds-surface-*   background tiers (deeper = lower index)
+   *   --ds-text-*      text tones from primary to muted
+   *   --ds-line-*      hairline borders
+   *   --ds-strand-*    primary cyan accent (BRIDGES strand color)
+   *   --ds-cargo-*     warning / urgent (cargo orange)
+   *   --ds-chiral-*    success (chiral green)
+   *   --ds-font-*      typography stack (display / body / mono)
+   *   --ds-text-*-size type ramp
+   *   --ds-tracking-*  letter-spacing presets
+   *   --ds-radius-*    geometry — corner radii
+   *   --ds-cut-*       angular chamfer sizes for clip-path
+   *   --ds-hairline    canonical 1px border width
+   *   --ds-snap-*      motion timings
+   *   --ds-ease-*      easing curves (overshoot/settle, soft-out)
+   *   --ds-glow-*      box-shadow glows for active states
+   * ══════════════════════════════════════════════════════════════════ */
+
+  /* Surface tiers — defined at the old white-canvas values for v1.8.0;
+     re-pointed at #0A0F14-family deeps in v1.8.1. */
+  --ds-surface-base: #FFFFFF;
+  --ds-surface-1: #FAFAFA;
+  --ds-surface-2: #F5F5F5;
+  --ds-surface-3: #F0F0F0;
+
+  /* Text — primary is the same dark navy the old --nm-ink uses. */
+  --ds-text-primary: #1A1A2E;
+  --ds-text-secondary: #3A3A4E;
+  --ds-text-muted: #6B7280;
+  --ds-text-on-accent: #FFFFFF;
+
+  /* Hairlines — Death Stranding uses 1px borders almost exclusively. */
+  --ds-hairline: 1px;
+  --ds-line-soft: #E0E0E0;
+  --ds-line-strong: rgba(0, 0, 0, 0.15);
+
+  /* Accents */
+  --ds-strand-cyan: #4A90D9;
+  --ds-strand-cyan-soft: rgba(74, 144, 217, 0.12);
+  --ds-strand-cyan-hover: #5A9DE6;
+  --ds-cargo-orange: #F5A623;
+  --ds-cargo-orange-soft: rgba(245, 166, 35, 0.2);
+  --ds-chiral-green: #16A34A;
+  --ds-danger: #DC2626;
+
+  /* Typography stacks. v1.8.0 keeps things appearing identical because
+     no selector reads --ds-font-* yet; v1.8.1 wires the display face
+     into headers + course rows. Display falls through to a condensed
+     system stack so we don't need a web-font for v1.8.0 to be safe. */
+  --ds-font-display: "Bebas Neue", "Oswald", "Inter Display", "Helvetica Neue Condensed", "Arial Narrow", system-ui, sans-serif;
+  --ds-font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ds-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Type ramp — pinned at the same px values the existing styles use. */
+  --ds-text-xs: 11px;
+  --ds-text-sm: 12.5px;
+  --ds-text-md: 14px;
+  --ds-text-lg: 16px;
+  --ds-text-xl: 19px;
+
+  /* Letter-spacing presets. The tracked-uppercase 0.12em is THE
+     Death Stranding micro-label move — applied to section headers
+     and tactical-readout labels in subsequent passes. */
+  --ds-tracking-tight: -0.01em;
+  --ds-tracking-body: 0;
+  --ds-tracking-label: 0.12em;
+  --ds-tracking-display: 0.04em;
+
+  /* Geometry — radii and angular chamfer sizes for clip-path corners. */
+  --ds-radius-sharp: 2px;
+  --ds-radius-soft: 6px;
+  --ds-cut-sm: 4px;
+  --ds-cut-md: 6px;
+  --ds-cut-lg: 10px;
+
+  /* Motion — 80ms snap + 200ms settle is the v1.8 baseline. The
+     overshoot easing on --ds-ease-snap gives the Persona-style "punch
+     then settle" feel without crossing into theatre territory. */
+  --ds-snap-quick: 80ms;
+  --ds-snap-settle: 200ms;
+  --ds-pulse-slow: 1600ms;
+  --ds-ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --ds-ease-soft-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Glows — box-shadow presets for active states. v1.8.1 ramps the
+     intensity once the dark surfaces land. */
+  --ds-glow-cyan: 0 0 8px rgba(74, 144, 217, 0.45);
+  --ds-glow-cyan-strong: 0 0 16px rgba(74, 144, 217, 0.6);
+  --ds-glow-orange: 0 0 8px rgba(245, 166, 35, 0.5);
+
+  /* ══════════════════════════════════════════════════════════════════
+   * Noteometry v1.2 — Document-style color scheme (legacy --nm-*)
    * White canvas, light gray chrome, clean and professional.
+   *
+   * These tokens remain the load-bearing palette through v1.8.0 — they
+   * are still the values every selector reads. v1.8.1 redirects
+   * select --nm-* tokens through the --ds-* layer to swap the palette.
    * ══════════════════════════════════════════════════════════════════ */
 
   /* Canvas surface */
