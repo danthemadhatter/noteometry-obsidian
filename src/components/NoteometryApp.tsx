@@ -156,15 +156,33 @@ export default function NoteometryApp({ plugin, app }: Props) {
 
   const clampZoom = useCallback((z: number) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)), []);
 
+  // v1.7.7: keyboard / button zoom anchors to the viewport center so
+  // tapping +/- expands/contracts around what the user is looking at,
+  // not toward world (0, 0). resetZoom keeps its identity behaviour
+  // (zoom=1, scroll preserved) since "100%" is canonically a snap.
+  const zoomAroundCenter = useCallback((newZoom: number) => {
+    const target = clampZoom(newZoom);
+    if (Math.abs(target - zoom) < 0.001) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (rect) {
+      const k = 1 / zoom - 1 / target;
+      const dx = (rect.width / 2) * k;
+      const dy = (rect.height / 2) * k;
+      setScrollX((s) => s + dx);
+      setScrollY((s) => s + dy);
+    }
+    setZoom(target);
+  }, [zoom, clampZoom]);
+
   const zoomIn = useCallback(() => {
     if (zoomLocked) return;
-    setZoom((z) => clampZoom(Math.round((z + ZOOM_STEP) * 100) / 100));
-  }, [zoomLocked, clampZoom]);
+    zoomAroundCenter(Math.round((zoom + ZOOM_STEP) * 100) / 100);
+  }, [zoomLocked, zoom, zoomAroundCenter]);
 
   const zoomOut = useCallback(() => {
     if (zoomLocked) return;
-    setZoom((z) => clampZoom(Math.round((z - ZOOM_STEP) * 100) / 100));
-  }, [zoomLocked, clampZoom]);
+    zoomAroundCenter(Math.round((zoom - ZOOM_STEP) * 100) / 100);
+  }, [zoomLocked, zoom, zoomAroundCenter]);
 
   const resetZoom = useCallback(() => {
     if (zoomLocked) return;

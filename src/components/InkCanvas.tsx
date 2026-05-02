@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect } from "react";
 import type { Stroke, StrokePoint, Stamp } from "../lib/inkEngine";
 import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from "../lib/inkEngine";
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
-import { nextWheelZoom } from "../lib/wheelZoom";
+import { nextWheelZoom, scrollForZoomAnchor } from "../lib/wheelZoom";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 
 export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
@@ -700,17 +700,33 @@ export default function InkCanvas({
       // Two-finger path (zoom + pan). v1.7.6: pan added so the canvas
       // slides with the finger centroid even while the user is also
       // pinching — and so finger-drawing mode finally has a usable
-      // pan gesture (single finger is committed to drawing).
+      // pan gesture (single finger is committed to drawing). v1.7.7:
+      // pinch zoom now anchors to the centroid so the world point
+      // under the user's fingers stays put across the zoom step.
       if (touchesRef.current.size >= 2) {
         let dirty = false;
 
-        // Pinch zoom from the distance ratio.
+        // Pinch zoom from the distance ratio. Anchored to the centroid.
         if (pinchStartDistRef.current !== null && !zoomLockedRef.current) {
           const currentDist = getPinchDist();
           if (currentDist > 0) {
             const ratio = currentDist / pinchStartDistRef.current;
             const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
             if (Math.abs(newZoom - zoomRef.current) >= 0.001) {
+              const ctrAnchor = getCentroid();
+              if (ctrAnchor) {
+                const rect = container.getBoundingClientRect();
+                const anchored = scrollForZoomAnchor({
+                  scrollX: scrollRef.current.x,
+                  scrollY: scrollRef.current.y,
+                  oldZoom: zoomRef.current,
+                  newZoom,
+                  canvasX: ctrAnchor.x - rect.left,
+                  canvasY: ctrAnchor.y - rect.top,
+                });
+                scrollRef.current = { x: anchored.scrollX, y: anchored.scrollY };
+                onViewportChange(anchored.scrollX, anchored.scrollY);
+              }
               zoomRef.current = newZoom;
               onZoomChangeRef.current?.(newZoom);
               dirty = true;
@@ -848,6 +864,21 @@ export default function InkCanvas({
           metaKey: e.metaKey,
         });
         if (Math.abs(next - zoomRef.current) < 0.0001) return;
+        // v1.7.7: anchor wheel zoom to the cursor so the world point
+        // under the pointer stays put. Trackpad pinches naturally
+        // anchor here too (Chromium synthesises wheel events at the
+        // pointer's last reported position).
+        const rect = container.getBoundingClientRect();
+        const anchored = scrollForZoomAnchor({
+          scrollX: scrollRef.current.x,
+          scrollY: scrollRef.current.y,
+          oldZoom: zoomRef.current,
+          newZoom: next,
+          canvasX: e.clientX - rect.left,
+          canvasY: e.clientY - rect.top,
+        });
+        scrollRef.current = { x: anchored.scrollX, y: anchored.scrollY };
+        onViewportChange(anchored.scrollX, anchored.scrollY);
         zoomRef.current = next;
         redrawGrid();
         redrawInk();
