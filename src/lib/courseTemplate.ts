@@ -24,17 +24,20 @@ export interface CourseTemplateDeps<P> {
  * Create a 16-week course as a 3-level tree:
  *   <course>/
  *     Week 1/  Lecture.md
- *     Week 2/
+ *     Week 2/  Lecture.md
  *     ...
- *     Week 16/
+ *     Week 16/ Lecture.md
  *
- * Only Week 1 gets a starter page; the rest are empty folders ready for
- * the user to drop homework / lecture / lab pages into. This matches the
- * Course → Week → Homework hierarchy the SidebarTree renders.
+ * Every week gets a starter Lecture page. v1.8.5 and earlier only
+ * seeded Week 1, which left Weeks 2-16 as empty folders that clicked
+ * but didn't navigate anywhere — the Z Fold audit surfaced this as
+ * "switching weeks doesn't change canvases." A page per week makes
+ * the whole template immediately usable; users can rename / add
+ * homework via the right-click menu.
  *
- * Returns `{ coursePath, firstPagePath }` on success, or `null` if the
- * name is blank after trim. Does NOT select the new course — the caller
- * owns that so UI state stays in its component.
+ * Returns `{ coursePath, firstPagePath }` on success, or `null` if
+ * the name is blank after trim. Does NOT select the new course —
+ * the caller owns that so UI state stays in its component.
  */
 export async function createSixteenWeekCourseWith<P>(
   plugin: P,
@@ -47,9 +50,8 @@ export async function createSixteenWeekCourseWith<P>(
   let firstPagePath = "";
   for (let i = 1; i <= COURSE_WEEKS; i++) {
     const weekPath = await deps.createFolderAt(plugin, coursePath, `Week ${i}`);
-    if (i === 1) {
-      firstPagePath = await deps.createPageAt(plugin, weekPath, COURSE_FIRST_PAGE_NAME);
-    }
+    const pagePath = await deps.createPageAt(plugin, weekPath, COURSE_FIRST_PAGE_NAME);
+    if (i === 1) firstPagePath = pagePath;
   }
   return { coursePath, firstPagePath };
 }

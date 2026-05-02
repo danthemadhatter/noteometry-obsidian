@@ -32,7 +32,7 @@ describe("createSixteenWeekCourseWith", () => {
     expect(COURSE_WEEKS).toBe(16);
   });
 
-  it("creates the course folder, 16 week folders, and a Lecture page in Week 1", async () => {
+  it("creates the course folder, 16 week folders, and a Lecture page in EVERY week", async () => {
     const deps = makeDeps();
     const plugin = {} as never;
     const result = await createSixteenWeekCourseWith(plugin, "EE 301", deps);
@@ -49,9 +49,14 @@ describe("createSixteenWeekCourseWith", () => {
       expect(deps.createFolderAt).toHaveBeenCalledWith(plugin, "EE 301", `Week ${i}`);
     }
 
-    // Exactly one starter page, inside Week 1
-    expect(deps.createPageAt).toHaveBeenCalledTimes(1);
-    expect(deps.createPageAt).toHaveBeenCalledWith(plugin, "EE 301/Week 1", COURSE_FIRST_PAGE_NAME);
+    // v1.8.6: every week now gets a starter Lecture so all 16 weeks are
+    // immediately navigable. Previously only Week 1 was seeded, which
+    // left Weeks 2-16 as empty folders and produced "switching weeks
+    // doesn't change canvases."
+    expect(deps.createPageAt).toHaveBeenCalledTimes(16);
+    for (let i = 1; i <= 16; i++) {
+      expect(deps.createPageAt).toHaveBeenCalledWith(plugin, `EE 301/Week ${i}`, COURSE_FIRST_PAGE_NAME);
+    }
   });
 
   it("trims whitespace around the course name", async () => {

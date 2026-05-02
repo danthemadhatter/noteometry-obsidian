@@ -19,7 +19,7 @@ import {
   deleteNode,
   type TreeNode,
 } from "../lib/persistence";
-import { ancestorPaths } from "../lib/treeHelpers";
+import { ancestorPaths, walkLeaves } from "../lib/treeHelpers";
 import { createSixteenWeekCourse, revealFolder } from "../lib/sidebarActions";
 import { validateRename } from "../lib/renameValidation";
 
@@ -163,6 +163,47 @@ export default function SidebarTree({
     await onTreeChanged();
     if (newCurrent !== undefined) onSelect(newCurrent);
   }, [onTreeChanged, onSelect]);
+
+  // v1.8.6: clicking a folder now expands AND navigates to a page
+  // inside it, matching OneNote-style behaviour. Resolves the
+  // "switching weeks doesn't change canvases" symptom Dan reported
+  // after the v1.8.x ships, which was rooted in the v1.8.5 course
+  // template only seeding Week 1's Lecture: every other week was an
+  // empty folder that clicked but went nowhere.
+  //
+  // - Folder with pages: navigate to the first depth-first leaf.
+  // - Empty folder: auto-create 'Lecture' and navigate to it. The
+  //   auto-create is a one-time onboarding fix; users with the older
+  //   single-Lecture template don't have to manually seed every
+  //   week — just click the empty week and get one.
+  const handleFolderClick = useCallback(async (node: TreeNode) => {
+    toggleExpand(node.path);
+
+    const firstLeaf = node.children ? walkLeaves(node.children)[0] : undefined;
+    if (firstLeaf) {
+      onSelect(firstLeaf.path);
+      return;
+    }
+
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      const createdPath = await createPageAt(plugin, node.path, "Lecture");
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.add(node.path);
+        saveExpandedToStorage(plugin, next);
+        return next;
+      });
+      await refreshAndMaybeReselect(createdPath);
+      new Notice(`Created "Lecture" in "${node.name}"`, 2500);
+    } catch (e) {
+      console.error("[Noteometry] auto-seed page failed:", e);
+      new Notice(`Couldn't create starter page in "${node.name}"`, 6000);
+    } finally {
+      submitting.current = false;
+    }
+  }, [plugin, onSelect, toggleExpand, refreshAndMaybeReselect]);
 
   const handleRename = useCallback(async (node: TreeNode, raw: string) => {
     if (submitting.current) return;
@@ -414,7 +455,7 @@ export default function SidebarTree({
           style={rowStyle}
           onClick={() => {
             if (isRenaming) return;
-            if (isFolder) toggleExpand(node.path);
+            if (isFolder) void handleFolderClick(node);
             else onSelect(node.path);
           }}
           onContextMenu={(e) => {
@@ -492,6 +533,7 @@ export default function SidebarTree({
   }, [
     currentPath, renamingPath, renameValue, newInput, newName,
     isExpanded, toggleExpand, onSelect, showNodeMenu, handleRename, submitNewInput,
+    handleFolderClick,
   ]);
 
   const rootRows = useMemo(() => tree.map(renderRow), [tree, renderRow]);
