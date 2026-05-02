@@ -3534,33 +3534,121 @@
 }
 
 /* ════════════════════════════════════════════════════════
-   v1.7.5 — in-canvas AI loading state
+   v1.7.5 / v1.8.4 — in-canvas AI overlay (Bridges frame)
+
+   v1.8.4 redesign: hairline 1px frame in strand-cyan, four corner
+   brackets (the Bridges tactical-readout signature), tracked-
+   uppercase type-card label tucked top-right with phase variants
+   (READING… / SOLVED / ERROR). Pulse animation removed in favour
+   of a steady glow + ambient breathing-pulse on the label.
    ════════════════════════════════════════════════════════ */
 
-.noteometry-ai-pending-rect {
-  border: 2px dashed var(--nm-accent, var(--interactive-accent, #4A90D9));
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--nm-accent, #4A90D9) 8%, transparent);
-  animation: noteometry-ai-pulse 1.6s ease-in-out infinite;
+.noteometry-ai-frame {
   z-index: 14;
+  color: var(--ds-strand-cyan);
+  border: var(--ds-hairline) solid currentColor;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, currentColor 30%, transparent),
+    var(--ds-glow-cyan);
+  transition:
+    color var(--ds-snap-quick) var(--ds-ease-soft-out),
+    background var(--ds-snap-quick) var(--ds-ease-soft-out),
+    box-shadow var(--ds-snap-settle) var(--ds-ease-soft-out);
 }
 
-@keyframes noteometry-ai-pulse {
-  0%, 100% {
-    opacity: 0.45;
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nm-accent, #4A90D9) 35%, transparent);
-  }
-  50% {
-    opacity: 0.95;
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--nm-accent, #4A90D9) 0%, transparent);
-  }
+.noteometry-ai-frame--read {
+  color: var(--ds-chiral-green);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ds-chiral-green) 35%, transparent),
+    0 0 12px rgba(124, 217, 146, 0.55);
 }
 
-/* Reduced-motion users: hold the highlighted state without the pulse. */
+.noteometry-ai-frame--error {
+  color: var(--ds-cargo-orange);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ds-cargo-orange) 35%, transparent),
+    var(--ds-glow-orange);
+}
+
+/* Corner brackets — the Bridges tactical-readout move. Each bracket
+   is a 10×10 absolute span with two coloured borders forming an L. */
+.noteometry-ai-bracket {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.noteometry-ai-bracket--tl {
+  top: -1px; left: -1px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+.noteometry-ai-bracket--tr {
+  top: -1px; right: -1px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+.noteometry-ai-bracket--bl {
+  bottom: -1px; left: -1px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+.noteometry-ai-bracket--br {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+/* Type-card label — tracked uppercase mono, tucked at the top-right
+ * outside the frame so it reads as a tag, not chrome inside the
+ * captured region. Pending phase breathes; read/error phases flash
+ * in then fade out via the parent's 850ms hold + clear cycle. */
+.noteometry-ai-label {
+  position: absolute;
+  top: -22px;
+  right: -1px;
+  font-family: var(--ds-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  background: var(--ds-surface-base);
+  color: currentColor;
+  border: var(--ds-hairline) solid currentColor;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.noteometry-ai-label--pending {
+  animation: noteometry-ai-label-breathe 1.4s ease-in-out infinite;
+}
+
+.noteometry-ai-label--read,
+.noteometry-ai-label--error {
+  animation: noteometry-ai-label-flash 0.85s var(--ds-ease-snap) forwards;
+}
+
+@keyframes noteometry-ai-label-breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+@keyframes noteometry-ai-label-flash {
+  0%   { transform: translateY(-3px); opacity: 0; }
+  18%  { transform: translateY(0);    opacity: 1; }
+  72%  { transform: translateY(0);    opacity: 1; }
+  100% { transform: translateY(0);    opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .noteometry-ai-pending-rect {
+  .noteometry-ai-label {
     animation: none;
-    opacity: 0.7;
+    opacity: 1;
+  }
+  .noteometry-ai-frame {
+    transition: none;
   }
 }
 

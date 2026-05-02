@@ -97,11 +97,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
 
-  /* ── v1.7.5: in-canvas AI loading state. While the vision call is
-   * in flight, the previous lasso bounds get pulsed so the user has
-   * ambient feedback on what's being processed. Cleared on success
-   * or failure. */
+  /* ── v1.7.5+: in-canvas AI loading state. v1.8.4 adds a phase enum
+   * so the overlay can flash 'SOLVED' or 'ERROR' briefly after the
+   * AI cycle completes, before clearing. Reads as a Death-Stranding-
+   * style type-card callout instead of the previous dashed pulse. */
   const [aiPendingBounds, setAiPendingBounds] = useState<LassoBounds[]>([]);
+  const [aiPhase, setAiPhase] = useState<"pending" | "read" | "error">("pending");
 
   /* ── Double-click / double-tap tool cycle ──────────────
    * Used by both Apple Pencil double-tap (iPad) and mouse double-click
@@ -470,20 +471,30 @@ export default function NoteometryApp({ plugin, app }: Props) {
     }
 
     // v1.7.5: snapshot the bounds so the loading-state overlay knows
-    // where to render the "AI is reading this" pulse, then clear the
+    // where to render the "AI is reading this" frame, then clear the
     // stack and deactivate lasso mode so the user can't accidentally
-    // add more regions mid-flight.
+    // add more regions mid-flight. v1.8.4: phase tracks pending →
+    // read|error so the overlay can flash a brief SOLVED/ERROR card.
     const pendingBounds = snapshot.map((r) => r.bounds);
     clearStack();
     setLassoActive(false);
     setAiPendingBounds(pendingBounds);
+    setAiPhase("pending");
 
-    // Hand off to the pipeline (OCR + solve + chat with image attached)
+    let success = false;
     try {
-      await processCrop(composite);
-    } finally {
-      setAiPendingBounds([]);
+      success = await processCrop(composite);
+    } catch {
+      success = false;
     }
+    setAiPhase(success ? "read" : "error");
+    // Hold the completion flash on-screen briefly so the user sees
+    // it as a distinct state, then clear the bounds. 850ms reads as
+    // 'flashed and gone' without crossing into 'lingered.'
+    window.setTimeout(() => {
+      setAiPendingBounds([]);
+      setAiPhase("pending");
+    }, 850);
   }, [lassoRegions, clearStack, setLassoActive, processCrop]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
@@ -1322,11 +1333,12 @@ export default function NoteometryApp({ plugin, app }: Props) {
                 pagePath={currentPath}
               />
 
-              {/* v1.7.5: in-canvas AI loading state. Pulses the
-                  previously lassoed bounds while readInk / solve is in
-                  flight. Pointer-events disabled in the component so
-                  it doesn't intercept canvas interactions. */}
-              <AiPendingOverlay bounds={aiPendingBounds} />
+              {/* v1.7.5+: in-canvas AI overlay. Death-Stranding-style
+                  Bridges frame with corner brackets + tracked-uppercase
+                  READING…/SOLVED/ERROR type-card label. Pointer-events
+                  disabled in the component so it doesn't intercept
+                  canvas interactions. */}
+              <AiPendingOverlay bounds={aiPendingBounds} phase={aiPhase} />
 
               {/* Lasso overlay — operates within the viewport */}
               <LassoOverlay
