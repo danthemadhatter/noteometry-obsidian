@@ -2,7 +2,7 @@
  *  in-app. Updated alongside manifest.json / package.json / versions.json so
  *  the user can confirm at a glance that Obsidian isn't serving a stale
  *  cached main.js. Rendered into the Settings tab and the tools FAB title. */
-export const NOTEOMETRY_VERSION = "1.8.5";
+export const NOTEOMETRY_VERSION = "1.8.6";
 
 /** Called once at plugin onload — writes a banner line to the console so
  *  Dan can open DevTools and verify the running build without needing to
