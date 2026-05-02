@@ -1,4 +1,4 @@
-# Noteometry v1.7.2
+# Noteometry
 
 **EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students.**
 
@@ -11,7 +11,7 @@ An Obsidian plugin that turns your vault into an infinite canvas notebook with h
 ### Ink Engine
 - **Pen** with pressure sensitivity (Apple Pencil: light touch = thin, hard press = thick)
 - **Eraser** with stroke hit-testing
-- **6 Google colors** (Black, Red, Blue, Green, Orange, Purple) + 4 widths
+- **6 ink colors** (Black, Red, Blue, Green, Orange, Purple) + 4 widths
 - **Catmull-Rom smoothing** for clean curves
 - **Math stamps** — drag symbols from the palette onto the canvas
 

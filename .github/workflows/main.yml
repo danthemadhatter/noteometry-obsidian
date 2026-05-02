@@ -42,6 +42,24 @@ jobs:
             echo "$f: $(wc -c < "$f") bytes"
           done
 
+      # Fail loudly if manifest.json's version doesn't match the pushed tag.
+      # The v1.8.x / v1.9.0 line shipped manifests with no `version` field at
+      # all, which BRAT rejects with `version attribute missing`. This guard
+      # makes that failure mode impossible to ship again.
+      - name: Verify manifest version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST_VERSION="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("manifest.json","utf8")).version || "")')"
+          if [ -z "$MANIFEST_VERSION" ]; then
+            echo "::error::manifest.json is missing a \"version\" field — BRAT will reject this release"
+            exit 1
+          fi
+          if [ "$MANIFEST_VERSION" != "$TAG" ]; then
+            echo "::error::manifest.json version ($MANIFEST_VERSION) does not match pushed tag ($TAG)"
+            exit 1
+          fi
+          echo "manifest version $MANIFEST_VERSION matches tag $TAG"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.9.1 — 2026-05-02
+
+Release-pipeline fix. Every release in the v1.8.x and v1.9.0 line shipped a `manifest.json` with **no `"version"` field at all** — the field had been deleted somewhere in the v1.8.0 cleanup and never replaced. BRAT (and Obsidian's plugin manifest validator) refuse to install a plugin whose manifest lacks `version`, surfacing as `version attribute missing` in the BRAT log. Cosmetic doc rot piled on top of it.
+
+- **`manifest.json` now carries `"version": "1.9.1"`.** Single root cause of the BRAT install failures since v1.8.0. Verified against the released asset on every prior tag — none of them had it. The `version-bump.mjs` driver still works for `npm version <x>` flows but was never the only path being used; the field is now in source so the build is correct regardless of how the bump is performed.
+- **CI guard so the manifest can't drift from the tag silently.** `.github/workflows/main.yml` now fails the release job if `manifest.json` `version` ≠ the pushed tag (stripping a leading `v`). Catches both "forgot to bump" and "deleted the field again" at build time instead of post-release at install time.
+- **`src/lib/version.ts` constant pinned to 1.9.1.** Was stuck on 1.7.2 through the whole v1.8.x line. The `tests/unit/version.test.ts` triple-pin (manifest / package.json / versions.json / constant) only catches drift when CI actually runs vitest — which the release workflow doesn't. The CI guard above closes that hole for the release path.
+- **`versions.json` extended with `1.9.1` → `1.0.0`.** Required for the Obsidian community-plugin update channel even when not listed in the directory.
+- **README cleanup.** Stale "v1.7.2" header removed; "6 Google colors" → "6 ink colors" (the Google Material palette reference dates from a much earlier draft and was never accurate to what's in the picker).
+- **Stale draft releases v1.8.7 and v1.8.8 removed from GitHub.** They were sitting as never-published drafts confusing the release timeline.
+
+**Out of scope (next pass):** Circuit Sniper drop-in mush — the OCR + node detection path needs a focused look, not a bolt-on fix from this release.
+
 ## 1.7.2 — 2026-04-28
 
 Bugfix on the legacy migration path that shipped with the v1.7 line. `convertLegacyMdPagesToNmpage` was silently `continue`ing whenever the target `.nmpage` already existed, leaving the legacy `.md` on disk. The next plugin load re-detected the unmigrated `.md` via `findLegacyMdPages` and the legacy notice fired again — every restart, even after the user ran the convert command. The convert command's success counter also excluded the skipped files, so the user had no signal anything went wrong.
