@@ -166,19 +166,6 @@ export class NoteometrySettingTab extends PluginSettingTab {
           })
       );
 
-    /* ── Experimental tools ──────────────────────────── */
-    new Setting(containerEl)
-      .setName("Show experimental tools")
-      .setDesc("Reveal Animation Canvas, Study Gantt, and Multimeter in the right-click hub. Off by default — these drop-ins exist but didn't land cleanly in manual testing; hidden so the main hub stays focused on Math + EE flow. Existing pages that use them keep rendering either way.")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showExperimentalTools)
-          .onChange(async (value) => {
-            this.plugin.settings.showExperimentalTools = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
     /* ── Finger drawing ──────────────────────────────── */
     new Setting(containerEl)
       .setName("Finger drawing")

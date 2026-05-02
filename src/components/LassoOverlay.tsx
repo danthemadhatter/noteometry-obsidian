@@ -24,8 +24,13 @@ interface Props {
   onCancel: () => void;
   /** Called when user clicks Clear — wipes the stack. */
   onClear: () => void;
-  /** Called when user clicks OCR/Process — composites the stack and sends to AI. */
-  onProcess: () => void;
+  /** Called when user clicks "123" — composites the stack, sends to
+   *  vision with a transcribe-to-LaTeX prompt, and spawns a MathDropin. */
+  onProcess123: () => void;
+  /** Called when user clicks "ABC" — composites the stack and spawns
+   *  a ChatDropin with the image pinned. First user turn sends the
+   *  image as an attachment; no pre-vision pass. */
+  onProcessABC: () => void;
   /** Optional Move action — only shown when the stack has exactly one region. */
   onMoveComplete?: (delta: { dx: number; dy: number }, bounds: LassoBounds) => void;
 }
@@ -38,7 +43,8 @@ export default function LassoOverlay({
   onComplete,
   onCancel,
   onClear,
-  onProcess,
+  onProcess123,
+  onProcessABC,
   onMoveComplete,
 }: Props) {
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
@@ -496,7 +502,20 @@ export default function LassoOverlay({
       <span className="noteometry-lasso-count">
         {regionCount} {regionCount === 1 ? "region" : "regions"}
       </span>
-      <button className="noteometry-lasso-action-btn" onClick={onProcess}>OCR</button>
+      <button
+        className="noteometry-lasso-action-btn noteometry-lasso-action-123"
+        onClick={onProcess123}
+        title="Render as math (LaTeX)"
+      >
+        123
+      </button>
+      <button
+        className="noteometry-lasso-action-btn noteometry-lasso-action-abc"
+        onClick={onProcessABC}
+        title="Ask a question about the selection"
+      >
+        ABC
+      </button>
       <button className="noteometry-lasso-action-btn" onClick={onClear}>Clear</button>
       {canMove && (
         <button className="noteometry-lasso-action-btn" onClick={handleMove}>Move</button>

@@ -1,7 +1,14 @@
 /* ── Canvas Objects ─────────────────────────────────────
-   Positioned objects on the canvas: text boxes, tables, images.
-   These render as DOM overlays above the ink layer.
+   Positioned objects on the canvas: text boxes, tables, images,
+   PDFs, and the v1.10 AI drop-ins (Math + Chat).
+
+   v1.10.0: The engineering + math-tools + study + legacy-AI drop-ins
+   were removed. Their types are no longer part of the CanvasObject
+   union, but the loader in persistence silently drops unknown kinds
+   so old .nmpage files keep loading.
    ──────────────────────────────────────────────────────── */
+
+import type { ChatMessage } from "../types";
 
 export interface CanvasObjectBase {
   id: string;
@@ -10,8 +17,8 @@ export interface CanvasObjectBase {
   w: number;
   h: number;
   /** User-editable display name shown in the drag handle. Defaults to
-   * the type (Text / Table / Image / PDF) when the object is created.
-   * Optional so old pages load without migration. */
+   * the type (Text / Table / Image / PDF / Math / Chat) when the
+   * object is created. Optional so old pages load without migration. */
   name?: string;
 }
 
@@ -39,103 +46,51 @@ export interface PdfObject extends CanvasObjectBase {
   page: number;
 }
 
-/* ── v1.2+ drop-in types ────────────────────────────────── */
+/* ── v1.10 AI drop-ins ─────────────────────────────────────
+   Every AI output lives as a canvas-anchored drop-in. No sidebar,
+   no global chat state. Each drop-in owns its own conversation or
+   its own LaTeX. Dropped next to the lasso that spawned it so the
+   question stays visually tethered to the thing it's about. This
+   is the ADHD-anti-amnesia architecture: if it's on the canvas,
+   it exists; if it's not, it doesn't.
 
-export interface CircuitSniperObject extends CanvasObjectBase {
-  type: "circuit-sniper";
-  /** JSON-serialized circuit state (components + wires). */
-  circuitData: string;
+   - MathObject: 123 output. Holds LaTeX. "Solve" button routes
+     the LaTeX through v12 and spawns a ChatObject next to it.
+   - ChatObject: ABC output (and Solve output). Holds a pinned
+     image attachment (base64 PNG) + a conversation. Sends image
+     + prompt on first turn, text-only follow-ups thereafter —
+     the vision-capable provider already has the image in context.
+   ──────────────────────────────────────────────────────── */
+
+export interface MathObject extends CanvasObjectBase {
+  type: "math";
+  /** LaTeX string — the 123 output. Editable in-place so the user
+   *  can fix a vision miss without re-lassoing. */
+  latex: string;
+  /** True while the vision call is in flight (first render after
+   *  creation). Rendered as a spinner in place of the KaTeX output. */
+  pending?: boolean;
 }
 
-export interface UnitConverterObject extends CanvasObjectBase {
-  type: "unit-converter";
-  /** Active category: "resistance" | "capacitance" | "inductance" | "voltage" | "current" | "frequency" */
-  category: string;
-  /** Current input value as string. */
-  inputValue: string;
-}
-
-export interface GraphPlotterObject extends CanvasObjectBase {
-  type: "graph-plotter";
-  /** Function definitions [{expr, color, enabled}] */
-  functions: Array<{ expr: string; color: string; enabled: boolean }>;
-  /** View window */
-  viewX: number; viewY: number; viewW: number; viewH: number;
-  signalLinked?: boolean;
-}
-
-export interface UnitCircleObject extends CanvasObjectBase {
-  type: "unit-circle";
-  /** Current angle in degrees. */
-  angleDeg: number;
-  signalLinked?: boolean;
-}
-
-export interface OscilloscopeObject extends CanvasObjectBase {
-  type: "oscilloscope";
-  /** Channel A/B configs */
-  channelA: OscilloscopeChannel;
-  channelB: OscilloscopeChannel;
-  /** Time division in ms */
-  timeDiv: number;
-  signalLinked?: boolean;
-}
-
-export interface OscilloscopeChannel {
-  waveform: "sine" | "square" | "triangle" | "sawtooth" | "pulse" | "noise" | "dc" | "off";
-  frequency: number;
-  amplitude: number;
-  phase: number;
-  offset: number;
-}
-
-export interface ComputeObject extends CanvasObjectBase {
-  type: "compute";
-  /** Named variable cells [{name, expr, value}] */
-  cells: Array<{ name: string; expr: string; value: string }>;
-  /** Result expression */
-  resultExpr: string;
-}
-
-export interface AnimationCanvasObject extends CanvasObjectBase {
-  type: "animation-canvas";
-  /** Frames as data URL strings (or empty for blank frames). */
-  frames: string[];
-  /** Current frame index (0-based). */
-  currentFrame: number;
-  /** Frames per second. */
-  fps: number;
-}
-
-export interface StudyGanttObject extends CanvasObjectBase {
-  type: "study-gantt";
-  /** Start date ISO string. */
-  startDate: string;
-  /** Tasks [{title, startDay, duration, color, progress}] */
-  tasks: Array<{
-    id: string; title: string; startDay: number; duration: number;
-    color: string; progress: number;
-  }>;
-}
-
-export interface AIDropinObject extends CanvasObjectBase {
-  type: "ai-dropin";
-  /** Whether the panel is in Chat or Solve mode. */
-  mode: "chat" | "solve";
-}
-
-export interface MultimeterObject extends CanvasObjectBase {
-  type: "multimeter";
-  meterMode: "DCV" | "ACV" | "DCA" | "ACA" | "OHM" | "CAP" | "CONT" | "DIODE";
-  inputValue: string;
+export interface ChatObject extends CanvasObjectBase {
+  type: "chat";
+  /** The lasso image, base64 PNG, pinned at the top of the chat.
+   *  Optional because Solve-spawned chats carry LaTeX instead of
+   *  an image — the math drop-in is already the visual anchor. */
+  attachedImage?: string;
+  /** Seeded LaTeX for Solve-spawned chats. When present, the first
+   *  user message is the LaTeX and the v12 preset is applied. */
+  seedLatex?: string;
+  /** Conversation history for this drop-in only. No cross-drop-in
+   *  state — each chat is its own universe. */
+  messages: ChatMessage[];
+  /** True while an AI response is pending. */
+  pending?: boolean;
 }
 
 export type CanvasObject =
   | TextBoxObject | TableObject | ImageObject | PdfObject
-  | CircuitSniperObject | UnitConverterObject
-  | GraphPlotterObject | UnitCircleObject | OscilloscopeObject
-  | ComputeObject | AnimationCanvasObject | StudyGanttObject
-  | AIDropinObject | MultimeterObject;
+  | MathObject | ChatObject;
 
 export function newObjectId(): string {
   return crypto.randomUUID();
@@ -167,68 +122,38 @@ export function createPdfObject(
   return { id: newObjectId(), type: "pdf", x, y, w, h, fileRef, page: 1, name };
 }
 
-/* ── v1.2+ factory functions ─────────────────────────────── */
+/* ── v1.10 factories ─────────────────────────────────────── */
 
-const DEFAULT_CHANNEL: OscilloscopeChannel = {
-  waveform: "sine", frequency: 1000, amplitude: 1, phase: 0, offset: 0,
-};
-
-export function createCircuitSniper(x: number, y: number, name = "Circuit Sniper"): CircuitSniperObject {
-  return { id: newObjectId(), type: "circuit-sniper", x, y, w: 500, h: 350, name, circuitData: "[]" };
+export function createMathObject(
+  x: number, y: number,
+  latex: string = "",
+  pending: boolean = false,
+  name: string = "Math",
+): MathObject {
+  return { id: newObjectId(), type: "math", x, y, w: 360, h: 160, name, latex, pending };
 }
 
-export function createUnitConverter(x: number, y: number, name = "Unit Converter"): UnitConverterObject {
-  return { id: newObjectId(), type: "unit-converter", x, y, w: 260, h: 280, name, category: "resistance", inputValue: "1" };
-}
-
-export function createGraphPlotter(x: number, y: number, name = "Graph Plotter"): GraphPlotterObject {
+export function createChatObject(
+  x: number, y: number,
+  opts: {
+    attachedImage?: string;
+    seedLatex?: string;
+    messages?: ChatMessage[];
+    pending?: boolean;
+    name?: string;
+  } = {},
+): ChatObject {
   return {
-    id: newObjectId(), type: "graph-plotter", x, y, w: 420, h: 340, name,
-    functions: [{ expr: "sin(x)", color: "#7C3AED", enabled: true }],
-    viewX: -10, viewY: -2, viewW: 20, viewH: 4,
-    signalLinked: false,
+    id: newObjectId(),
+    type: "chat",
+    x, y,
+    w: 420, h: 480,
+    name: opts.name ?? "Chat",
+    attachedImage: opts.attachedImage,
+    seedLatex: opts.seedLatex,
+    messages: opts.messages ?? [],
+    pending: opts.pending,
   };
-}
-
-export function createUnitCircle(x: number, y: number, name = "Unit Circle"): UnitCircleObject {
-  return { id: newObjectId(), type: "unit-circle", x, y, w: 360, h: 380, name, angleDeg: 45, signalLinked: false };
-}
-
-export function createOscilloscope(x: number, y: number, name = "Oscilloscope"): OscilloscopeObject {
-  return {
-    id: newObjectId(), type: "oscilloscope", x, y, w: 480, h: 400, name,
-    channelA: { ...DEFAULT_CHANNEL }, channelB: { ...DEFAULT_CHANNEL, waveform: "off" },
-    timeDiv: 1, signalLinked: false,
-  };
-}
-
-export function createCompute(x: number, y: number, name = "Calculator"): ComputeObject {
-  return {
-    id: newObjectId(), type: "compute", x, y, w: 300, h: 250, name,
-    cells: [], resultExpr: "",
-  };
-}
-
-export function createAnimationCanvas(x: number, y: number, name = "Animation Canvas"): AnimationCanvasObject {
-  return {
-    id: newObjectId(), type: "animation-canvas", x, y, w: 400, h: 350, name,
-    frames: [""], currentFrame: 0, fps: 12,
-  };
-}
-
-export function createStudyGantt(x: number, y: number, name = "Study Gantt"): StudyGanttObject {
-  return {
-    id: newObjectId(), type: "study-gantt", x, y, w: 500, h: 300, name,
-    startDate: new Date().toISOString().slice(0, 10), tasks: [],
-  };
-}
-
-export function createAIDropin(x: number, y: number, name = "AI Drop-in"): AIDropinObject {
-  return { id: newObjectId(), type: "ai-dropin", x, y, w: 350, h: 500, name, mode: "solve" };
-}
-
-export function createMultimeter(x: number, y: number, name = "Multimeter"): MultimeterObject {
-  return { id: newObjectId(), type: "multimeter", x, y, w: 280, h: 350, name, meterMode: "DCV", inputValue: "0" };
 }
 
 /** Default display name when an object has none set (old pages). */
@@ -239,15 +164,56 @@ export function defaultObjectName(obj: CanvasObject): string {
     case "table": return "Table";
     case "image": return "Image";
     case "pdf": return "PDF";
-    case "circuit-sniper": return "Circuit Sniper";
-    case "unit-converter": return "Unit Converter";
-    case "graph-plotter": return "Graph Plotter";
-    case "unit-circle": return "Unit Circle";
-    case "oscilloscope": return "Oscilloscope";
-    case "compute": return "Calculator";
-    case "animation-canvas": return "Animation Canvas";
-    case "study-gantt": return "Study Gantt";
-    case "ai-dropin": return "AI Drop-in";
-    case "multimeter": return "Multimeter";
+    case "math": return "Math";
+    case "chat": return "Chat";
   }
+}
+
+/* ── v1.10 migration ────────────────────────────────────────
+   Old pages may contain drop-ins of types that no longer exist
+   (circuit-sniper, oscilloscope, multimeter, compute, graph-plotter,
+   unit-circle, unit-converter, animation-canvas, study-gantt,
+   ai-dropin). The loader calls this to strip them and report the
+   counts to the user via a one-time Notice.
+   ──────────────────────────────────────────────────────── */
+
+const REMOVED_TYPES = new Set([
+  "circuit-sniper", "oscilloscope", "multimeter", "compute",
+  "graph-plotter", "unit-circle", "unit-converter",
+  "animation-canvas", "study-gantt", "ai-dropin",
+]);
+
+const REMOVED_LABELS: Record<string, string> = {
+  "circuit-sniper": "Circuit Sniper",
+  "oscilloscope": "Oscilloscope",
+  "multimeter": "Multimeter",
+  "compute": "Calculator",
+  "graph-plotter": "Graph Plotter",
+  "unit-circle": "Unit Circle",
+  "unit-converter": "Unit Converter",
+  "animation-canvas": "Animation Canvas",
+  "study-gantt": "Study Gantt",
+  "ai-dropin": "AI Drop-in",
+};
+
+export function stripRemovedObjects(
+  objects: unknown[],
+): { kept: CanvasObject[]; removed: Record<string, number> } {
+  const kept: CanvasObject[] = [];
+  const removed: Record<string, number> = {};
+  for (const o of objects) {
+    const t = (o as { type?: string } | null)?.type;
+    if (!t) continue;
+    if (REMOVED_TYPES.has(t)) {
+      const label = REMOVED_LABELS[t] ?? t;
+      removed[label] = (removed[label] ?? 0) + 1;
+      continue;
+    }
+    // Belt-and-braces: only keep types we actually render.
+    if (t === "textbox" || t === "table" || t === "image" || t === "pdf"
+        || t === "math" || t === "chat") {
+      kept.push(o as CanvasObject);
+    }
+  }
+  return { kept, removed };
 }

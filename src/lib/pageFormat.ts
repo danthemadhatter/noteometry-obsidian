@@ -9,9 +9,7 @@
  * persistence.ts owns the I/O layer and imports from here.
  */
 import type { Stroke, StrokePoint, Stamp } from "./inkEngine";
-import type {
-  CanvasObject, OscilloscopeChannel,
-} from "./canvasObjects";
+import type { CanvasObject } from "./canvasObjects";
 import type { ChatMessage } from "../types";
 
 /**
@@ -25,7 +23,9 @@ export interface CanvasData {
   stamps: Stamp[];
   canvasObjects: CanvasObject[];
   viewport: { scrollX: number; scrollY: number; zoom?: number };
+  /** Legacy v1.9 field — empty in v1.10+ but preserved for v1.9 readers. */
   panelInput: string;
+  /** Legacy v1.9 field — empty in v1.10+ but preserved for v1.9 readers. */
   chatMessages: ChatMessage[];
   tableData: Record<string, string[][]>;
   textBoxData: Record<string, string>;
@@ -61,13 +61,19 @@ export const EMPTY_PAGE: CanvasData = {
  *        on next write
  *   - v3 (current): single elements[] array; text/table data inlined
  *        into their elements; image fileRef path (no more base64)
+ *   - v1.10.0 (within v3): the engineering / math-tools / study /
+ *     legacy-AI element types are no longer accepted on the in-memory
+ *     side. They're treated as unknown elements during unpack and silently
+ *     skipped — the right place to surface a Notice about this is the
+ *     stripRemovedObjects helper in canvasObjects.ts which runs on the
+ *     hydrated CanvasData (this module is intentionally I/O-free).
  *
  * Loading any version returns CanvasData; saving always writes v3.
  * Untouched v2 files remain v2 on disk until they are next modified.
  * ══════════════════════════════════════════════════════════════════════
  */
 
-export const V3_SOURCE_TAG = "noteometry-1.5.0";
+export const V3_SOURCE_TAG = "noteometry-1.10.0";
 
 export interface StrokeElementV3 {
   type: "stroke";
@@ -139,90 +145,42 @@ export interface PdfElementV3 {
   name?: string;
 }
 
-/* ── v1.2+ element types ─────────────────────────────────── */
+/* ── v1.10 element types ──────────────────────────────────
+ * Math + Chat drop-ins replace the entire old engineering / math /
+ * study / legacy-AI suite. Each ChatElement carries its own message
+ * history; there is no global chat state. */
 
-export interface CircuitSniperElementV3 {
-  type: "circuit-sniper";
-  id: string; x: number; y: number; w: number; h: number;
-  circuitData: string;
+export interface MathElementV3 {
+  type: "math";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** LaTeX string — the 123 vision output, editable in place. */
+  latex: string;
+  /** Pending state should never persist (a half-finished vision call
+   *  becomes a permanently-spinning ghost on reload), but we accept
+   *  it on read and force it to false. Optional on write. */
+  pending?: boolean;
   name?: string;
 }
 
-export interface UnitConverterElementV3 {
-  type: "unit-converter";
-  id: string; x: number; y: number; w: number; h: number;
-  category: string;
-  inputValue: string;
-  name?: string;
-}
-
-export interface GraphPlotterElementV3 {
-  type: "graph-plotter";
-  id: string; x: number; y: number; w: number; h: number;
-  functions: Array<{ expr: string; color: string; enabled: boolean }>;
-  viewX: number; viewY: number; viewW: number; viewH: number;
-  signalLinked?: boolean;
-  name?: string;
-}
-
-export interface UnitCircleElementV3 {
-  type: "unit-circle";
-  id: string; x: number; y: number; w: number; h: number;
-  angleDeg: number;
-  signalLinked?: boolean;
-  name?: string;
-}
-
-export interface OscilloscopeElementV3 {
-  type: "oscilloscope";
-  id: string; x: number; y: number; w: number; h: number;
-  channelA: OscilloscopeChannel;
-  channelB: OscilloscopeChannel;
-  timeDiv: number;
-  signalLinked?: boolean;
-  name?: string;
-}
-
-export interface ComputeElementV3 {
-  type: "compute";
-  id: string; x: number; y: number; w: number; h: number;
-  cells: Array<{ name: string; expr: string; value: string }>;
-  resultExpr: string;
-  name?: string;
-}
-
-export interface AnimationCanvasElementV3 {
-  type: "animation-canvas";
-  id: string; x: number; y: number; w: number; h: number;
-  frames: string[];
-  currentFrame: number;
-  fps: number;
-  name?: string;
-}
-
-export interface StudyGanttElementV3 {
-  type: "study-gantt";
-  id: string; x: number; y: number; w: number; h: number;
-  startDate: string;
-  tasks: Array<{
-    id: string; title: string; startDay: number; duration: number;
-    color: string; progress: number;
-  }>;
-  name?: string;
-}
-
-export interface AIDropinElementV3 {
-  type: "ai-dropin";
-  id: string; x: number; y: number; w: number; h: number;
-  mode: "chat" | "solve";
-  name?: string;
-}
-
-export interface MultimeterElementV3 {
-  type: "multimeter";
-  id: string; x: number; y: number; w: number; h: number;
-  meterMode: string;
-  inputValue: string;
+export interface ChatElementV3 {
+  type: "chat";
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Lasso image (base64 PNG) pinned at the top of the chat. */
+  attachedImage?: string;
+  /** Seeded LaTeX for Solve-spawned chats. */
+  seedLatex?: string;
+  /** Conversation history for this drop-in only. */
+  messages: ChatMessage[];
+  /** Same intent as MathElement.pending — accepted on read, never persisted. */
+  pending?: boolean;
   name?: string;
 }
 
@@ -233,16 +191,8 @@ export type PageElementV3 =
   | TableElementV3
   | ImageElementV3
   | PdfElementV3
-  | CircuitSniperElementV3
-  | UnitConverterElementV3
-  | GraphPlotterElementV3
-  | UnitCircleElementV3
-  | OscilloscopeElementV3
-  | ComputeElementV3
-  | AnimationCanvasElementV3
-  | StudyGanttElementV3
-  | AIDropinElementV3
-  | MultimeterElementV3;
+  | MathElementV3
+  | ChatElementV3;
 
 export interface NoteometryPageV3 {
   type: "noteometry-page";
@@ -254,13 +204,26 @@ export interface NoteometryPageV3 {
     scrollY: number;
     zoom: number;
   };
-  pipeline: {
-    panelInput: string;
-    /** Phase 3 will introduce structured run history here. For now: chat messages. */
-    chatMessages: ChatMessage[];
+  /** Legacy v1.9 field. Always empty in v1.10+ writes; tolerated on read so
+   *  v1.9 pages with sidebar chat history don't crash the parser. */
+  pipeline?: {
+    panelInput?: string;
+    chatMessages?: ChatMessage[];
   };
   lastSaved: string;
 }
+
+/* ── Legacy v1.9 element types ───────────────────────────────
+ * These were valid in v1.5–v1.9 but are no longer part of the in-memory
+ * CanvasObject union. We keep skeletal interfaces here so we can recognize
+ * them on disk and silently skip them during unpack — no migration path,
+ * since the corresponding components were deleted in v1.10.0. */
+
+const REMOVED_ELEMENT_TYPES = new Set([
+  "circuit-sniper", "oscilloscope", "multimeter", "compute",
+  "graph-plotter", "unit-circle", "unit-converter",
+  "animation-canvas", "study-gantt", "ai-dropin",
+]);
 
 /**
  * Pack a CanvasData into the v3 on-disk shape. Merges strokes, stamps,
@@ -328,70 +291,27 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         page: obj.page,
         name: obj.name,
       });
-    } else if (obj.type === "circuit-sniper") {
+    } else if (obj.type === "math") {
       elements.push({
-        type: "circuit-sniper", id: obj.id,
+        type: "math",
+        id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        circuitData: obj.circuitData, name: obj.name,
+        latex: obj.latex,
+        // Never persist a pending flag — see MathElementV3 docs.
+        name: obj.name,
       });
-    } else if (obj.type === "unit-converter") {
+    } else if (obj.type === "chat") {
       elements.push({
-        type: "unit-converter", id: obj.id,
+        type: "chat",
+        id: obj.id,
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        category: obj.category, inputValue: obj.inputValue, name: obj.name,
-      });
-    } else if (obj.type === "graph-plotter") {
-      elements.push({
-        type: "graph-plotter", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        functions: obj.functions,
-        viewX: obj.viewX, viewY: obj.viewY, viewW: obj.viewW, viewH: obj.viewH,
-        signalLinked: obj.signalLinked, name: obj.name,
-      });
-    } else if (obj.type === "unit-circle") {
-      elements.push({
-        type: "unit-circle", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        angleDeg: obj.angleDeg, signalLinked: obj.signalLinked, name: obj.name,
-      });
-    } else if (obj.type === "oscilloscope") {
-      elements.push({
-        type: "oscilloscope", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        channelA: obj.channelA, channelB: obj.channelB,
-        timeDiv: obj.timeDiv, signalLinked: obj.signalLinked, name: obj.name,
-      });
-    } else if (obj.type === "compute") {
-      elements.push({
-        type: "compute", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        cells: obj.cells, resultExpr: obj.resultExpr, name: obj.name,
-      });
-    } else if (obj.type === "animation-canvas") {
-      elements.push({
-        type: "animation-canvas", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        frames: obj.frames, currentFrame: obj.currentFrame, fps: obj.fps, name: obj.name,
-      });
-    } else if (obj.type === "study-gantt") {
-      elements.push({
-        type: "study-gantt", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        startDate: obj.startDate, tasks: obj.tasks, name: obj.name,
-      });
-    } else if (obj.type === "ai-dropin") {
-      elements.push({
-        type: "ai-dropin", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        mode: obj.mode, name: obj.name,
-      });
-    } else if (obj.type === "multimeter") {
-      elements.push({
-        type: "multimeter", id: obj.id,
-        x: obj.x, y: obj.y, w: obj.w, h: obj.h,
-        meterMode: obj.meterMode, inputValue: obj.inputValue, name: obj.name,
+        attachedImage: obj.attachedImage,
+        seedLatex: obj.seedLatex,
+        messages: obj.messages ?? [],
+        name: obj.name,
       });
     }
+    // Any other obj.type is unreachable since v1.10 trimmed the union.
   }
 
   return {
@@ -404,6 +324,8 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
       scrollY: data.viewport?.scrollY ?? 0,
       zoom: (data.viewport as { zoom?: number }).zoom ?? 1.0,
     },
+    // v1.10 leaves these empty but still emits the field so v1.9 readers
+    // (which assume `pipeline` exists) don't choke.
     pipeline: {
       panelInput: data.panelInput ?? "",
       chatMessages: data.chatMessages ?? [],
@@ -424,7 +346,11 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
   const tableData: Record<string, string[][]> = {};
   const textBoxData: Record<string, string> = {};
 
-  for (const el of v3.elements ?? []) {
+  for (const raw of v3.elements ?? []) {
+    // Soft-cast: legacy types fall through the switch. We treat the whole
+    // element as `any` for the dispatch so unknown legacy fields don't
+    // need to be enumerated in the union.
+    const el = raw as PageElementV3 & { type: string };
     switch (el.type) {
       case "stroke":
         strokes.push({
@@ -477,82 +403,37 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           fileRef: el.fileRef, page: el.page ?? 1, name: el.name,
         });
         break;
-      case "circuit-sniper":
+      case "math":
         canvasObjects.push({
-          id: el.id, type: "circuit-sniper",
+          id: el.id, type: "math",
           x: el.x, y: el.y, w: el.w, h: el.h,
-          circuitData: el.circuitData, name: el.name,
-        });
-        break;
-      case "unit-converter":
-        canvasObjects.push({
-          id: el.id, type: "unit-converter",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          category: el.category, inputValue: el.inputValue, name: el.name,
-        });
-        break;
-      case "graph-plotter":
-        canvasObjects.push({
-          id: el.id, type: "graph-plotter",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          functions: el.functions,
-          viewX: el.viewX, viewY: el.viewY, viewW: el.viewW, viewH: el.viewH,
-          signalLinked: el.signalLinked, name: el.name,
-        });
-        break;
-      case "unit-circle":
-        canvasObjects.push({
-          id: el.id, type: "unit-circle",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          angleDeg: el.angleDeg, signalLinked: el.signalLinked, name: el.name,
-        });
-        break;
-      case "oscilloscope":
-        canvasObjects.push({
-          id: el.id, type: "oscilloscope",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          channelA: el.channelA, channelB: el.channelB,
-          timeDiv: el.timeDiv, signalLinked: el.signalLinked, name: el.name,
-        });
-        break;
-      case "compute":
-        canvasObjects.push({
-          id: el.id, type: "compute",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          cells: el.cells, resultExpr: el.resultExpr, name: el.name,
-        });
-        break;
-      case "animation-canvas":
-        canvasObjects.push({
-          id: el.id, type: "animation-canvas",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          frames: el.frames, currentFrame: el.currentFrame, fps: el.fps, name: el.name,
-        });
-        break;
-      case "study-gantt":
-        canvasObjects.push({
-          id: el.id, type: "study-gantt",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          startDate: el.startDate, tasks: el.tasks, name: el.name,
-        });
-        break;
-      case "ai-dropin":
-        canvasObjects.push({
-          id: el.id, type: "ai-dropin",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          mode: el.mode ?? "solve", name: el.name,
-        });
-        break;
-      case "multimeter":
-        canvasObjects.push({
-          id: el.id, type: "multimeter",
-          x: el.x, y: el.y, w: el.w, h: el.h,
-          meterMode: ((el as MultimeterElementV3).meterMode ?? "DCV") as "DCV",
-          inputValue: (el as MultimeterElementV3).inputValue ?? "0",
+          latex: el.latex ?? "",
+          // Force pending=false on load: a stuck spinner from a crashed
+          // session would otherwise be permanent.
+          pending: false,
           name: el.name,
         });
         break;
-      // Unknown element types silently skipped for forward compat
+      case "chat":
+        canvasObjects.push({
+          id: el.id, type: "chat",
+          x: el.x, y: el.y, w: el.w, h: el.h,
+          attachedImage: el.attachedImage,
+          seedLatex: el.seedLatex,
+          messages: Array.isArray(el.messages) ? el.messages : [],
+          pending: false,
+          name: el.name,
+        });
+        break;
+      default: {
+        const t = (el as { type?: string }).type;
+        if (t && REMOVED_ELEMENT_TYPES.has(t)) {
+          // Silent on this layer — stripRemovedObjects in canvasObjects.ts
+          // counts them and surfaces a Notice from the React side.
+        }
+        // Unknown element types silently skipped for forward compat
+        break;
+      }
     }
   }
 

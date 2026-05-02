@@ -5,10 +5,7 @@ import { stampBBox, newStampId, STAMP_SIZES, type StampSize } from "../lib/inkEn
 import { renderStrokesToImage } from "../lib/canvasRenderer";
 import {
   createTextBox, createTable, createImageObject, createPdfObject,
-  createCircuitSniper, createUnitConverter, createGraphPlotter,
-  createUnitCircle, createOscilloscope, createCompute,
-  createAnimationCanvas, createStudyGantt,
-  createMultimeter,
+  createMathObject, createChatObject, stripRemovedObjects,
 } from "../lib/canvasObjects";
 import {
   saveImageBytesTo, savePdfBytesTo, rootDir,
@@ -17,8 +14,6 @@ import {
 import InkCanvas, { CanvasTool } from "./InkCanvas";
 // CanvasToolbar removed — all tools now live in the right-click context menu
 import CanvasObjectLayer from "./CanvasObjectLayer";
-import Panel from "./Panel";
-import ChatPanel from "./ChatPanel";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
@@ -27,13 +22,12 @@ import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuAct
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { makePastedObject } from "../lib/objectClipboard";
-import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, setTextBoxData, clearScope } from "../lib/tableStore";
+import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, clearScope } from "../lib/tableStore";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
-import { usePipeline } from "../features/pipeline/usePipeline";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -146,13 +140,10 @@ export default function NoteometryApp({
     hydrate: hydrateObjects,
   } = useObjects();
 
-  /* ── Pipeline feature: panel input + chat + READ INK + solve ─── */
-  const {
-    inputCode, chatMessages, isReading, chatLoading,
-    setInputCode, setChatMessages,
-    sendToChat, stopChat, processCrop, handleSolveInput, handleInsertSymbol,
-    hydrate: hydratePipeline,
-  } = usePipeline(plugin);
+  /* v1.10.0: usePipeline removed entirely. The right-side Panel + ChatPanel
+     have been deleted; AI flow lives 100% on the lasso 123/ABC radial which
+     spawns Math/Chat drop-ins on the canvas, and the Math Palette popup arms
+     a pending stamp instead of typing into a now-nonexistent input box. */
 
   /* ── Composition-layer state ─── */
   const [scrollX, setScrollX] = useState(0);
@@ -299,11 +290,7 @@ export default function NoteometryApp({
   }, [handleUndoWrapped, handleRedoWrapped]);
 
   /* ── Panel state ──────────────────────────────────────── */
-  const [panelOpen, setPanelOpen] = useState(true);
   const [mathPaletteOpen, setMathPaletteOpen] = useState(false);
-  /* Mobile-only: which of the two stacked right-panel sections is visible.
-   * On wider screens CSS shows both simultaneously. */
-  const [mobileRightTab, setMobileRightTab] = useState<"input" | "chat">("input");
 
   /* ── Persistence coordination (file-bound) ─────────────────
    *
@@ -343,15 +330,29 @@ export default function NoteometryApp({
 
   const hydrateFromData = useCallback((data: CanvasData) => {
     loadingPageRef.current = true;
-    hydratePipeline(data.panelInput ?? "", data.chatMessages ?? []);
     hydrateInk(data.strokes ?? [], data.stamps ?? []);
-    hydrateObjects(data.canvasObjects ?? []);
+    // v1.10.0: silently strip any drop-in types we deleted (Circuit
+    // Sniper, Calculator, etc.) before hydrating, and surface a one-time
+    // Notice listing what was migrated so users aren't blindsided.
+    const incoming = (data.canvasObjects ?? []) as unknown[];
+    const { kept, removed } = stripRemovedObjects(incoming);
+    hydrateObjects(kept);
+    const removedEntries = Object.entries(removed);
+    if (removedEntries.length > 0) {
+      const summary = removedEntries
+        .map(([label, count]) => `${count}× ${label}`)
+        .join(", ");
+      new Notice(
+        `Noteometry v1.10: removed retired drop-ins from this page (${summary}).`,
+        12000,
+      );
+    }
     loadAllTableData(scope, data.tableData ?? {});
     loadAllTextBoxData(scope, data.textBoxData ?? {});
     setScrollX(data.viewport?.scrollX ?? 0);
     setScrollY(data.viewport?.scrollY ?? 0);
     requestAnimationFrame(() => { loadingPageRef.current = false; });
-  }, [hydratePipeline, hydrateInk, hydrateObjects, scope]);
+  }, [hydrateInk, hydrateObjects, scope]);
 
   // Hydrate on first mount (and when the view pushes a new initial data
   // token for a newly-bound file).
@@ -387,14 +388,16 @@ export default function NoteometryApp({
       stamps,
       canvasObjects,
       viewport: { scrollX, scrollY },
-      panelInput: inputCode,
-      chatMessages,
+      // v1.10.0: panelInput + chatMessages no longer exist (Panel + ChatPanel
+      // deleted). Persist empty values so v1.9 readers stay happy.
+      panelInput: "",
+      chatMessages: [],
       tableData: getAllTableData(scope),
       textBoxData: getAllTextBoxData(scope),
       lastSaved: new Date().toISOString(),
     };
     await onSaveDataRef.current(data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, inputCode, chatMessages, scope]);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, scope]);
 
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
@@ -407,7 +410,7 @@ export default function NoteometryApp({
     }, plugin.settings.autoSaveDelay);
   }, [saveNow, plugin]);
 
-  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [inputCode, chatMessages, strokes, stamps, canvasObjects]);
+  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [strokes, stamps, canvasObjects]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
   useEffect(() => {
@@ -466,27 +469,87 @@ export default function NoteometryApp({
     pushRegion(region);
   }, [setLassoActive, pushRegion]);
 
-  /* ── Process the lasso stack: composite + send to AI pipeline ── */
-  const handleProcessStack = useCallback(async () => {
-    // Snapshot the current stack so the async work is decoupled from state.
+  /* ── Lasso 123 ── Render Equation
+     Composite the lasso stack → spawn an empty (pending) MathDropin near
+     the lasso → await readInk() → fill the LaTeX into the drop-in.
+     Failure leaves the drop-in in place with an empty + non-pending state
+     plus a Notice, so the user can fix-by-edit or delete it. */
+  const handleProcess123 = useCallback(async () => {
     const snapshot = lassoRegions;
     if (snapshot.length === 0) return;
-
-    // Composite all region images into one tall labeled PNG
     const composite = await compositeRegions(snapshot.map((r) => r.capturedImage));
     if (!composite) {
       new Notice("Failed to composite lasso regions — see console", 8000);
       return;
     }
-
-    // Clear the stack and deactivate lasso mode before sending to the AI
-    // so the user can't accidentally add more regions mid-flight.
+    // Anchor the math drop-in just below the bottom-right of the
+    // bounding box of the most recent region, so it visually "falls
+    // out" of what was lassoed.
+    const last = snapshot[snapshot.length - 1];
+    const anchorX = (last?.bounds?.maxX ?? scrollX + 200) + 16;
+    const anchorY = last?.bounds?.minY ?? scrollY + 200;
+    const obj = createMathObject(anchorX, anchorY, "", true);
+    setCanvasObjects((prev) => [...prev, obj]);
+    setSelectedObjectId(obj.id);
     clearStack();
     setLassoActive(false);
 
-    // Hand off to the pipeline (OCR + solve + chat with image attached)
-    await processCrop(composite);
-  }, [lassoRegions, clearStack, setLassoActive, processCrop]);
+    // Lazy import to avoid pulling lib/ai into modules that don't need it.
+    const { readInk } = await import("../lib/ai");
+    try {
+      const res = await readInk(composite, plugin.settings);
+      setCanvasObjects((prev) => prev.map((o) =>
+        o.id === obj.id && o.type === "math"
+          ? { ...o, latex: res.ok ? res.text.trim() : "", pending: false }
+          : o,
+      ));
+      if (!res.ok) new Notice(res.error ?? "123 failed — vision returned no text", 6000);
+    } catch (err) {
+      console.error("[Noteometry] 123 vision call failed:", err);
+      setCanvasObjects((prev) => prev.map((o) =>
+        o.id === obj.id && o.type === "math" ? { ...o, pending: false } : o,
+      ));
+      new Notice("123 failed — see console", 6000);
+    }
+  }, [lassoRegions, clearStack, setLassoActive, scrollX, scrollY, setCanvasObjects, setSelectedObjectId, plugin]);
+
+  /* ── Lasso ABC ── Ask a Question
+     Composite the stack → spawn an empty ChatDropin with the image pinned.
+     User types/speaks the question; the first send packages the image as
+     the attachment. No pre-vision pass — the chat model handles it. */
+  const handleProcessABC = useCallback(async () => {
+    const snapshot = lassoRegions;
+    if (snapshot.length === 0) return;
+    const composite = await compositeRegions(snapshot.map((r) => r.capturedImage));
+    if (!composite) {
+      new Notice("Failed to composite lasso regions — see console", 8000);
+      return;
+    }
+    const last = snapshot[snapshot.length - 1];
+    const anchorX = (last?.bounds?.maxX ?? scrollX + 200) + 16;
+    const anchorY = last?.bounds?.minY ?? scrollY + 200;
+    const obj = createChatObject(anchorX, anchorY, { attachedImage: composite });
+    setCanvasObjects((prev) => [...prev, obj]);
+    setSelectedObjectId(obj.id);
+    clearStack();
+    setLassoActive(false);
+  }, [lassoRegions, clearStack, setLassoActive, scrollX, scrollY, setCanvasObjects, setSelectedObjectId]);
+
+  /* ── Math → Solve ──
+     User clicked Solve on a math drop-in. Spawn a ChatDropin offset to
+     the right, seeded with the LaTeX. The ChatDropin auto-fires its
+     first turn through the v12 system prompt. */
+  const handleSolveMath = useCallback((mathDropinId: string) => {
+    const math = canvasObjects.find((o) => o.id === mathDropinId && o.type === "math");
+    if (!math || math.type !== "math" || !math.latex.trim()) return;
+    const chat = createChatObject(
+      math.x + math.w + 24,
+      math.y,
+      { seedLatex: math.latex },
+    );
+    setCanvasObjects((prev) => [...prev, chat]);
+    setSelectedObjectId(chat.id);
+  }, [canvasObjects, setCanvasObjects, setSelectedObjectId]);
 
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
     // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
@@ -561,28 +624,8 @@ export default function NoteometryApp({
     }
   }, [scrollX, scrollY]);
 
-  /* ── Drop AI chat response onto the canvas ──────────────
-   * Creates a new text box at the top-left of the current viewport
-   * pre-populated with the rendered HTML (LaTeX already converted to
-   * MathML by ChatPanel before calling us). User can then drag/resize
-   * or edit the text around the rendered math. */
-  const handleDropChatToCanvas = useCallback((html: string) => {
-    // Position near the top-left of what the user is currently looking
-    // at. Stack subsequent drops diagonally so they don't fully overlap.
-    const existingDropCount = canvasObjects.filter((o) => o.type === "textbox").length;
-    const offset = 40 + (existingDropCount % 6) * 24;
-    const x = scrollX + offset;
-    const y = scrollY + offset;
-    const obj = createTextBox(x, y);
-    // Wider/taller than default so a full DLP-format solution fits.
-    const sized = { ...obj, w: 460, h: 280 };
-    // Seed the textbox HTML BEFORE the component mounts, so RichTextEditor
-    // reads the content from tableStore on first render and shows it.
-    setTextBoxData(scope, sized.id, html);
-    setCanvasObjects((prev) => [...prev, sized]);
-    setTool("select");
-    setSelectedObjectId(sized.id);
-  }, [scrollX, scrollY, canvasObjects, setCanvasObjects, setSelectedObjectId, scope, setTool]);
+  /* v1.10.0: handleDropChatToCanvas removed — ChatDropin already lives ON the canvas. */
+
 
   const handleInsertTable = useCallback(() => {
     try {
@@ -622,23 +665,11 @@ export default function NoteometryApp({
     }
   }, [scrollX, scrollY, setCanvasObjects, setSelectedObjectId]);
 
-  const handleInsertCircuitSniper = useCallback(() => insertDropin(createCircuitSniper, "Circuit Sniper"), [insertDropin]);
-  const handleInsertUnitConverter = useCallback(() => insertDropin(createUnitConverter, "Unit Converter"), [insertDropin]);
-  const handleInsertGraphPlotter = useCallback(() => insertDropin(createGraphPlotter, "Graph Plotter"), [insertDropin]);
-  const handleInsertUnitCircle = useCallback(() => insertDropin(createUnitCircle, "Unit Circle"), [insertDropin]);
-  const handleInsertOscilloscope = useCallback(() => insertDropin(createOscilloscope, "Oscilloscope"), [insertDropin]);
-  // Renamed v1.6.7: user called this "Computer" in feedback — the label
-   // "Compute" wasn't doing its job. "Calculator" matches what it actually
-   // is (a named-variables scratchpad that spits out a number). The
-   // create* factory still uses the "compute" kind for persistence
-   // compatibility.
-   const handleInsertCompute = useCallback(() => insertDropin(createCompute, "Calculator"), [insertDropin]);
-  const handleInsertAnimationCanvas = useCallback(() => insertDropin(createAnimationCanvas, "Animation Canvas"), [insertDropin]);
-  const handleInsertStudyGantt = useCallback(() => insertDropin(createStudyGantt, "Study Gantt"), [insertDropin]);
-  // handleInsertAIDropin removed in v1.6.6 — the AI drop-in is quarantined;
-  // chat/solve live in the right panel. Old pages with an ai-dropin object
-  // still render via CanvasObjectLayer with a deprecation placeholder.
-  const handleInsertMultimeter = useCallback(() => insertDropin(createMultimeter, "Multimeter"), [insertDropin]);
+  /* v1.10.0: All engineering + math-tool + study + legacy-AI drop-in
+     inserters removed. The surviving factories (Text/Table/Image/PDF/
+     Math/Chat) use the insertDropin helper where applicable; Math and
+     Chat are never inserted manually — they only spawn from the lasso
+     123/ABC radial or from Solve on a math drop-in. */
 
   const handlePdfUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0];
@@ -853,61 +884,17 @@ export default function NoteometryApp({
         { label: "", separator: true },
       );
 
-      // ── Engineering ──
-      // Multimeter was hidden from the main hub in v1.6.7 — user reported
-      // they didn't know how it fit the math/EE workbench flow. Still
-      // reachable behind the "Show experimental tools" setting so existing
-      // pages keep working and power users can opt in.
+      // v1.10.0: Engineering / Math Tools / Study / Canvas sections
+      // are gone. The right-click hub is now four insertable kinds
+      // (Text/Table/Image/PDF), the Math Palette toggle, and Export PNG.
+      // Everything else (zoom, undo/redo/clear, ink color/width) lives
+      // pinned at the top of this same menu via the existing helpers,
+      // or as keyboard shortcuts. AI flow lives entirely on the lasso
+      // 123/ABC radial — not here.
       items.push(
-        { label: "\u2500\u2500 Engineering \u2500\u2500", disabled: true },
-        { label: "Circuit Sniper", icon: "⚡", onClick: handleInsertCircuitSniper },
-        { label: "Unit Converter", icon: "🔄", onClick: handleInsertUnitConverter },
-      );
-      if (plugin.settings.showExperimentalTools) {
-        items.push({ label: "Multimeter (experimental)", icon: "🔌", onClick: handleInsertMultimeter });
-      }
-      items.push({ label: "", separator: true });
-
-      // ── Math Tools ──
-      // Compute → renamed "Calculator" in v1.6.7; user's feedback was
-      // "WTF is 'Computer' for?" — the label was the problem, not the
-      // feature. Animation Canvas was a Manim-inspired speculative
-      // experiment; hide behind the setting until it earns its keep.
-      items.push(
-        { label: "\u2500\u2500 Math Tools \u2500\u2500", disabled: true },
         { label: "Math Palette", icon: "🧮", shortcut: mathPaletteOpen ? "\u2713" : "", onClick: () => setMathPaletteOpen(p => !p) },
-        { label: "Graph Plotter", icon: "📈", onClick: handleInsertGraphPlotter },
-        { label: "Unit Circle", icon: "🔘", onClick: handleInsertUnitCircle },
-        { label: "Oscilloscope", icon: "📟", onClick: handleInsertOscilloscope },
-        { label: "Calculator", icon: "🧮", onClick: handleInsertCompute },
-      );
-      if (plugin.settings.showExperimentalTools) {
-        items.push({ label: "Animation Canvas (experimental)", icon: "🎬", onClick: handleInsertAnimationCanvas });
-      }
-      items.push({ label: "", separator: true });
-
-      // ── Study ──
-      // Study Gantt was reported as "completely worthless" — hide behind
-      // the setting. Legacy pages still render via CanvasObjectLayer.
-      if (plugin.settings.showExperimentalTools) {
-        items.push(
-          { label: "\u2500\u2500 Study \u2500\u2500", disabled: true },
-          { label: "Study Gantt (experimental)", icon: "📅", onClick: handleInsertStudyGantt },
-          { label: "", separator: true },
-        );
-      }
-
-      // AI Drop-in removed from menu — Preview + Input remain in the right panel
-
-      // ── Canvas ── (Undo/Redo/Clear live pinned at top; here we keep
-      // the less-critical view-level actions that are fine to scroll to.)
-      items.push(
-        { label: "\u2500\u2500 Canvas \u2500\u2500", disabled: true },
-        { label: "Zoom In", shortcut: `${Math.round(zoom * 100)}%`, onClick: zoomIn },
-        { label: "Zoom Out", onClick: zoomOut },
-        { label: "Reset Zoom (100%)", onClick: resetZoom },
         { label: "", separator: true },
-        { label: "Export PNG", onClick: () => {
+        { label: "Export PNG", icon: "🖼️", onClick: () => {
           const dataUrl = renderStrokesToImage(strokes, 20, 2, stamps);
           if (!dataUrl) return;
           const link = document.createElement("a");
@@ -932,10 +919,7 @@ export default function NoteometryApp({
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
-    handleInsertCircuitSniper, handleInsertUnitConverter, handleInsertGraphPlotter,
-    handleInsertUnitCircle, handleInsertOscilloscope, handleInsertCompute,
-    handleInsertAnimationCanvas, handleInsertStudyGantt, handleInsertMultimeter,
-    mathPaletteOpen, plugin.settings.showExperimentalTools,
+    mathPaletteOpen,
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1167,49 +1151,7 @@ export default function NoteometryApp({
     } catch { /* ignore */ }
   }, [scrollX, scrollY, activeColor, pushUndo]);
 
-  /* ── Right panel resize ──────────────────────────────── */
-  const [panelWidth, setPanelWidth] = useState(() => window.innerWidth < 1024 ? 240 : 320);
-  const panelDragging = useRef(false);
-  const panelLastX = useRef(0);
-
-  const handlePanelResizeDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    panelDragging.current = true;
-    panelLastX.current = e.clientX;
-  };
-  const handlePanelResizeMove = (e: React.PointerEvent) => {
-    if (!panelDragging.current) return;
-    const dx = e.clientX - panelLastX.current;
-    panelLastX.current = e.clientX;
-    setPanelWidth((w) => Math.max(200, Math.min(900, w - dx)));
-  };
-  const handlePanelResizeUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    panelDragging.current = false;
-  };
-
-  /* ── Chat vertical resize ───────────────────────────── */
-  const [chatHeight, setChatHeight] = useState(320);
-  const chatDragging = useRef(false);
-  const chatLastY = useRef(0);
-
-  const handleChatResizeDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    chatDragging.current = true;
-    chatLastY.current = e.clientY;
-  };
-  const handleChatResizeMove = (e: React.PointerEvent) => {
-    if (!chatDragging.current) return;
-    const dy = e.clientY - chatLastY.current;
-    chatLastY.current = e.clientY;
-    setChatHeight((h) => Math.max(80, h - dy));
-  };
-  const handleChatResizeUp = (e: React.PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    chatDragging.current = false;
-  };
+  /* v1.10.0: panel + chat resize handlers removed along with the right sidebar. */
 
   /* ── Render ──────────────────────────────────────────── */
   if (!ready) {
@@ -1247,17 +1189,6 @@ export default function NoteometryApp({
 
             {/* ── Viewport: the full drawing surface (toolbar removed — use right-click) ── */}
             <div ref={viewportRef} className="noteometry-canvas-viewport">
-              {!panelOpen && (
-                <div className="noteometry-canvas-actions">
-                  <button
-                    className="noteometry-canvas-action-btn"
-                    onClick={() => setPanelOpen(true)}
-                    title="Open panel"
-                  >
-                    ◨ Panel
-                  </button>
-                </div>
-              )}
 
               {/* Ink canvas */}
               <InkCanvas
@@ -1313,6 +1244,7 @@ export default function NoteometryApp({
                 plugin={plugin}
                 parentFolder={parentFolderPath}
                 scope={scope}
+                onSolveMath={handleSolveMath}
               />
 
               {/* Lasso overlay — operates within the viewport */}
@@ -1324,7 +1256,8 @@ export default function NoteometryApp({
                 onComplete={handleLassoComplete}
                 onCancel={clearStack}
                 onClear={handleLassoClear}
-                onProcess={handleProcessStack}
+                onProcess123={handleProcess123}
+                onProcessABC={handleProcessABC}
                 onMoveComplete={handleLassoMoveComplete}
               />
 
@@ -1375,77 +1308,11 @@ export default function NoteometryApp({
             </div>
           </div>
 
-          {/* ── Right panel ── */}
-          {panelOpen && (
-            <div className="noteometry-right" style={{ width: panelWidth }}>
-              <div
-                className="noteometry-right-resize"
-                onPointerDown={handlePanelResizeDown}
-                onPointerMove={handlePanelResizeMove}
-                onPointerUp={handlePanelResizeUp}
-              />
-              <div className="noteometry-right-inner" data-mobile-tab={mobileRightTab}>
-                {/* Mobile-only tab switcher — hidden on desktop via CSS */}
-                <div className="nm-right-tabs">
-                  <button
-                    className={`nm-right-tab${mobileRightTab === "input" ? " active" : ""}`}
-                    onClick={() => setMobileRightTab("input")}
-                  >Input</button>
-                  <button
-                    className={`nm-right-tab${mobileRightTab === "chat" ? " active" : ""}`}
-                    onClick={() => setMobileRightTab("chat")}
-                  >Chat</button>
-                  <button
-                    className="nm-right-tab nm-right-tab-hide"
-                    onClick={() => setPanelOpen(false)}
-                    title="Hide panel"
-                    aria-label="Hide panel"
-                  >×</button>
-                </div>
-
-                <div className="nm-right-pane nm-right-pane-input">
-                  <Panel
-                    inputCode={inputCode}
-                    setInputCode={setInputCode}
-                    onInsertSymbol={handleInsertSymbol}
-                    onStampSymbol={(sym) => setPendingSymbol(sym)}
-                    onDropStamp={(display, screenX, screenY) => {
-                      // Direct stamp placement from touch drag. Divide
-                      // by zoom before adding scroll so the drop lands
-                      // under the finger at any zoom level — same screen
-                      // → world math used by InkCanvas pointer handlers.
-                      const rect = canvasAreaRef.current?.getBoundingClientRect();
-                      if (!rect) return;
-                      const x = (screenX - rect.left) / zoom + scrollX;
-                      const y = (screenY - rect.top) / zoom + scrollY;
-                      setStamps(prev => [...prev, {
-                        id: newStampId(), x, y,
-                        text: display, fontSize: 96, color: activeColor,
-                      }]);
-                    }}
-                    onSolve={handleSolveInput}
-                    onClosePanel={() => setPanelOpen(false)}
-                  />
-                </div>
-                <div
-                  className="noteometry-resize-handle nm-desktop-only"
-                  onPointerDown={handleChatResizeDown}
-                  onPointerMove={handleChatResizeMove}
-                  onPointerUp={handleChatResizeUp}
-                />
-                <div className="nm-right-pane nm-right-pane-chat" style={{ height: chatHeight }}>
-                  <ChatPanel
-                    messages={chatMessages}
-                    onSend={sendToChat}
-                    onStop={stopChat}
-                    onClear={() => setChatMessages([])}
-                    loading={chatLoading}
-                    onDropToCanvas={handleDropChatToCanvas}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+          {/* v1.10.0: Right side panel removed entirely. Both Panel (LaTeX
+              input + preview) and ChatPanel (sidebar chat) are gone. The
+              new flow is canvas-first: lasso → 123/ABC radial spawns Math
+              or Chat drop-ins on the canvas itself. The Math Palette popup
+              (right-click → Math Palette) replaces the in-panel symbol grid. */}
         </div>
       </div>
       {ctxMenu && (
@@ -1479,7 +1346,14 @@ export default function NoteometryApp({
             >x</button>
           </div>
           <MathPalette
-            onInsert={handleInsertSymbol}
+            // v1.10.0: There is no longer an Input box to insert into.
+            // Pure-glyph buttons still arm a stamp via onArmStamp; for the
+            // structural-LaTeX buttons we route the same way — the user
+            // wanted symbols to land *on the canvas*, not in a sidebar.
+            onInsert={(latex) => {
+              setPendingSymbol(latex);
+              setMathPaletteOpen(false);
+            }}
             onDragStart={(sym) => setPendingSymbol(sym)}
             onArmStamp={(display) => {
               // v1.6.9: close the palette so the user immediately sees

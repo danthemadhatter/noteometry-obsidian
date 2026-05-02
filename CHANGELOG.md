@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.10.0 — 2026-05-02
+
+The big cull. Ten drop-ins and the right-side AI sidebar are gone. The chat box is reborn as a canvas drop-in. Lasso flow collapses to a binary 123/ABC choice. Everything optimized for ADHD/bipolar use — anti-amnesia, anti-modal, fast and smooth.
+
+### Removed (permanent)
+- **All EE / lab / scratch drop-ins:** Circuit Sniper, Oscilloscope, Multimeter, Compute, Graph Plotter, Unit Circle, Unit Converter, Animation Canvas, Study Gantt, AI Drop-in. Source files deleted, factories removed from the hub, persistence layer drops them on read with a one-time migration Notice. Existing pages that referenced them lose those objects but keep ink/text/tables/PDFs/images intact.
+- **Right-side AI panel** (the persistent `ChatPanel` sidebar) and its `Panel` wrapper. The whole right-pane resize/drag plumbing went with it (panelWidth, panelDragging, chatHeight, mobileRightTab — all removed). Reopener button gone too.
+- **`showExperimentalTools` setting.** No longer relevant — there are no experimental tools.
+- **Calculator drop-in.** Folded into the cull above.
+
+### Kept
+- Math toolbar (palette stamp), text, tables, PDF import, drawing/ink, OCR pipeline, file tree. The bullet-proof core. Export PNG stays.
+
+### New — drop-ins as canvas-anchored notes
+- **MathDropin** — KaTeX-rendered LaTeX block. Editable. Has a **Solve** button that fires the v12 preset and spawns a ChatDropin pinned beside it. Spinner during the vision call.
+- **ChatDropin** — wraps the chat engine, lives on the canvas. When seeded from a lasso, the lasso image is pinned at the top of the conversation. Auto-fires v12 on `seedLatex`. Conversations are notes — they save with the page and stay where you put them.
+- Drop-in philosophy: **anti-amnesia anchors.** Tool/meta planes are hideable; canvas objects are not. Out of sight is not out of mind — it's permanently lost. So nothing important hides.
+
+### New — lasso flow
+- **Lasso → radial 2-button (123 / ABC).** No more menu hunting, no more named modes that confused the flow.
+  - **123** → vision → LaTeX → MathDropin spawned at lasso centroid.
+  - **ABC** → ChatDropin spawned with the lasso image pinned, ready for free-form question.
+- **100% of lassoed content goes to vision as image.** No pre-OCR. Vision sees what the user sees. (Pre-OCR was lossy and inconsistent across handwriting.)
+- With only two choices, the radial degenerates cleanly to a left/right split at the lasso centroid — fast for hypomanic mode, still legible in depressive/mixed mode.
+
+### Persistence & migration
+- **`stripRemovedObjects` migration in the page loader.** First time v1.10 reads a page that contains any of the 10 deleted element types, it strips them and fires a one-time `Notice` so the user knows what happened. Loud once, silent thereafter. Migration tested with happy / partial / malformed / mixed-with-current cases.
+- **`pageFormat.ts` rewritten.** New element types: `MathElementV3`, `ChatElementV3`. `V3_SOURCE_TAG` bumped to `"noteometry-1.10.0"`. The `pipeline` field is now optional on read, written empty on save. `unpackFromV3` uses a soft cast + `REMOVED_ELEMENT_TYPES` set so unknown types fail closed instead of crashing.
+- **v1.9 reader compat.** Saves still emit `panelInput: ""` and `chatMessages: []` so a user on a stale v1.9 install can open a v1.10 page without the parser exploding. Those fields are documented as legacy on the `CanvasData` interface.
+- **No permanently-spinning ghosts.** `MathElement.pending` and `ChatElement.pending` are forced to `false` on read. If the app crashed mid-AI-call, the drop-in comes back idle, not stuck.
+
+### Removed UI plumbing
+- `mobileRightTab` state, `panelOpen` / `setPanelOpen`, `handleDropChatToCanvas`, the Panel/chat resize handlers, the ◨ Panel reopener button. ≈100 lines of NoteometryApp.tsx gone.
+- `MathPalette.onInsert` rerouted: the input box it used to populate is gone, so it now stamps via `setPendingSymbol(latex)` and closes the palette.
+
+### ADHD / bipolar design notes (parked here for future reference; full research in `docs/adhd-bipolar-gui-research.md`)
+- Calm-tech target: **peripherally present, not invisible.** Cursor indicators and 1px edge glows preferred over hidden state.
+- Latency budget: pencil-to-ink ≤22ms, tool-plane summon ≤80ms (animate 150ms), AI ack ≤500ms, completion ≤8s streaming. Smoothness over raw speed — bipolar processing is measurably slower even in euthymia.
+- Long-press contextual menu always works as a slow path — the radial is the fast path for hypomanic mode but inverts in depressive/mixed mode.
+
+### Tests
+- `tests/unit/contextMenuInsert.test.ts` rewritten for v1.10. `VISIBLE_HUB_FACTORIES` = textbox/table/image/pdf. `SPAWN_ONLY_FACTORIES` = math/chat (factory contracts, not in hub). New `stripRemovedObjects` migration coverage. All 243 tests pass.
+
+### Out of scope
+- 3D layers redesign (the next big swing). Research is done; implementation lands in v1.11.
+
 ## 1.9.1 — 2026-05-02
 
 Release-pipeline fix. Every release in the v1.8.x and v1.9.0 line shipped a `manifest.json` with **no `"version"` field at all** — the field had been deleted somewhere in the v1.8.0 cleanup and never replaced. BRAT (and Obsidian's plugin manifest validator) refuse to install a plugin whose manifest lacks `version`, surfacing as `version attribute missing` in the BRAT log. Cosmetic doc rot piled on top of it.

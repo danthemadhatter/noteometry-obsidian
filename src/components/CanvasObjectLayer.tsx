@@ -11,16 +11,8 @@ import { loadImageFromVault, saveImageBytesTo } from "../lib/persistence";
 import RichTextEditor from "./RichTextEditor";
 import TableEditor from "./TableEditor";
 import PdfViewer from "./PdfViewer";
-import UnitConverterDropin from "./dropins/UnitConverterDropin";
-import GraphPlotterDropin from "./dropins/GraphPlotterDropin";
-import UnitCircleDropin from "./dropins/UnitCircleDropin";
-import OscilloscopeDropin from "./dropins/OscilloscopeDropin";
-import ComputeDropin from "./dropins/ComputeDropin";
-import AnimationCanvasDropin from "./dropins/AnimationCanvasDropin";
-import StudyGanttDropin from "./dropins/StudyGanttDropin";
-import CircuitSniperDropin from "./dropins/CircuitSniperDropin";
-import AIDropin from "./dropins/AIDropin";
-import MultimeterDropin from "./dropins/MultimeterDropin";
+import MathDropin from "./dropins/MathDropin";
+import ChatDropin from "./dropins/ChatDropin";
 
 /** Editable title input at the top of every canvas object. Click to
  * edit, Enter/blur to commit, Escape to revert. The input also doubles
@@ -360,6 +352,9 @@ interface Props {
   /** Per-page scope for the table/textbox store. Derived from the bound
    *  file path so multiple .nmpage tabs don't share data. */
   scope: string;
+  /** v1.10: called when the user clicks Solve on a math drop-in.
+   *  Parent spawns a chat drop-in seeded with that drop-in's LaTeX. */
+  onSolveMath?: (mathDropinId: string) => void;
 }
 
 /** Resolves vault image paths to data URLs with caching. Reports error when the file is missing. */
@@ -440,7 +435,7 @@ function VaultImage({ src, plugin }: { src: string; plugin?: NoteometryPlugin })
 }
 
 export default function CanvasObjectLayer({
-  objects, onObjectsChange, scrollX, scrollY,
+  objects, onObjectsChange, scrollX, scrollY, onSolveMath,
   zoom = 1,
   tool, selectedObjectId, onSelectObject, plugin, parentFolder, scope,
 }: Props) {
@@ -727,119 +722,28 @@ export default function CanvasObjectLayer({
                 }}
               />
             )}
-            {obj.type === "circuit-sniper" && (
-              <CircuitSniperDropin
-                circuitData={obj.circuitData}
+            {obj.type === "math" && (
+              <MathDropin
+                latex={obj.latex}
+                pending={obj.pending}
                 onChange={(u) => {
                   onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "circuit-sniper" ? { ...o, ...u } : o
+                    o.id === obj.id && o.type === "math" ? { ...o, ...u } : o
                   ));
                 }}
+                onSolve={() => onSolveMath?.(obj.id)}
               />
             )}
-            {obj.type === "unit-converter" && (
-              <UnitConverterDropin
-                category={obj.category}
-                inputValue={obj.inputValue}
+            {obj.type === "chat" && plugin && (
+              <ChatDropin
+                plugin={plugin}
+                messages={obj.messages}
+                attachedImage={obj.attachedImage}
+                seedLatex={obj.seedLatex}
+                pending={obj.pending}
                 onChange={(u) => {
                   onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "unit-converter" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "graph-plotter" && (
-              <GraphPlotterDropin
-                id={obj.id}
-                functions={obj.functions}
-                viewX={obj.viewX} viewY={obj.viewY} viewW={obj.viewW} viewH={obj.viewH}
-                signalLinked={obj.signalLinked ?? false}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "graph-plotter" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "unit-circle" && (
-              <UnitCircleDropin
-                id={obj.id}
-                angleDeg={obj.angleDeg}
-                signalLinked={obj.signalLinked ?? false}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "unit-circle" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "oscilloscope" && (
-              <OscilloscopeDropin
-                id={obj.id}
-                channelA={obj.channelA}
-                channelB={obj.channelB}
-                timeDiv={obj.timeDiv}
-                signalLinked={obj.signalLinked ?? false}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "oscilloscope" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "compute" && (
-              <ComputeDropin
-                cells={obj.cells}
-                resultExpr={obj.resultExpr}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "compute" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "animation-canvas" && (
-              <AnimationCanvasDropin
-                frames={obj.frames}
-                currentFrame={obj.currentFrame}
-                fps={obj.fps}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "animation-canvas" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "study-gantt" && (
-              <StudyGanttDropin
-                startDate={obj.startDate}
-                tasks={obj.tasks}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "study-gantt" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "ai-dropin" && (
-              <AIDropin
-                mode={obj.mode}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "ai-dropin" ? { ...o, ...u } : o
-                  ));
-                }}
-              />
-            )}
-            {obj.type === "multimeter" && (
-              <MultimeterDropin
-                mode={obj.meterMode}
-                inputValue={obj.inputValue}
-                onChange={(u) => {
-                  onObjectsChange(objects.map(o =>
-                    o.id === obj.id && o.type === "multimeter"
-                      ? { ...o, meterMode: u.mode ?? obj.meterMode, inputValue: u.inputValue ?? obj.inputValue }
-                      : o
+                    o.id === obj.id && o.type === "chat" ? { ...o, ...u } : o
                   ));
                 }}
               />

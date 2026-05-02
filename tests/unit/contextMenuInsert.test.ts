@@ -1,42 +1,31 @@
 import { describe, it, expect } from "vitest";
 import {
   createTextBox, createTable, createImageObject, createPdfObject,
-  createCircuitSniper, createUnitConverter, createGraphPlotter,
-  createUnitCircle, createOscilloscope, createCompute,
-  createAnimationCanvas, createStudyGantt, createMultimeter,
-  defaultObjectName,
+  createMathObject, createChatObject,
+  defaultObjectName, stripRemovedObjects,
 } from "../../src/lib/canvasObjects";
 
 /**
- * v1.6.6 regression guardrails for the right-click context-menu hub.
+ * v1.10.0 regression guardrails for the right-click context-menu hub.
  *
  * The context menu in NoteometryApp wires each "Insert" item directly to a
- * factory here. These tests pin the contract the menu depends on: every
- * visible Insert action must return a hydratable CanvasObject with a
- * stable, non-empty `type`, `id`, a positive bounding box, and a non-empty
- * default display name. If a factory regresses (e.g. someone silently
- * drops a field or breaks the discriminator), the menu action would show
- * no object on the canvas — exactly the class of silent failure we're
- * trying to stop shipping.
+ * factory here. v1.10 culled the engineering / math-tools / study / legacy-AI
+ * drop-ins; the surviving inserts are Text/Table/Image/PDF. Math + Chat are
+ * NOT manually-insertable — they only spawn from the lasso 123/ABC radial or
+ * from Solve on a math drop-in. We still pin the factory contract for them so
+ * the spawn paths stay honest.
  */
 
-// The registry intentionally excludes createAIDropin: in v1.6.6 the AI
-// drop-in is quarantined behind a deprecation placeholder and no longer
-// surfaced in the context menu.
 const VISIBLE_HUB_FACTORIES = [
   ["textbox",         () => createTextBox(0, 0)],
   ["table",           () => createTable(0, 0)],
   ["image",           () => createImageObject(0, 0, "data:image/png;base64,x")],
   ["pdf",             () => createPdfObject(0, 0, "fake/path.pdf")],
-  ["circuit-sniper",  () => createCircuitSniper(0, 0)],
-  ["unit-converter",  () => createUnitConverter(0, 0)],
-  ["graph-plotter",   () => createGraphPlotter(0, 0)],
-  ["unit-circle",     () => createUnitCircle(0, 0)],
-  ["oscilloscope",    () => createOscilloscope(0, 0)],
-  ["compute",         () => createCompute(0, 0)],
-  ["animation-canvas",() => createAnimationCanvas(0, 0)],
-  ["study-gantt",     () => createStudyGantt(0, 0)],
-  ["multimeter",      () => createMultimeter(0, 0)],
+] as const;
+
+const SPAWN_ONLY_FACTORIES = [
+  ["math",            () => createMathObject(0, 0)],
+  ["chat",            () => createChatObject(0, 0)],
 ] as const;
 
 describe("context-menu insert registry", () => {
@@ -66,25 +55,91 @@ describe("context-menu insert registry", () => {
   it("factories respect the (x, y) insert position", () => {
     for (const [, make] of VISIBLE_HUB_FACTORIES) {
       const obj = make();
-      // All visible-hub factories place the object at (0, 0) when called
-      // with those coords; regressing to an ignored-coord factory (which
-      // would mean the menu "Insert at cursor" loses meaning) should fail
-      // here rather than silently drop objects off-screen.
       expect(obj.x).toBe(0);
       expect(obj.y).toBe(0);
     }
   });
 });
 
-describe("quarantined drop-ins stay loadable", () => {
-  // Legacy pages may still carry an ai-dropin object. v1.6.6 removed it
-  // from the creatable hub but kept the factory + component so existing
-  // pages render with a deprecation placeholder rather than blowing up.
-  it("createAIDropin is still exported for legacy page loads", async () => {
-    const mod = await import("../../src/lib/canvasObjects");
-    expect(typeof mod.createAIDropin).toBe("function");
-    const obj = mod.createAIDropin(0, 0);
-    expect(obj.type).toBe("ai-dropin");
-    expect(defaultObjectName(obj)).toBe("AI Drop-in");
+describe("v1.10 spawn-only factories (Math + Chat)", () => {
+  it.each(SPAWN_ONLY_FACTORIES)(
+    "%s factory produces a well-formed CanvasObject",
+    (type, make) => {
+      const obj = make();
+      expect(obj.type).toBe(type);
+      expect(typeof obj.id).toBe("string");
+      expect(obj.id.length).toBeGreaterThan(0);
+      expect(obj.w).toBeGreaterThan(0);
+      expect(obj.h).toBeGreaterThan(0);
+      const name = defaultObjectName(obj);
+      expect(name.trim().length).toBeGreaterThan(0);
+    },
+  );
+
+  it("createMathObject defaults to empty latex + non-pending", () => {
+    const m = createMathObject(0, 0);
+    expect(m.type).toBe("math");
+    expect(m.latex).toBe("");
+    expect(m.pending).toBe(false);
+  });
+
+  it("createChatObject defaults to empty messages", () => {
+    const c = createChatObject(0, 0);
+    expect(c.type).toBe("chat");
+    expect(c.messages).toEqual([]);
+    expect(c.attachedImage).toBeUndefined();
+    expect(c.seedLatex).toBeUndefined();
+  });
+
+  it("createChatObject pins lasso image when provided", () => {
+    const c = createChatObject(0, 0, { attachedImage: "data:image/png;base64,xyz" });
+    expect(c.attachedImage).toBe("data:image/png;base64,xyz");
+  });
+
+  it("createChatObject seeds LaTeX for Solve-spawned chats", () => {
+    const c = createChatObject(0, 0, { seedLatex: "\\int x dx" });
+    expect(c.seedLatex).toBe("\\int x dx");
+  });
+});
+
+describe("v1.10 stripRemovedObjects migration", () => {
+  it("drops every retired drop-in type and tallies counts by label", () => {
+    const incoming = [
+      { id: "a", type: "circuit-sniper", x: 0, y: 0, w: 10, h: 10 },
+      { id: "b", type: "oscilloscope", x: 0, y: 0, w: 10, h: 10 },
+      { id: "c", type: "compute", x: 0, y: 0, w: 10, h: 10 },
+      { id: "d", type: "compute", x: 0, y: 0, w: 10, h: 10 },
+      { id: "e", type: "ai-dropin", x: 0, y: 0, w: 10, h: 10 },
+      { id: "f", type: "graph-plotter", x: 0, y: 0, w: 10, h: 10 },
+      { id: "g", type: "unit-circle", x: 0, y: 0, w: 10, h: 10 },
+      { id: "h", type: "unit-converter", x: 0, y: 0, w: 10, h: 10 },
+      { id: "i", type: "animation-canvas", x: 0, y: 0, w: 10, h: 10 },
+      { id: "j", type: "study-gantt", x: 0, y: 0, w: 10, h: 10 },
+      { id: "k", type: "multimeter", x: 0, y: 0, w: 10, h: 10 },
+    ];
+    const { kept, removed } = stripRemovedObjects(incoming);
+    expect(kept).toEqual([]);
+    expect(removed["Calculator"]).toBe(2);
+    expect(removed["Circuit Sniper"]).toBe(1);
+    expect(removed["Oscilloscope"]).toBe(1);
+    expect(removed["AI Drop-in"]).toBe(1);
+  });
+
+  it("keeps Text/Table/Image/PDF/Math/Chat objects untouched", () => {
+    const incoming = [
+      createTextBox(10, 20),
+      createTable(0, 0),
+      createMathObject(5, 5, "x^2"),
+      createChatObject(0, 0),
+    ];
+    const { kept, removed } = stripRemovedObjects(incoming);
+    expect(kept).toHaveLength(4);
+    expect(Object.keys(removed)).toHaveLength(0);
+  });
+
+  it("silently drops elements with no `type` field rather than crashing", () => {
+    const incoming = [{ id: "x", x: 0, y: 0, w: 0, h: 0 }, null, undefined];
+    const { kept } = stripRemovedObjects(incoming as unknown[]);
+    expect(kept).toEqual([]);
   });
 });
