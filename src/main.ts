@@ -1,5 +1,6 @@
 import { Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import { NoteometryView, VIEW_TYPE } from "./NoteometryView";
+import { NoteometryHomeView, HOME_VIEW_TYPE } from "./HomeView";
 import { NoteometrySettingTab } from "./settings";
 import { NoteometrySettings, DEFAULT_SETTINGS } from "./types";
 import { logVersionBanner } from "./lib/version";
@@ -23,22 +24,30 @@ export default class NoteometryPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new NoteometryView(leaf, this)
     );
 
-    // Tier 3 native-explorer: Obsidian's file explorer is the page
-    // navigator. Clicking a .nmpage file opens NoteometryView for that
-    // file; each page is its own tab.
+    this.registerView(
+      HOME_VIEW_TYPE,
+      (leaf: WorkspaceLeaf) => new NoteometryHomeView(leaf, this)
+    );
+
     this.registerExtensions(["nmpage"], VIEW_TYPE);
 
-    // Ribbon stays as the entry point — repurposed from "open singleton"
-    // to "create a new page", so users always have a visible hook even
-    // when no .nmpage files exist yet.
     this.addRibbonIcon("pencil", "New Noteometry page", () => {
       void this.createAndOpenNewPage();
+    });
+    this.addRibbonIcon("home", "Noteometry home", () => {
+      void this.openHome();
     });
 
     this.addCommand({
       id: "noteometry-new-page",
       name: "Noteometry: New page",
       callback: () => this.createAndOpenNewPage(),
+    });
+
+    this.addCommand({
+      id: "noteometry-open-home",
+      name: "Noteometry: Open home",
+      callback: () => this.openHome(),
     });
 
     this.addCommand({
@@ -50,11 +59,10 @@ export default class NoteometryPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
       void this.notifyIfLegacyPagesPresent();
+      this.maybeAutoOpenHome();
     });
   }
 
-  /** Figure out the best parent folder for a new page: the folder of the
-   *  active file if it's inside the Noteometry tree, else vaultFolder. */
   private resolveNewPageParentFolder(): string {
     const active = this.app.workspace.getActiveFile();
     if (active && active.parent instanceof TFolder) {
@@ -63,13 +71,33 @@ export default class NoteometryPlugin extends Plugin {
     return rootDir(this);
   }
 
-  private async createAndOpenNewPage(): Promise<void> {
+  async createAndOpenNewPage(): Promise<void> {
     const parent = this.resolveNewPageParentFolder();
     const file = await createNewPageFile(this.app, parent);
     if (!file) return;
-    // Open in a new leaf so the user keeps whatever they had open.
     const leaf = this.app.workspace.getLeaf(true);
     await leaf.openFile(file);
+  }
+
+  async openHome(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE)[0];
+    if (existing) {
+      void this.app.workspace.revealLeaf(existing);
+      return;
+    }
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.setViewState({ type: HOME_VIEW_TYPE, active: true });
+  }
+
+  /** Don't ambush a fresh vault — only auto-open when the user has at
+   *  least one .nmpage somewhere. */
+  private maybeAutoOpenHome(): void {
+    const hasPageTab = this.app.workspace.getLeavesOfType(VIEW_TYPE).length > 0;
+    const hasHomeTab = this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE).length > 0;
+    if (hasPageTab || hasHomeTab) return;
+    const anyNmpage = this.app.vault.getFiles().some(f => f.extension === "nmpage");
+    if (!anyNmpage) return;
+    void this.openHome();
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
