@@ -3654,3 +3654,180 @@
   font-size: var(--ds-text-sm);
   letter-spacing: 0.01em;
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.8.3 — Sidebar Bridges chrome
+   ════════════════════════════════════════════════════════ */
+
+/* Hairline right-border on the sidebar shell. Pinned to 1px
+ * --ds-line-soft so it reads as a tactical-readout divider rather
+ * than a heavy panel edge. */
+.noteometry-sidebar--tree.noteometry-sidebar-open {
+  border-right: var(--ds-hairline) solid var(--ds-line-soft);
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+/* Sidebar header: angular chamfer on the bottom-right corner so the
+ * header reads as a clipped panel block (the Bridges menu signature)
+ * instead of a flat rectangle. Subtle — 8px on one corner, not all
+ * four. Also: hairline bottom border + subtle cargo-orange accent
+ * underline on the title row to mark active-context. */
+.noteometry-sidebar--tree .noteometry-sidebar-hdr {
+  border-bottom: var(--ds-hairline) solid var(--ds-line-soft);
+  background:
+    linear-gradient(180deg,
+      var(--ds-surface-2) 0%,
+      var(--ds-surface-1) 100%
+    );
+  position: relative;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+
+/* The accent stripe: a thin Bridges-strand-cyan line under the
+ * header, but only spanning ~30% of the width on the left, so it
+ * reads as a tactical underline rather than a full divider. */
+.noteometry-sidebar--tree .noteometry-sidebar-hdr::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 32%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--ds-strand-cyan) 0%,
+    var(--ds-strand-cyan) 60%,
+    transparent 100%
+  );
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Course bands: signal-trace feel. A thin colored vertical with two
+ * tiny perpendicular caps at the top and bottom (like a circuit
+ * trace terminating at via pads). Implemented via a linear-gradient
+ * that has solid color most of the way, with small fades at the
+ * ends, plus a subtle inset highlight on the band itself. */
+.noteometry-sidebar--tree .noteometry-tree-row::before {
+  background: var(--noteometry-row-accent, transparent);
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+.noteometry-sidebar--tree .noteometry-tree-row--course::before {
+  width: 4px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--noteometry-row-accent, transparent) 12%,
+    var(--noteometry-row-accent, transparent) 88%,
+    transparent 100%
+  );
+  /* Faint trace-cap glow at top and bottom, like a via on a PCB. */
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--noteometry-row-accent, transparent) 30%, transparent);
+  opacity: 1;
+}
+
+/* Active page row: outer Arc glow ramped via --ds-glow-cyan, plus
+ * the existing inset accent bar on the left. Soft, not loud — 6px
+ * radius on the box-shadow so it's an aura, not a halo. */
+.noteometry-sidebar--tree .noteometry-tree-row--page.noteometry-tree-row--active {
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--nm-accent) 80%, #000),
+    0 0 0 1px color-mix(in srgb, var(--ds-strand-cyan) 22%, transparent),
+    0 0 12px 0 rgba(95, 217, 255, 0.18);
+}
+
+/* Subtle scanline animation: a thin horizontal sweep across the
+ * active row every 6s, very low opacity so it reads as ambient
+ * liveness rather than animation theatre. Disabled under
+ * prefers-reduced-motion. */
+.noteometry-sidebar--tree .noteometry-tree-row--page.noteometry-tree-row--active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(95, 217, 255, 0.0) 30%,
+    rgba(95, 217, 255, 0.18) 50%,
+    rgba(95, 217, 255, 0.0) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: -100% 0;
+  animation: noteometry-tree-scanline 6s linear infinite;
+}
+
+@keyframes noteometry-tree-scanline {
+  0%, 60% { background-position: -100% 0; }
+  85% { background-position: 100% 0; }
+  100% { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-sidebar--tree .noteometry-tree-row--page.noteometry-tree-row--active::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* Bottom action bar: hairline top border + slightly recessed bg to
+ * separate the actions zone from the tree above. */
+.noteometry-sidebar--tree .noteometry-tree-bottom-bar {
+  border-top: var(--ds-hairline) solid var(--ds-line-soft);
+  background: var(--ds-surface-base);
+}
+
+.noteometry-sidebar--tree .noteometry-tree-action-btn {
+  background: var(--ds-surface-2);
+  border: var(--ds-hairline) solid var(--ds-line-soft);
+  color: var(--ds-text-primary);
+}
+
+.noteometry-sidebar--tree .noteometry-tree-action-btn:hover {
+  background: var(--ds-surface-3);
+  border-color: var(--ds-strand-cyan);
+  color: var(--ds-strand-cyan);
+}
+
+.noteometry-sidebar--tree .noteometry-tree-action-course {
+  background: var(--ds-strand-cyan-soft);
+  border-color: color-mix(in srgb, var(--ds-strand-cyan) 50%, transparent);
+  color: var(--ds-strand-cyan);
+}
+
+.noteometry-sidebar--tree .noteometry-tree-action-course:hover {
+  background: var(--ds-strand-cyan);
+  color: var(--ds-text-on-accent);
+  border-color: var(--ds-strand-cyan);
+  box-shadow: var(--ds-glow-cyan);
+}
+
+/* Footer: hairline top border with the same cargo-orange-style accent
+ * underline pattern as the header (but reversed direction), so the
+ * sidebar bookends visually. */
+.noteometry-sidebar--tree .noteometry-tree-footer {
+  border-top: var(--ds-hairline) solid var(--ds-line-soft);
+  background: var(--ds-surface-base);
+  position: relative;
+}
+
+.noteometry-sidebar--tree .noteometry-tree-footer::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 28%;
+  height: 1px;
+  background: linear-gradient(
+    270deg,
+    var(--ds-cargo-orange) 0%,
+    var(--ds-cargo-orange) 60%,
+    transparent 100%
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
