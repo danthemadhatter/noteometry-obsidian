@@ -33,32 +33,33 @@
    *   --ds-glow-*      box-shadow glows for active states
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Surface tiers — defined at the old white-canvas values for v1.8.0;
-     re-pointed at #0A0F14-family deeps in v1.8.1. */
-  --ds-surface-base: #FFFFFF;
-  --ds-surface-1: #FAFAFA;
-  --ds-surface-2: #F5F5F5;
-  --ds-surface-3: #F0F0F0;
+  /* v1.8.1: surface tiers swapped from white-canvas to BB-pod blacks.
+     The Bridges depth scale runs deep (--surface-base, the deepest)
+     up to a hover/raised tier (--surface-3). */
+  --ds-surface-base: #0A0F14;
+  --ds-surface-1: #0F1620;
+  --ds-surface-2: #121A26;
+  --ds-surface-3: #1A2435;
 
-  /* Text — primary is the same dark navy the old --nm-ink uses. */
-  --ds-text-primary: #1A1A2E;
-  --ds-text-secondary: #3A3A4E;
-  --ds-text-muted: #6B7280;
-  --ds-text-on-accent: #FFFFFF;
+  /* Text — cool warm-white tilted slightly cyan. */
+  --ds-text-primary: #C8D4E0;
+  --ds-text-secondary: #9BA9B8;
+  --ds-text-muted: #5A6B7A;
+  --ds-text-on-accent: #0A0F14;
 
   /* Hairlines — Death Stranding uses 1px borders almost exclusively. */
   --ds-hairline: 1px;
-  --ds-line-soft: #E0E0E0;
-  --ds-line-strong: rgba(0, 0, 0, 0.15);
+  --ds-line-soft: #1F2A33;
+  --ds-line-strong: #2D3A45;
 
-  /* Accents */
-  --ds-strand-cyan: #4A90D9;
-  --ds-strand-cyan-soft: rgba(74, 144, 217, 0.12);
-  --ds-strand-cyan-hover: #5A9DE6;
-  --ds-cargo-orange: #F5A623;
-  --ds-cargo-orange-soft: rgba(245, 166, 35, 0.2);
-  --ds-chiral-green: #16A34A;
-  --ds-danger: #DC2626;
+  /* Accents — Bridges strand cyan + cargo orange + chiral green. */
+  --ds-strand-cyan: #5FD9FF;
+  --ds-strand-cyan-soft: rgba(95, 217, 255, 0.14);
+  --ds-strand-cyan-hover: #8AE3FF;
+  --ds-cargo-orange: #E59B45;
+  --ds-cargo-orange-soft: rgba(229, 155, 69, 0.2);
+  --ds-chiral-green: #7CD992;
+  --ds-danger: #FF5C5C;
 
   /* Typography stacks. v1.8.0 keeps things appearing identical because
      no selector reads --ds-font-* yet; v1.8.1 wires the display face
@@ -99,11 +100,11 @@
   --ds-ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
   --ds-ease-soft-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Glows — box-shadow presets for active states. v1.8.1 ramps the
-     intensity once the dark surfaces land. */
-  --ds-glow-cyan: 0 0 8px rgba(74, 144, 217, 0.45);
-  --ds-glow-cyan-strong: 0 0 16px rgba(74, 144, 217, 0.6);
-  --ds-glow-orange: 0 0 8px rgba(245, 166, 35, 0.5);
+  /* Glows — box-shadow presets for active states. v1.8.1: intensity
+     ramped to read against the new deep surfaces. */
+  --ds-glow-cyan: 0 0 10px rgba(95, 217, 255, 0.55);
+  --ds-glow-cyan-strong: 0 0 20px rgba(95, 217, 255, 0.7);
+  --ds-glow-orange: 0 0 10px rgba(229, 155, 69, 0.55);
 
   /* ══════════════════════════════════════════════════════════════════
    * Noteometry v1.2 — Document-style color scheme (legacy --nm-*)
@@ -114,56 +115,64 @@
    * select --nm-* tokens through the --ds-* layer to swap the palette.
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* Canvas surface */
+  /* Canvas surface — stays light. Drawing inks (default Black, Red,
+     Blue, Green, Orange, Purple) need a paper-like substrate to be
+     visible; an all-dark canvas would invert ink visibility for
+     every existing page. */
   --nm-canvas-bg: #FFFFFF;
   --nm-grid-color: #E8E8E8;
   --nm-grid-major-color: #D0D0D0;
 
-  /* UI Chrome — light gray surfaces */
-  --nm-faceplate: #F5F5F5;
-  --nm-faceplate-light: #FAFAFA;
-  --nm-faceplate-alt: #F0F0F0;
-  --nm-faceplate-recessed: #E8E8E8;
+  /* UI Chrome — v1.8.1: redirected through --ds-surface-* so the
+     sidebar / panels / toolbars pick up the BB-pod dark palette. */
+  --nm-faceplate: var(--ds-surface-1);
+  --nm-faceplate-light: var(--ds-surface-2);
+  --nm-faceplate-alt: var(--ds-surface-1);
+  --nm-faceplate-recessed: var(--ds-surface-base);
 
   /* Sidebar and panels */
-  --nm-sidebar-bg: #F5F5F5;
+  --nm-sidebar-bg: var(--ds-surface-1);
 
-  /* Chassis — kept as aliases for backward compatibility */
-  --nm-chassis: #F5F5F5;
-  --nm-chassis-light: #FAFAFA;
-  --nm-chassis-dark: #E8E8E8;
-  --nm-chassis-deep: #E0E0E0;
-  --nm-chassis-fg: #1A1A2E;
+  /* Chassis — same dark surfaces, different aliases for back-compat. */
+  --nm-chassis: var(--ds-surface-1);
+  --nm-chassis-light: var(--ds-surface-2);
+  --nm-chassis-dark: var(--ds-surface-base);
+  --nm-chassis-deep: #050810;
+  --nm-chassis-fg: var(--ds-text-primary);
 
-  /* Text — always dark navy */
-  --nm-ink: #1A1A2E;
-  --nm-ink-muted: #6B7280;
+  /* Text — chrome text is light (cool warm-white), paper text stays
+     dark for canvas / drop-in cards. The split is what lets the
+     palette swap without inverting drop-in legibility. */
+  --nm-ink: var(--ds-text-primary);
+  --nm-ink-muted: var(--ds-text-muted);
   --nm-paper-ink: #1A1A2E;
 
-  /* Accent — steel blue */
-  --nm-accent: #4A90D9;
-  --nm-accent-light: rgba(74, 144, 217, 0.12);
-  --nm-accent-hover: #5A9DE6;
+  /* Accent — Bridges strand cyan. */
+  --nm-accent: var(--ds-strand-cyan);
+  --nm-accent-light: var(--ds-strand-cyan-soft);
+  --nm-accent-hover: var(--ds-strand-cyan-hover);
 
-  /* Active/selected — amber */
-  --nm-phosphor: #F5A623;
-  --nm-phosphor-light: rgba(245, 166, 35, 0.2);
+  /* Active / cargo — orange retained but pointed at the Bridges hue. */
+  --nm-phosphor: var(--ds-cargo-orange);
+  --nm-phosphor-light: var(--ds-cargo-orange-soft);
 
   /* Semantic */
-  --nm-danger: #DC2626;
-  --nm-success: #16A34A;
+  --nm-danger: var(--ds-danger);
+  --nm-success: var(--ds-chiral-green);
 
-  /* Borders — subtle on light surfaces */
-  --nm-paper-border: #E0E0E0;
-  --nm-warm-border: rgba(0, 0, 0, 0.08);
-  --nm-warm-border-strong: rgba(0, 0, 0, 0.15);
+  /* Borders — hairlines on chrome surfaces. Warm-borders inverted so
+     drop shadows / dividers read against the deep surfaces. */
+  --nm-paper-border: var(--ds-line-soft);
+  --nm-warm-border: rgba(255, 255, 255, 0.06);
+  --nm-warm-border-strong: rgba(255, 255, 255, 0.12);
 
-  /* Drop-in chrome */
+  /* Drop-in chrome — paper cards on the canvas. Stay light so the
+     drop-in feels paper-like over the white canvas. */
   --nm-dropin-border: #E0E0E0;
-  --nm-dropin-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --nm-dropin-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 
-  /* Canvas edge */
-  --nm-canvas-bg-edge: #F5F5F5;
+  /* Canvas edge — the dark gutter around the white canvas. */
+  --nm-canvas-bg-edge: var(--ds-surface-base);
 
   /* Cabinet aliases — backward compat */
   --nm-cabinet: var(--nm-chassis);
@@ -182,7 +191,12 @@
   /* Legacy aliases */
   --nm-warm-bg: var(--nm-faceplate);
   --nm-warm-bg-alt: var(--nm-faceplate-alt);
-  --nm-paper: var(--nm-faceplate);
+  /* v1.8.1: --nm-paper decoupled from --nm-faceplate. Used as a light
+     paper surface for inputs / drop-in cards / chat-assistant bubbles
+     and (historically) as the on-accent text color. The latter has
+     been migrated to --ds-text-on-accent in the SidebarTree CSS to
+     fix strand-cyan-bg contrast post-palette-swap. */
+  --nm-paper: #FAFAFA;
   --nm-paper-muted: var(--nm-ink-muted);
 
   /* Geometry */
@@ -1540,10 +1554,12 @@
   -webkit-user-select: text;
   cursor: text;
 }
-/* User messages — warm amber indicator */
+/* User messages — warm amber (cargo-orange) indicator. v1.8.1: text
+   uses --nm-paper-ink (dark) so amber-bg contrast survives the dark
+   chrome palette swap. */
 .noteometry-chat-bubble.user {
   background: var(--nm-phosphor) !important;
-  color: var(--nm-ink) !important;
+  color: var(--nm-paper-ink) !important;
   border-radius: 12px 12px 4px 12px;
   border: none;
 }
@@ -3192,15 +3208,18 @@
 }
 
 .noteometry-tree-row--page.noteometry-tree-row--active {
-  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
-  color: var(--nm-paper, var(--text-on-accent, #fff));
+  /* v1.8.1: dark text on strand-cyan bg via --ds-text-on-accent. Pre-
+     v1.8.1 this used --nm-paper which paired correctly with the old
+     pale-blue accent but flips to invisible on the new bright cyan. */
+  background: var(--nm-accent, var(--interactive-accent, #5FD9FF));
+  color: var(--ds-text-on-accent, #0A0F14);
   opacity: 1;
-  font-weight: 500;
-  box-shadow: inset 3px 0 0 var(--nm-accent-strong, #2c6db3);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--nm-accent) 80%, #000);
 }
 
 .noteometry-tree-row--page.noteometry-tree-row--active:hover {
-  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
+  background: var(--nm-accent, var(--interactive-accent, #5FD9FF));
 }
 
 .noteometry-tree-twisty {
@@ -3363,8 +3382,8 @@
 }
 
 .noteometry-tree-action-course:hover {
-  background: var(--nm-accent, var(--interactive-accent, #4A90D9));
-  color: var(--nm-paper, var(--text-on-accent, #fff));
+  background: var(--nm-accent, var(--interactive-accent, #5FD9FF));
+  color: var(--ds-text-on-accent, #0A0F14);
 }
 
 .noteometry-tree-footer {
