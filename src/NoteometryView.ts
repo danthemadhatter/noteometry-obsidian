@@ -32,6 +32,13 @@ export class NoteometryView extends ItemView {
     if (!container) return;
     container.empty();
     container.addClass("noteometry-root");
+    // v1.8.5: combat-mode class mirrors the persisted setting so the
+    // intensified chrome reads on next open without needing a manual
+    // re-toggle. The settings tab updates the class live for already-
+    // open views.
+    if (this.plugin.settings.combatMode) {
+      container.addClass("noteometry-combat-mode");
+    }
 
     // ── Block swipe gestures from reaching Obsidian ──
     // Use BUBBLE phase — events still reach child elements normally,

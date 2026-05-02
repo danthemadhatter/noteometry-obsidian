@@ -3919,3 +3919,108 @@
   opacity: 0.45;
   pointer-events: none;
 }
+
+/* ════════════════════════════════════════════════════════
+   v1.8.5 — Combat Mode
+   Toggled via Settings → Combat Mode. Intensifies the v1.8.x chrome
+   without changing any structure or layout. Implementation rule:
+   only override visual properties (glow intensity, animation timing,
+   accent saturation). No new geometry, no new selectors targeting
+   elements that don't already exist. So the toggle is reversible
+   instantly and never alters behavior — just vibe.
+   ════════════════════════════════════════════════════════ */
+
+/* Active page row: ramp glow from --ds-glow-cyan to -strong, +
+   add a thin colored outline that breathes at 0.4Hz. */
+.noteometry-combat-mode .noteometry-tree-row--page.noteometry-tree-row--active {
+  box-shadow:
+    inset 3px 0 0 var(--nm-accent),
+    0 0 0 1px color-mix(in srgb, var(--ds-strand-cyan) 45%, transparent),
+    var(--ds-glow-cyan-strong);
+  animation: noteometry-combat-active-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes noteometry-combat-active-breathe {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.08) saturate(1.15);
+  }
+}
+
+/* Scanline: faster cycle (3.5s vs 6s), brighter peak. */
+.noteometry-combat-mode .noteometry-tree-row--page.noteometry-tree-row--active::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(95, 217, 255, 0.0) 25%,
+    rgba(95, 217, 255, 0.32) 50%,
+    rgba(95, 217, 255, 0.0) 75%,
+    transparent 100%
+  );
+  animation-duration: 3.5s;
+}
+
+/* Course bands: saturate the via-pad glow + thicken the trace. */
+.noteometry-combat-mode .noteometry-tree-row--course::before {
+  width: 5px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--noteometry-row-accent, transparent) 45%, transparent),
+    0 0 8px color-mix(in srgb, var(--noteometry-row-accent, transparent) 60%, transparent);
+}
+
+/* Header tactical-underline: brighter, slight upward pulse. */
+.noteometry-combat-mode .noteometry-sidebar-hdr::after {
+  opacity: 0.85;
+  box-shadow: 0 0 6px var(--ds-strand-cyan);
+}
+
+/* Footer tactical-underline (cargo-orange): same intensity bump. */
+.noteometry-combat-mode .noteometry-tree-footer::before {
+  opacity: 0.7;
+  box-shadow: 0 0 6px var(--ds-cargo-orange);
+}
+
+/* AI overlay: corner brackets thicken to 3px and the frame glow
+ * doubles. The READING… label flashes brighter on each breath. */
+.noteometry-combat-mode .noteometry-ai-bracket--tl,
+.noteometry-combat-mode .noteometry-ai-bracket--tr,
+.noteometry-combat-mode .noteometry-ai-bracket--bl,
+.noteometry-combat-mode .noteometry-ai-bracket--br {
+  border-width: 3px;
+}
+
+.noteometry-combat-mode .noteometry-ai-frame {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, currentColor 50%, transparent),
+    0 0 18px color-mix(in srgb, currentColor 70%, transparent);
+}
+
+.noteometry-combat-mode .noteometry-ai-label--pending {
+  animation-duration: 0.9s;
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* "16-Week Course" button: ambient glow even in idle. */
+.noteometry-combat-mode .noteometry-tree-action-course {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ds-strand-cyan) 40%, transparent),
+              0 0 8px color-mix(in srgb, var(--ds-strand-cyan) 25%, transparent);
+}
+
+.noteometry-combat-mode .noteometry-tree-action-course:hover {
+  box-shadow: var(--ds-glow-cyan-strong),
+              0 0 0 1px var(--ds-strand-cyan);
+}
+
+/* Settings-tab note for users: even Combat Mode respects reduced-
+ * motion. All animations get suppressed; only the static intensity
+ * (thicker brackets, brighter glows) survives. */
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-combat-mode .noteometry-tree-row--page.noteometry-tree-row--active {
+    animation: none;
+  }
+  .noteometry-combat-mode .noteometry-ai-label--pending {
+    animation: none;
+  }
+}

@@ -191,5 +191,22 @@ export class NoteometrySettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Combat Mode")
+      .setDesc("Intensifies the Death-Stranding chrome — glows ramp up, active-row scanline runs faster, course bands saturate, the AI overlay flashes its corner brackets harder. Off = subdued business-casual skin; on = canvas feels alive. Try it when you're solo-coding circuits at 2am.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.combatMode)
+          .onChange(async (value) => {
+            this.plugin.settings.combatMode = value;
+            await this.plugin.saveSettings();
+            // Apply the class to every open Noteometry root so the
+            // toggle takes effect without reloading the view.
+            document.querySelectorAll(".noteometry-root").forEach((el) => {
+              el.classList.toggle("noteometry-combat-mode", value);
+            });
+          })
+      );
   }
 }

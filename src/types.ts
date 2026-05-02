@@ -23,6 +23,13 @@ export interface NoteometrySettings {
    * what they did or how they fit. Keep them shippable but out of the way
    * until either their purpose is reworked or the user opts in. */
   showExperimentalTools: boolean;
+  /** v1.8.5 — "Combat Mode." When on, the v1.8.x Death-Stranding chrome
+   * intensifies: glows ramp from --ds-glow-cyan to --ds-glow-cyan-strong,
+   * the active-row scanline animates faster + brighter, course bands
+   * saturate, and the AI overlay flashes its corner brackets harder.
+   * Default off so the baseline skin reads as a serious tool; flip on
+   * when you want the canvas to feel alive. */
+  combatMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -39,6 +46,7 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   autoSaveDelay: 2000,
   fingerDrawing: false,
   showExperimentalTools: false,
+  combatMode: false,
 };
 
 export interface ChatMessage {
