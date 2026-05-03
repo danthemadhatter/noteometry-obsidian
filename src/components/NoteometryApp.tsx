@@ -612,6 +612,32 @@ export default function NoteometryApp({
     setSelectedObjectId(chat.id);
   }, [canvasObjects, setCanvasObjects, setSelectedObjectId]);
 
+  /* ── v1.11.0 phase-3 sub-PR 3.2: Freeze → Brain dump ──
+     Spawn a ChatDropin centered in the visible viewport, pre-filled
+     with the seed text and cursor-focused. NOT auto-fired — user
+     keeps typing. Uses viewportRef bounds + scroll/zoom to pick a
+     world-space anchor that lands the drop-in roughly center-screen. */
+  const handleBrainDump = useCallback((seed: string) => {
+    // Default chat dropin size from createChatObject (420x480). Center
+    // it in the viewport. Fall back to (scrollX+200, scrollY+200) if
+    // viewportRef hasn't measured yet (rare, e.g. before first paint).
+    const vp = viewportRef.current;
+    let anchorX = scrollX + 200;
+    let anchorY = scrollY + 200;
+    if (vp) {
+      const rect = vp.getBoundingClientRect();
+      const z = zoom || 1;
+      // World-space center of viewport.
+      const cx = (rect.width / 2) / z + scrollX;
+      const cy = (rect.height / 2) / z + scrollY;
+      anchorX = Math.max(0, cx - 210); // 420/2
+      anchorY = Math.max(0, cy - 240); // 480/2
+    }
+    const chat = createChatObject(anchorX, anchorY, { seedText: seed });
+    setCanvasObjects((prev) => [...prev, chat]);
+    setSelectedObjectId(chat.id);
+  }, [scrollX, scrollY, zoom, setCanvasObjects, setSelectedObjectId]);
+
   const handleLassoMoveComplete = useCallback((delta: { dx: number; dy: number }, bounds: LassoBounds) => {
     // Screen-space bounds + delta → world-space: divide by zoom, then add scroll.
     // At 2x zoom, a screen bound of 100px maps to 50 world units.
@@ -1242,7 +1268,7 @@ export default function NoteometryApp({
           paper-frozen class on .noteometry-main supplies desat + dim
           + disabled-pointer; this component supplies the badge.
           Sub-PR 3.2 will wire onBrainDump to spawn a ChatDropin. */}
-      <FreezeOverlay />
+      <FreezeOverlay onBrainDump={handleBrainDump} />
       {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
           mount; their visibility is driven by LayerManager state via
           useLayerManager() inside the components. They sit OUTSIDE

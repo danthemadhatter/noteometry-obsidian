@@ -177,6 +177,8 @@ export interface ChatElementV3 {
   attachedImage?: string;
   /** Seeded LaTeX for Solve-spawned chats. */
   seedLatex?: string;
+  /** Seeded plain text for the input textarea (v1.11 brain-dump). */
+  seedText?: string;
   /** Conversation history for this drop-in only. */
   messages: ChatMessage[];
   /** Same intent as MathElement.pending — accepted on read, never persisted. */
@@ -307,6 +309,7 @@ export function packToV3(data: CanvasData): NoteometryPageV3 {
         x: obj.x, y: obj.y, w: obj.w, h: obj.h,
         attachedImage: obj.attachedImage,
         seedLatex: obj.seedLatex,
+        seedText: obj.seedText,
         messages: obj.messages ?? [],
         name: obj.name,
       });
@@ -420,6 +423,7 @@ export function unpackFromV3(v3: NoteometryPageV3): CanvasData {
           x: el.x, y: el.y, w: el.w, h: el.h,
           attachedImage: el.attachedImage,
           seedLatex: el.seedLatex,
+          seedText: el.seedText,
           messages: Array.isArray(el.messages) ? el.messages : [],
           pending: false,
           name: el.name,

@@ -81,6 +81,12 @@ export interface ChatObject extends CanvasObjectBase {
   /** Seeded LaTeX for Solve-spawned chats. When present, the first
    *  user message is the LaTeX and the v12 preset is applied. */
   seedLatex?: string;
+  /** Seeded plain text for the input textarea (NOT auto-fired).
+   *  v1.11.0 phase-3 sub-PR 3.2: freeze → "Brain dump" pre-fills the
+   *  textarea with `[brain dump @ <iso>]` and focuses the cursor at
+   *  the end so the user just keeps typing. Cleared after consumption
+   *  on first render so re-hydration doesn't re-seed. */
+  seedText?: string;
   /** Conversation history for this drop-in only. No cross-drop-in
    *  state — each chat is its own universe. */
   messages: ChatMessage[];
@@ -138,6 +144,7 @@ export function createChatObject(
   opts: {
     attachedImage?: string;
     seedLatex?: string;
+    seedText?: string;
     messages?: ChatMessage[];
     pending?: boolean;
     name?: string;
@@ -151,6 +158,7 @@ export function createChatObject(
     name: opts.name ?? "Chat",
     attachedImage: opts.attachedImage,
     seedLatex: opts.seedLatex,
+    seedText: opts.seedText,
     messages: opts.messages ?? [],
     pending: opts.pending,
   };
