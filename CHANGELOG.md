@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.1 — 2026-05-03
+
+Hotfix to v1.12.0. Dan: "gestures don't work on Z Fold 7."
+
+### Fixed
+- **Two-finger hold + pinch + pan now reach JS on Android Chromium / Samsung WebView.** The `.noteometry-ink-canvas-container` (where the multi-touch handler lives) had no `touch-action` set — defaulting to `auto`, which lets the OS consume multi-touch gestures before our PointerEvent listeners see them. The inner `.noteometry-ink-layer` was already `touch-action: none`, but Z Fold's WebView routes gestures starting near the edges (or via the container's pointerdown bubble) through the container, where they got eaten. Pinned `touch-action: none` on the container itself.
+
+iPad Safari was forgiving here and shipped fine in v1.12.0; Android Chromium is stricter. One CSS line.
+
 ## 1.12.0 — 2026-05-03
 
 The leaf-management war ends. After v1.11.1–v1.11.5 spent five releases fighting Obsidian's workspace manager to make the Pages panel behave in the left split (file-explorer displacement, stacked duplicates, "Plugin no longer active" orphans), Dan's call: scrap the panel, layer navigation into the right-click hub. **Right-click is the OS.**

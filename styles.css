@@ -2225,6 +2225,15 @@
   width: 100%;
   height: 100%;
   background: var(--nm-warm-bg);
+  /* v1.12.1: Android Chromium / Samsung WebView consume multi-touch
+   * gestures before JS sees them when touch-action is auto. The inner
+   * .noteometry-ink-layer already sets touch-action: none, but the
+   * pan/pinch/two-finger-hold handlers live on this container — so
+   * gestures starting outside the ink-layer rect (or routed through
+   * the container's pointerdown by Z Fold's WebView) were silently
+   * eaten. Pin touch-action: none on the container itself so all
+   * multi-touch lands in JS regardless of the OS's preferred gesture. */
+  touch-action: none;
 }
 
 .noteometry-ink-grid {
