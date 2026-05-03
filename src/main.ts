@@ -83,13 +83,11 @@ export default class NoteometryPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
-      // v1.11.3 Bug A cleanup: prior versions could land the canvas view
-      // in the left sidebar (via revealPagesPanel displacing the file
-      // explorer, or via getLeaf(false) when workspace.json restored a
-      // blank leaf there). Once saved to workspace.json that state
-      // persists. Relocate those leaves to the main editor area so the
-      // sidebar goes back to the file explorer / pages panel.
+      // v1.11.3+1.11.4: rescue any canvas leaves stuck in the sidebar
+      // from prior buggy sessions, then restore the file explorer if
+      // it was displaced by the pages panel before the v1.11.3 fix.
       this.relocateNoteometryLeavesOutOfSidebar();
+      void this.ensureFileExplorerVisible();
       void this.notifyIfLegacyPagesPresent();
       this.handleLaunchOpen();
       // v1.11.1: open the pages panel by default (left split, collapsed).
@@ -177,28 +175,76 @@ export default class NoteometryPlugin extends Plugin {
 
   /** Return true when `leaf` lives in the left or right sidebar split
    *  (i.e. NOT in the main editor area / rootSplit). Used to avoid
-   *  opening canvas pages inside a narrow sidebar pane. */
+   *  opening canvas pages inside a narrow sidebar pane.
+   *
+   *  v1.11.4: previous version used `leftSplit.containsLeaf()` which
+   *  isn't a real Obsidian API in current builds, so the check always
+   *  returned false and sidebar leaves slipped through. The reliable
+   *  signal is `leaf.getRoot()` — every leaf reports its split root,
+   *  and we compare against the three known roots. The DOM-walk
+   *  fallback stays as belt-and-braces for headless Obsidian versions
+   *  where getRoot() may be missing. */
   private isLeafInSidebar(leaf: WorkspaceLeaf): boolean {
     const ws = this.app.workspace as unknown as {
-      leftSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
-      rightSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
-      rootSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
+      leftSplit?: unknown;
+      rightSplit?: unknown;
+      rootSplit?: unknown;
     };
-    // Prefer the explicit containsLeaf check when Obsidian exposes it.
-    if (ws.leftSplit?.containsLeaf?.(leaf)) return true;
-    if (ws.rightSplit?.containsLeaf?.(leaf)) return true;
-    // Fallback: walk up the leaf's parents and look for the sidebar
-    // split classes Obsidian uses on the parent containers. This
-    // survives Obsidian internals churn since `containsLeaf` is
-    // technically private API.
-    let node: { parent?: unknown; containerEl?: HTMLElement } | null =
-      leaf as unknown as { parent?: unknown; containerEl?: HTMLElement };
-    while (node) {
-      const el = (node as { containerEl?: HTMLElement }).containerEl;
-      if (el?.closest(".mod-left-split, .mod-right-split")) return true;
-      node = (node as { parent?: typeof node }).parent ?? null;
+    const leafWithRoot = leaf as unknown as { getRoot?: () => unknown };
+    const root = leafWithRoot.getRoot?.();
+    if (root) {
+      if (root === ws.leftSplit) return true;
+      if (root === ws.rightSplit) return true;
+      // If we know rootSplit and the leaf's root matches, it's in the
+      // main area — trust that and short-circuit the DOM walk.
+      if (ws.rootSplit && root === ws.rootSplit) return false;
+    }
+    // DOM fallback: walk up from the leaf's container element looking
+    // for Obsidian's sidebar split class. This survives churn in the
+    // workspace internals since the class names have been stable.
+    const containerEl = (leaf as unknown as { containerEl?: HTMLElement })
+      .containerEl;
+    if (containerEl?.closest?.(".mod-left-split, .mod-right-split")) {
+      return true;
     }
     return false;
+  }
+
+  /** v1.11.4: restore Obsidian's file-explorer leaf if no file-explorer
+   *  view is currently mounted. Users upgrading through v1.11.1–1.11.3
+   *  may have had their file-explorer leaf hijacked by the pages panel
+   *  (Bug A). Once that happened, workspace.json no longer contains a
+   *  file-explorer leaf and Obsidian doesn't auto-recreate one. We do
+   *  it here — idempotent: skips when the explorer is already present.
+   *
+   *  Important: this is BEST EFFORT. Some users have intentionally
+   *  closed the explorer; we only re-create it when there's literally
+   *  zero file-explorer leaf, which is the broken state. We never
+   *  re-create one if any explorer leaf already exists somewhere. */
+  private async ensureFileExplorerVisible(): Promise<void> {
+    const ws = this.app.workspace;
+    const existing = ws.getLeavesOfType("file-explorer");
+    if (existing.length > 0) return;
+    // Prefer asking the file-explorer internal plugin to open itself —
+    // that way Obsidian uses its own placement logic instead of us
+    // guessing. Falls back to creating a leaf manually if the command
+    // isn't available (older Obsidian builds, or plugin disabled).
+    const cmd = (this.app as unknown as {
+      commands?: { executeCommandById?: (id: string) => boolean };
+    }).commands;
+    if (cmd?.executeCommandById?.("file-explorer:open")) return;
+    try {
+      const leaf = ws.getLeftLeaf(true);
+      if (!leaf) return;
+      await leaf.setViewState({ type: "file-explorer", active: false });
+    } catch (err) {
+      // Don't break plugin load if the file-explorer view type isn't
+      // registered (e.g. user disabled the core plugin). Log only.
+      console.warn(
+        "[Noteometry] Could not auto-restore file explorer:",
+        err,
+      );
+    }
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
