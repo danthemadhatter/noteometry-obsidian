@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.5 — 2026-05-03
+
+Dan's report: "this is impossible to use" with a screenshot showing **three stacked Noteometry Pages panels** plus a dead **"Plugin no longer active (file-explorer)"** leaf filling the entire left sidebar. v1.11.4 made things worse: my file-explorer auto-restore fallback created an orphan leaf, and every plugin reload through v1.11.1–v1.11.4 accumulated another Pages panel because the de-dup check raced with workspace.json restore.
+
+### Fixed
+- **Pages panel no longer stacks on every reload.** Added `detachDuplicatePagesPanelLeaves` that runs on layout-ready and detaches every pages-panel leaf past the first. Also guarded the auto-reveal on startup with an explicit `getLeavesOfType` check before calling `revealPagesPanel`, so even if the de-dup inside `revealPagesPanel` ever races we still don't add a second leaf.
+- **"Plugin no longer active" file-explorer orphan removed.** v1.11.4's fallback path called `setViewState({ type: "file-explorer" })` on a fresh leaf when the `file-explorer:open` command wasn't available. That produced an orphan leaf because Obsidian only mounts the file-explorer view through its core-plugin lifecycle — not through `setViewState` on an arbitrary leaf. v1.11.5 drops the fallback entirely: command or nothing. Added `detachDeadEmptyLeavesInSidebar` that sweeps any leaf whose view type is `"empty"` out of the sidebar on layout-ready, cleaning up the orphans v1.11.4 already created.
+
+### Tests
+- 520/517 (+3 in `v1115Regressions.test.ts`: duplicate pages-panel detach, dead-empty-leaf sidebar sweep, file-explorer fallback removed).
+
 ## 1.11.4 — 2026-05-03
 
 Hotfix to v1.11.3. Two user reports: file tree is still stuck, and there's no Chat tool in the insert menu.
