@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import type { CanvasObject } from "../lib/canvasObjects";
 import { defaultObjectName, createImageObject } from "../lib/canvasObjects";
 import { shouldStartObjectDrag } from "../lib/objectDragHitTest";
+import { shouldSkipBringToFront } from "../lib/dropinFocusGuards";
 import { sanitizeDownloadName, htmlToPlainText, buildRichTextClipboardBlobs } from "../lib/dropinExport";
 import { getTextBoxData } from "../lib/tableStore";
 import type { CanvasTool } from "./InkCanvas";
@@ -266,7 +267,20 @@ function EditableObjectTitle({
        *   subtle faceplate so the icons are immediately visible — plus
        *   Duplicate and Delete so common operations are one tap away
        *   instead of requiring a right-click. */}
-      <div className="nm-object-chrome-icons" onPointerDown={(e) => e.stopPropagation()}>
+      <div
+        className="nm-object-chrome-icons"
+        onPointerDown={(e) => e.stopPropagation()}
+        // v1.11.2 Fix 5: preventDefault on mousedown stops the browser from
+        // moving focus to the BUTTON. Without this, clicking a chrome icon
+        // (Snapshot/Download/Duplicate/Delete) yanks focus out of the
+        // contenteditable RichTextEditor inside the dropin, which then
+        // (a) collapses the selection — making text dropins look broken —
+        // and (b) lets a subsequent Backspace nuke the dropin (Bug 1).
+        // Click still fires because click != mousedown.
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+        }}
+      >
         <button
           className="nm-object-chrome-btn"
           title="Snapshot to canvas"
@@ -532,6 +546,13 @@ export default function CanvasObjectLayer({
   const bringToFront = useCallback((id: string) => {
     const idx = objects.findIndex(o => o.id === id);
     if (idx === -1 || idx === objects.length - 1) return;
+    // v1.11.2 Fix 3: skip the reorder when an editable inside THIS dropin
+    // currently has focus. Reordering changes React key positions, which
+    // unmounts/remounts the wrapper subtree — RichTextEditor remounts and
+    // its useEffect rehydrates innerHTML, blowing away the caret/selection
+    // mid-keystroke. Symptom: text dropin appears to "disappear" or lose
+    // what was just typed when you click around inside it.
+    if (typeof document !== "undefined" && shouldSkipBringToFront(document, id)) return;
     const next = objects.slice();
     const [obj] = next.splice(idx, 1);
     if (!obj) return;
@@ -688,6 +709,11 @@ export default function CanvasObjectLayer({
               handleDragStart(e, obj);
             }}
             onTouchStart={(e) => e.stopPropagation()}
+            // v1.11.2 Fix 2: stop wheel events from bubbling to the canvas
+            // pan/zoom. Without this, scrolling chat history or a long
+            // RichTextEditor body also scrolls the canvas underneath —
+            // disorienting and looks like a bug.
+            onWheel={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               // Only auto-focus the first editable when the user clicked empty

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.11.2 — 2026-05-03
+
+Drop-in interaction bugfixes. Dan's report: "the text drop in disappears when you mess with it. There are tons of bugs all over." Five concrete bugs traced from a deep code read of every drop-in path; one root focus issue was driving most of the visible chaos.
+
+### Fixed
+- **Text drop-in no longer disappears when you click chrome icons.** The window-level `Delete` / `Backspace` handler in `NoteometryApp` only guarded `INPUT` / `TEXTAREA` / `contenteditable`, but clicking Snapshot / Download / Duplicate moved focus to the chrome `BUTTON` — Backspace then fell through to the "delete selected object" branch and nuked the drop-in. New guard: any focus inside `.noteometry-object-selected` suppresses the delete.
+- **Chrome icon buttons no longer steal focus from the editor.** Added `onMouseDown` `preventDefault` to the chrome icon row so clicking Snapshot / Download / Duplicate / Delete keeps the caret inside the `RichTextEditor`. Click still fires (click ≠ mousedown), but focus stays where the user put it.
+- **Wheel-scrolling inside a drop-in no longer pans the canvas.** The drop-in content `<div>` had `onTouchStart` `stopPropagation` but no `onWheel` handler, so scrolling chat history or a long text body also scrolled the canvas underneath. Added `onWheel={(e) => e.stopPropagation()}`.
+- **`bringToFront` no longer remounts `RichTextEditor` mid-edit.** Every `pointerdown` on a drop-in moved its object to the end of the array; React saw the changed key order and unmounted/remounted the wrapper subtree, which made `RichTextEditor`'s `useEffect` rehydrate `innerHTML` from `tableStore` and blow away the caret position. Now skips the reorder when an `input` / `textarea` / `contenteditable` inside that drop-in already has focus.
+- **Circular dark-mode CSS token resolved.** `--nm-paper-ink: var(--text-normal, #E8E8EC)` (line 166) and `.noteometry-container { --text-normal: var(--nm-paper-ink) }` (line 224) formed a cycle; CSS resolves cycles to guaranteed-invalid, so `color` fell back to `inherit` and could render wrong (or invisibly) on certain ancestor scopes. Replaced the dark-mode `--nm-paper-ink` with the literal `#E8E8EC`.
+
+### Refactor
+- Extracted the focus-aware Delete and `bringToFront` guards into `src/lib/dropinFocusGuards.ts` (`shouldSuppressDelete`, `shouldSkipBringToFront`) so they're unit-testable without jsdom.
+
+### Tests
+- 497/497 (was 486, +11 covering both focus guards across body / no-selection / chrome-button / contenteditable / out-of-dropin / cross-dropin scenarios).
+
 ## 1.11.1 — 2026-05-03
 
 UX overhaul. Four user-reported pain points fixed in one ship.
