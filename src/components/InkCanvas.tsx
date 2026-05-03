@@ -4,6 +4,7 @@ import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
 import { nextWheelZoom } from "../lib/wheelZoom";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
+import { resolveInkCursor } from "../features/ink/cursorColor";
 
 export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
 
@@ -779,7 +780,7 @@ export default function InkCanvas({
         ref={inkCanvasRef}
         className="noteometry-ink-layer"
         style={{
-          cursor: tool === "grab" ? "grab" : tool === "eraser" ? "cell" : (tool === "pen" || tool === "line" || tool === "arrow" || tool === "rect" || tool === "circle") ? "crosshair" : "default",
+          cursor: resolveInkCursor(tool, activeColor),
           pointerEvents: (tool === "select" || disabled) ? "none" : "auto",
         }}
       />

@@ -36,6 +36,7 @@ import { MetaLayer } from "./layers/MetaLayer";
 import { EdgeGlow } from "./ambient/EdgeGlow";
 import { SaveDot } from "./ambient/SaveDot";
 import { AIActivityRibbon } from "./ambient/AIActivityRibbon";
+import GhostEcho from "./ambient/GhostEcho";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -1228,6 +1229,12 @@ export default function NoteometryApp({
       <EdgeGlow side="left" />
       <SaveDot />
       <AIActivityRibbon />
+      {/* v1.11.0 phase-2 sub-PR 2.2: GhostEcho — translucent emblem at
+          dismiss origin (400ms hold + 800ms fade, design doc §6).
+          Aborts on first ink event so it never lingers when user moves
+          on. Solves object-permanence crash for ADHD users in deep
+          hyperfocus who won't see the 1px edge glow. */}
+      <GhostEcho />
       {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
           mount; their visibility is driven by LayerManager state via
           useLayerManager() inside the components. They sit OUTSIDE

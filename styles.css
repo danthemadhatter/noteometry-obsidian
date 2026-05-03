@@ -3455,3 +3455,50 @@
     opacity: 0.35;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * v1.11.0 phase-2 sub-PR 2.2 — GhostEcho
+ * 12px emblem at swipe-origin coordinate. 400ms hold at 25% opacity,
+ * then 800ms fade. Pure CSS keyframe; the React layer just mounts and
+ * unmounts entries. Aborts (component unmount) on first pointerdown.
+ * ------------------------------------------------------------------- */
+.noteometry-ghost-echo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.noteometry-ghost-echo {
+  position: absolute;
+  /* Center the emblem on (x, y). */
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-normal, #888);
+  user-select: none;
+  pointer-events: none;
+  opacity: 0;
+  animation: noteometry-ghost-echo-fade 1200ms ease-out forwards;
+}
+
+@keyframes noteometry-ghost-echo-fade {
+  0%    { opacity: 0; }
+  /* Hold 400ms at 25% opacity (400/1200 = 33.3%). */
+  10%   { opacity: 0.25; }
+  33%   { opacity: 0.25; }
+  /* Fade 800ms to 0. */
+  100%  { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-ghost-echo {
+    /* Reduced-motion: simple instant-on, instant-off at 1.2s. */
+    animation: noteometry-ghost-echo-fade-reduced 1200ms steps(2, end) forwards;
+  }
+}
+
+@keyframes noteometry-ghost-echo-fade-reduced {
+  0%   { opacity: 0.25; }
+  100% { opacity: 0; }
+}
