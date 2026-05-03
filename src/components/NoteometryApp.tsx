@@ -19,6 +19,7 @@ import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
 import { buildPagesMenu } from "./menu/buildPagesMenu";
+import PageBreadcrumb from "./PageBreadcrumb";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
@@ -1406,6 +1407,20 @@ export default function NoteometryApp({
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
+            {/* v1.12.0: top-of-canvas page-name breadcrumb. Tap → opens
+                the canvas right-click menu (which leads with 📚 Pages),
+                so the breadcrumb is both an orientation cue and the
+                primary navigation entry point. */}
+            <PageBreadcrumb
+              file={file}
+              onClick={(cx, cy) => {
+                const fake = new MouseEvent("contextmenu", {
+                  clientX: cx, clientY: cy, bubbles: true,
+                });
+                Object.defineProperty(fake, "preventDefault", { value: () => {} });
+                handleCanvasContextMenu(fake as unknown as React.MouseEvent);
+              }}
+            />
             {/* Hidden image input */}
             <input
               ref={imageInputRef}
