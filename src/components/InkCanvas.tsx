@@ -5,6 +5,7 @@ import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from
 import { nextWheelZoom } from "../lib/wheelZoom";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 import { resolveInkCursor } from "../features/ink/cursorColor";
+import { LONG_PRESS_MS, LONG_PRESS_SLOP_SQ } from "../features/gestures/longPress";
 
 export type CanvasTool = "select" | "pen" | "eraser" | "grab" | "line" | "arrow" | "rect" | "circle";
 
@@ -361,7 +362,9 @@ export default function InkCanvas({
         // Deadline reached without the pen having moved → treat this as
         // a long-press. Abort any in-progress stroke (so the tick mark
         // doesn't get left behind) and open the hub at the original
-        // pen-down coordinates.
+        // pen-down coordinates. Timing comes from LONG_PRESS_MS so it
+        // stays unified with anywhere else the gesture is recognized
+        // (v1.11.0 phase-3 sub-PR 3.3 unification).
         if (isDrawingRef.current) {
           isDrawingRef.current = false;
           activeStrokeRef.current = [];
@@ -369,7 +372,7 @@ export default function InkCanvas({
         }
         penLongPressFiredRef.current = true;
         onRequestContextMenuRef.current?.(cx, cy);
-      }, 550);
+      }, LONG_PRESS_MS);
     }
   }, [onStrokesChange, onStampsChange, onToolChange]);
 
@@ -381,11 +384,12 @@ export default function InkCanvas({
     }
 
     // v1.6.9: cancel the pen long-press timer the moment the pen drifts.
-    // 8px slop matches iOS's own long-press tolerance.
+    // Slop is LONG_PRESS_SLOP_SQ (8px squared) — matches iOS's own
+    // long-press tolerance and stays in sync with the recognizer.
     if (e.pointerType === "pen" && penLongPressTimerRef.current && penLongPressStartPosRef.current) {
       const dx = e.clientX - penLongPressStartPosRef.current.x;
       const dy = e.clientY - penLongPressStartPosRef.current.y;
-      if (dx * dx + dy * dy > 64) {
+      if (dx * dx + dy * dy > LONG_PRESS_SLOP_SQ) {
         window.clearTimeout(penLongPressTimerRef.current);
         penLongPressTimerRef.current = 0;
         penLongPressStartPosRef.current = null;
