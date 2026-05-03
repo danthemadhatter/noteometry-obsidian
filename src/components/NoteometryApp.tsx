@@ -38,6 +38,8 @@ import { SaveDot } from "./ambient/SaveDot";
 import { AIActivityRibbon } from "./ambient/AIActivityRibbon";
 import GhostEcho from "./ambient/GhostEcho";
 import FreezeOverlay from "./freeze/FreezeOverlay";
+import OnboardingModal from "./onboarding/OnboardingModal";
+import { shouldShowOnboarding } from "./onboarding/onboardingContent";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -224,6 +226,24 @@ export default function NoteometryApp({
         : activeLayer === "frozen"
           ? " noteometry-paper-frozen"
           : "";
+
+  // v1.11.0 phase-4 sub-PR 4.2: first-run gesture cheatsheet.
+  // Mirror the persisted flag in local state so dismissal flips the
+  // UI immediately even before saveSettings() round-trips. The
+  // upstream plugin instance owns persistence; this component just
+  // signals the dismiss event and trusts saveSettings() upstream.
+  const [onboardingVisible, setOnboardingVisible] = useState(
+    shouldShowOnboarding(plugin.settings),
+  );
+  // Re-sync if the user resets via Settings while the canvas is open.
+  useEffect(() => {
+    setOnboardingVisible(shouldShowOnboarding(plugin.settings));
+  }, [plugin.settings.gestureTutorialSeen]);
+  const dismissOnboarding = useCallback(() => {
+    plugin.settings.gestureTutorialSeen = true;
+    void plugin.saveSettings();
+    setOnboardingVisible(false);
+  }, [plugin]);
 
   // Swipe blocking is handled in NoteometryView.ts at the view boundary
 
@@ -1269,6 +1289,16 @@ export default function NoteometryApp({
           + disabled-pointer; this component supplies the badge.
           Sub-PR 3.2 will wire onBrainDump to spawn a ChatDropin. */}
       <FreezeOverlay onBrainDump={handleBrainDump} />
+      {/* v1.11.0 phase-4 sub-PR 4.2: first-run gesture cheatsheet.
+          Renders above all other layers when gestureTutorialSeen is
+          false. Dismissal flips the persisted flag and the modal
+          unmounts. Settings → Reset gesture tutorial flips it back to
+          false so the user can re-trigger this on day-30 re-learning
+          (design doc §6b mitigation). */}
+      <OnboardingModal
+        visible={onboardingVisible}
+        onDismiss={dismissOnboarding}
+      />
       {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
           mount; their visibility is driven by LayerManager state via
           useLayerManager() inside the components. They sit OUTSIDE

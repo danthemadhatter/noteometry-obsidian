@@ -17,6 +17,12 @@ export interface NoteometrySettings {
    * on for Android / finger-only devices. Two-finger gestures always
    * pan/pinch regardless. */
   fingerDrawing: boolean;
+  /** v1.11.0: false until the user has completed the first-run gesture
+   * cheatsheet onboarding. Settings → "Reset gesture tutorial" flips
+   * this back to false so the user can re-trigger the modal during a
+   * day-30 re-learning episode (per design doc §6b: gesture recall +
+   * object-permanence crash mitigation). */
+  gestureTutorialSeen: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -32,6 +38,7 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   autoSave: true,
   autoSaveDelay: 2000,
   fingerDrawing: false,
+  gestureTutorialSeen: false,
 };
 
 export interface ChatMessage {

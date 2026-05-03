@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type NoteometryPlugin from "./main";
 import { NOTEOMETRY_VERSION } from "./lib/version";
 
@@ -164,6 +164,35 @@ export class NoteometrySettingTab extends PluginSettingTab {
             this.plugin.settings.autoSave = value;
             await this.plugin.saveSettings();
           })
+      );
+
+    /* ── Reset gesture tutorial ───────────────────────── */
+    /* v1.11.0 phase-4 sub-PR 4.2: design doc §6b mitigation for the
+     * "gesture recall + object-permanence crash" failure mode. Always
+     * one tap away. Flipping this back to false re-arms the first-run
+     * cheatsheet on the next canvas open. */
+    new Setting(containerEl)
+      .setName("Reset gesture tutorial")
+      .setDesc(
+        "Replay the first-run gesture cheatsheet next time you open a Noteometry page. Useful if you forget the 3-finger / 4-finger gestures.",
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText(
+            this.plugin.settings.gestureTutorialSeen
+              ? "Reset"
+              : "Already armed",
+          )
+          .setDisabled(!this.plugin.settings.gestureTutorialSeen)
+          .onClick(async () => {
+            this.plugin.settings.gestureTutorialSeen = false;
+            await this.plugin.saveSettings();
+            new Notice(
+              "Gesture tutorial will replay next time you open a Noteometry page.",
+              5000,
+            );
+            this.display();
+          }),
       );
 
     /* ── Finger drawing ──────────────────────────────── */
