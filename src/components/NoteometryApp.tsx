@@ -757,6 +757,36 @@ export default function NoteometryApp({
     }
   }, [scrollX, scrollY]);
 
+  /* v1.11.4: Chat is a first-class drop-in too. v1.10–1.11.3 only
+   * exposed it through Lasso → ABC and Math → Solve, which is fine for
+   * power users but invisible for anyone who doesn't know the lasso
+   * radial exists. Surface it directly in the right-click insert hub. */
+  const handleInsertChat = useCallback(() => {
+    try {
+      // Match the freeze brain-dump centering: place the new chat
+      // roughly center-screen instead of the upper-left corner of
+      // the visible viewport, so the user actually sees it.
+      const vp = viewportRef.current;
+      let anchorX = scrollX + 200;
+      let anchorY = scrollY + 200;
+      if (vp) {
+        const rect = vp.getBoundingClientRect();
+        const z = zoom || 1;
+        const cx = (rect.width / 2) / z + scrollX;
+        const cy = (rect.height / 2) / z + scrollY;
+        anchorX = Math.max(0, cx - 210); // 420/2
+        anchorY = Math.max(0, cy - 240); // 480/2
+      }
+      const obj = createChatObject(anchorX, anchorY);
+      setCanvasObjects((prev) => [...prev, obj]);
+      setTool("select");
+      setSelectedObjectId(obj.id);
+    } catch (err) {
+      console.error("[Noteometry] Chat insert failed:", err);
+      new Notice("Couldn't insert Chat — see console", 6000);
+    }
+  }, [scrollX, scrollY, zoom]);
+
   const handleInsertImage = useCallback(() => {
     imageInputRef.current?.click();
   }, []);
@@ -997,6 +1027,10 @@ export default function NoteometryApp({
         { label: "\u2500\u2500 Insert \u2500\u2500", disabled: true },
         { label: "Text Box", icon: "📝", onClick: handleInsertTextBox },
         { label: "Table", icon: "📊", onClick: handleInsertTable },
+        // v1.11.4: Chat is a first-class insert. Previously only
+        // reachable through Lasso→ABC and Math→Solve, which is hidden
+        // gameplay for first-time users.
+        { label: "Chat", icon: "💬", onClick: handleInsertChat },
         { label: "Image", icon: "🖼️", onClick: handleInsertImage },
         { label: "PDF", icon: "📄", onClick: handleInsertPdf },
         { label: "", separator: true },
@@ -1036,7 +1070,7 @@ export default function NoteometryApp({
     lassoActive, lassoMode, canUndo, canRedo, strokes, currentPage,
     setCanvasObjects, setSelectedObjectId, setStamps, setTool, setLassoActive, setActiveColor, setStrokeWidth,
     toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
-    handleInsertTextBox, handleInsertTable, handleInsertImage, handleInsertPdf,
+    handleInsertTextBox, handleInsertTable, handleInsertChat, handleInsertImage, handleInsertPdf,
     mathPaletteOpen,
   ]);
 

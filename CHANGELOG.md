@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.4 — 2026-05-03
+
+Hotfix to v1.11.3. Two user reports: file tree is still stuck, and there's no Chat tool in the insert menu.
+
+### Fixed
+- **Sidebar detection actually works now.** v1.11.3's `isLeafInSidebar` helper used `leftSplit.containsLeaf()` — but that's not a public Obsidian API in current builds, the call returned `undefined`, and every leaf read as not-in-sidebar. The canvas leaves stuck in the sidebar from pre-v1.11.3 workspace.json therefore never got relocated. Switched to `leaf.getRoot()` + identity compare against `workspace.leftSplit` / `workspace.rightSplit`, which is the documented path. DOM-class fallback stays for headless builds.
+- **File explorer auto-restores on load.** Users upgraded through v1.11.1–v1.11.3 have a workspace.json with NO `file-explorer` leaf (it was overwritten by the pages panel). Obsidian never auto-recreates it. Added `ensureFileExplorerVisible` that runs on layout-ready: if zero file-explorer leaves exist, invoke the `file-explorer:open` command, fall back to creating a leaf manually. Idempotent — skips when the explorer is already there, so users who intentionally closed it aren't trampled... except by the first v1.11.4 launch, which will reopen it. Unavoidable without a persisted "user wants explorer closed" flag.
+
+### Added
+- **Chat is a first-class insert tool.** Right-click on empty canvas → Insert → Chat. Previously only reachable through Lasso → ABC (empty chat with pinned lasso image) or Math → Solve (chat seeded with LaTeX). Both flows are hidden gameplay for anyone who doesn't know the lasso radial exists. Menu item spawns a fresh `ChatObject` center-viewport, just like the freeze brain-dump flow.
+
 ## 1.11.3 — 2026-05-03
 
 Followup to 1.11.2. Dan's report: "Text in the text box and table are white on white so it's invisible. I think all text is that way. The file tree is messed up." Two distinct bugs, both traced from the screenshot + code read.
