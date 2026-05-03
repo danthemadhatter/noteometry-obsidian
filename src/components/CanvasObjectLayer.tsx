@@ -740,6 +740,7 @@ export default function CanvasObjectLayer({
                 messages={obj.messages}
                 attachedImage={obj.attachedImage}
                 seedLatex={obj.seedLatex}
+                seedText={obj.seedText}
                 pending={obj.pending}
                 onChange={(u) => {
                   onObjectsChange(objects.map(o =>

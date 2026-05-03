@@ -45,11 +45,13 @@ interface Props {
   messages: ChatMessage[];
   attachedImage?: string;
   seedLatex?: string;
+  seedText?: string;
   pending?: boolean;
   onChange: (u: {
     messages?: ChatMessage[];
     pending?: boolean;
     seedLatex?: string;
+    seedText?: string;
   }) => void;
 }
 
@@ -58,10 +60,14 @@ export default function ChatDropin({
   messages,
   attachedImage,
   seedLatex,
+  seedText,
   pending,
   onChange,
 }: Props) {
-  const [input, setInput] = useState("");
+  // v1.11.0 phase-3 sub-PR 3.2: seedText pre-fills the textarea (NOT
+  // auto-fired). Used by the freeze "Brain dump" path to drop the user
+  // straight into typing without the friction of an empty box.
+  const [input, setInput] = useState(seedText ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -163,6 +169,26 @@ export default function ChatDropin({
     onChange({ seedLatex: undefined });
     void send(seedLatex, [], solvePreset().system);
   }, [seedLatex, messages.length, send, onChange]);
+
+  /** Brain-dump-seeded drop-ins focus the textarea on mount with the
+   *  seed text pre-filled and cursor placed at the END so the user just
+   *  keeps typing. Cleared after consumption so re-opening the page
+   *  doesn't re-seed (the input state holds it for this session). */
+  const didSeedTextRef = useRef(false);
+  useEffect(() => {
+    if (didSeedTextRef.current) return;
+    if (!seedText) return;
+    didSeedTextRef.current = true;
+    onChange({ seedText: undefined });
+    // Defer focus to next tick so layout is settled.
+    queueMicrotask(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      const len = ta.value.length;
+      ta.setSelectionRange(len, len);
+    });
+  }, [seedText, onChange]);
 
   const handleSend = useCallback(() => {
     const atts = [...attachments];
