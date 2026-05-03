@@ -18,6 +18,7 @@ import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
+import { buildPagesMenu } from "./menu/buildPagesMenu";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
@@ -941,6 +942,33 @@ export default function NoteometryApp({
     } else {
       /* ── Right-clicked on empty canvas — full tool interface ── */
 
+      // v1.12.0: 📚 Pages submenu pinned at the top. Replaces the v1.11.x
+      // leaf-based PagesPanel as the primary navigation surface. Same
+      // nav data (recent + folder buckets + new-page), rendered as a
+      // submenu of the right-click hub instead of an Obsidian sidebar
+      // leaf. Tap a page → opens in the current leaf, replacing whatever
+      // was here. New page → uses the plugin helper that picks a folder
+      // based on the active file.
+      items.push(
+        {
+          label: "Pages",
+          icon: "📚",
+          submenu: buildPagesMenu({
+            app,
+            rootDir: rootDir(plugin),
+            currentPath: file?.path ?? null,
+            onPick: (target) => {
+              const leaf = app.workspace.getLeaf(false);
+              void leaf.openFile(target);
+            },
+            onCreateNew: () => {
+              void plugin.createAndOpenNewPage();
+            },
+          }),
+        },
+        { label: "", separator: true },
+      );
+
       // v1.6.9: pin Clear Canvas at the TOP of the hub, right next to
       // Undo/Redo. Previously it was the last item after Export PNG, so
       // on iPad the menu grew tall enough that reaching Clear required
@@ -1072,6 +1100,8 @@ export default function NoteometryApp({
     toggleLasso, handleUndoWrapped, handleRedoWrapped, zoomIn, zoomOut, resetZoom, pushUndo,
     handleInsertTextBox, handleInsertTable, handleInsertChat, handleInsertImage, handleInsertPdf,
     mathPaletteOpen,
+    // v1.12.0: Pages submenu reads the vault + current file.
+    app, plugin, file,
   ]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
