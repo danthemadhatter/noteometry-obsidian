@@ -31,9 +31,6 @@ export interface NoteometrySettings {
   /** v1.11.1: apply the Noteometry visual theme to all of Obsidian
    * (sidebar, tab bar, ribbon, command palette). Default true. */
   globalThemeEnabled: boolean;
-  /** v1.11.1: show the custom Noteometry pages sidebar (only .nmpage
-   * files, large tap targets, search). Default true. */
-  pagesPanelEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -52,7 +49,6 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   gestureTutorialSeen: false,
   homeViewOnLaunch: false,
   globalThemeEnabled: true,
-  pagesPanelEnabled: true,
 };
 
 export interface ChatMessage {

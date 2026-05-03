@@ -11,11 +11,6 @@ import {
   rootDir,
 } from "./lib/persistence";
 import { getMostRecentNmpage } from "./lib/recentPages";
-import {
-  registerPagesPanelView,
-  PAGES_PANEL_VIEW_TYPE,
-  revealPagesPanel,
-} from "./components/pages/registerPagesPanel";
 import { applyGlobalTheme, removeGlobalTheme } from "./lib/globalTheme";
 
 export default class NoteometryPlugin extends Plugin {
@@ -63,18 +58,14 @@ export default class NoteometryPlugin extends Plugin {
       callback: () => this.runConvertLegacyCommand(),
     });
 
-    // v1.11.1: register the new Pages panel view (custom file tree).
-    registerPagesPanelView(this);
-
-    // v1.11.1: "Open Pages panel" command + ribbon icon.
-    this.addRibbonIcon("folder-tree", "Noteometry pages", () => {
-      void revealPagesPanel(this);
-    });
-    this.addCommand({
-      id: "noteometry-open-pages-panel",
-      name: "Noteometry: Open pages panel",
-      callback: () => void revealPagesPanel(this),
-    });
+    // v1.12.0: PagesPanel leaf-view replaced by the Pages submenu in
+    // the canvas right-click hub (see buildPagesMenu). Removed here:
+    //   - registerPagesPanelView(this)
+    //   - 'Noteometry pages' ribbon icon
+    //   - 'noteometry-open-pages-panel' command
+    // The leaf-management war (v1.11.1–v1.11.5: stacking duplicates,
+    // displaced file-explorer, dead 'Plugin no longer active' leaves)
+    // is over. No leaf, no fight.
 
     // v1.11.1: apply global theme if enabled.
     if (this.settings.globalThemeEnabled) {
@@ -87,28 +78,16 @@ export default class NoteometryPlugin extends Plugin {
       // from prior buggy sessions, then restore the file explorer if
       // it was displaced by the pages panel before the v1.11.3 fix.
       this.relocateNoteometryLeavesOutOfSidebar();
-      // v1.11.5: aggressive cleanup of accumulated junk leaves.
-      // Multiple plugin reloads through v1.11.1–v1.11.4 stacked extra
-      // pages-panel leaves and a dead "Plugin no longer active"
-      // file-explorer leaf in workspace.json. Detach duplicates and
-      // empty-view leaves in the sidebar before doing anything else.
-      this.detachDuplicatePagesPanelLeaves();
+      // v1.12.0: the panel-leaf is gone, but historical workspace.json
+      // can still hold leftover noteometry-pages-panel leaves AND dead
+      // 'Plugin no longer active' empty leaves from the v1.11.x cycle.
+      // Sweep them once on first load after upgrade so the workspace
+      // ends clean. After this users will never see them again.
+      this.detachLegacyPagesPanelLeaves();
       this.detachDeadEmptyLeavesInSidebar();
       void this.ensureFileExplorerVisible();
       void this.notifyIfLegacyPagesPresent();
       this.handleLaunchOpen();
-      // v1.11.1: open the pages panel by default (left split, collapsed).
-      // v1.11.5: only reveal IF none exists yet — the de-dup check
-      // inside revealPagesPanel does this too, but we keep it explicit
-      // here so the auto-reveal stops adding leaves once we have one.
-      if (this.settings.pagesPanelEnabled) {
-        const existing = this.app.workspace.getLeavesOfType(
-          PAGES_PANEL_VIEW_TYPE,
-        );
-        if (existing.length === 0) {
-          void revealPagesPanel(this, /*reveal*/ false);
-        }
-      }
     });
   }
 
@@ -225,20 +204,18 @@ export default class NoteometryPlugin extends Plugin {
     return false;
   }
 
-  /** v1.11.5: detach extra pages-panel leaves so at most ONE remains.
-   *  Multiple plugin reloads through v1.11.1–1.11.4 stacked duplicates
-   *  in the sidebar (every onLayoutReady created another one because
-   *  the de-dup check raced with workspace.json restore). Keep the
-   *  first leaf so the user's chosen position is preserved; drop the
-   *  rest. */
-  private detachDuplicatePagesPanelLeaves(): void {
+  /** v1.12.0: detach EVERY leftover noteometry-pages-panel leaf from
+   *  the v1.11.x cycle. The panel view itself is no longer registered
+   *  in this version, so each historical leaf would render as
+   *  'Plugin no longer active'. Sweep on layout-ready and the
+   *  workspace ends clean. Idempotent — once the leaves are gone,
+   *  subsequent calls find nothing and no-op. */
+  private detachLegacyPagesPanelLeaves(): void {
+    const LEGACY_PANEL_VIEW_TYPE = "noteometry-pages-panel";
     const leaves = this.app.workspace.getLeavesOfType(
-      PAGES_PANEL_VIEW_TYPE,
+      LEGACY_PANEL_VIEW_TYPE,
     );
-    // Keep [0], detach [1..n].
-    for (let i = 1; i < leaves.length; i++) {
-      leaves[i]!.detach();
-    }
+    for (const leaf of leaves) leaf.detach();
   }
 
   /** v1.11.5: detach "Plugin no longer active" / empty-view leaves

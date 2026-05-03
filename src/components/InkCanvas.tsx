@@ -603,6 +603,34 @@ export default function InkCanvas({
       return Math.hypot(b!.x - a!.x, b!.y - a!.y);
     };
 
+    // v1.12.0: two-finger hold → context menu. Same gesture pattern as
+    // the v1.6.9 pen long-press but driven by fingers, so iPad users
+    // without an Apple Pencil can reach the right-click hub. Fires at
+    // 550ms with no movement past 12px on either finger; cancels on
+    // pinch-or-pan motion or finger lift before the threshold.
+    let twoFingerHoldTimer: number | null = null;
+    const twoFingerInitialPos = new Map<number, { x: number; y: number }>();
+    const cancelTwoFingerHold = () => {
+      if (twoFingerHoldTimer !== null) {
+        window.clearTimeout(twoFingerHoldTimer);
+        twoFingerHoldTimer = null;
+      }
+    };
+    const armTwoFingerHold = () => {
+      cancelTwoFingerHold();
+      if (!onRequestContextMenuRef.current) return;
+      twoFingerInitialPos.clear();
+      for (const [id, pt] of touchesRef.current) twoFingerInitialPos.set(id, { ...pt });
+      twoFingerHoldTimer = window.setTimeout(() => {
+        twoFingerHoldTimer = null;
+        if (touchesRef.current.size !== 2) return;
+        const vals = Array.from(touchesRef.current.values());
+        const cx = (vals[0]!.x + vals[1]!.x) / 2;
+        const cy = (vals[0]!.y + vals[1]!.y) / 2;
+        onRequestContextMenuRef.current?.(cx, cy);
+      }, 550);
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -621,6 +649,7 @@ export default function InkCanvas({
           pinchStartDistRef.current = getPinchDist();
           pinchStartZoomRef.current = zoomRef.current;
           lastPanRef.current = null;
+          armTwoFingerHold();
         }
         return;
       }
@@ -634,12 +663,23 @@ export default function InkCanvas({
         pinchStartDistRef.current = getPinchDist();
         pinchStartZoomRef.current = zoomRef.current;
         lastPanRef.current = null;
+        armTwoFingerHold();
       }
     };
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // v1.12.0: cancel two-finger hold if any finger drifts past slop.
+      if (twoFingerHoldTimer !== null) {
+        const initial = twoFingerInitialPos.get(e.pointerId);
+        if (initial) {
+          const dx = e.clientX - initial.x;
+          const dy = e.clientY - initial.y;
+          if (Math.hypot(dx, dy) > 12) cancelTwoFingerHold();
+        }
+      }
 
       // Pinch-zoom path (2 fingers)
       if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
@@ -684,6 +724,8 @@ export default function InkCanvas({
     const onUp = (e: PointerEvent) => {
       if (e.pointerType !== "touch") return;
       touchesRef.current.delete(e.pointerId);
+      // v1.12.0: any drop below 2 fingers cancels the hold timer.
+      if (touchesRef.current.size < 2) cancelTwoFingerHold();
       if (touchesRef.current.size === 0) {
         lastPanRef.current = null;
         pinchStartDistRef.current = null;
@@ -705,6 +747,7 @@ export default function InkCanvas({
       container.removeEventListener("pointermove", onMove);
       container.removeEventListener("pointerup", onUp);
       container.removeEventListener("pointercancel", onUp);
+      cancelTwoFingerHold();
     };
   }, [onViewportChange, redrawGrid, redrawInk]);
 

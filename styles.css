@@ -2138,6 +2138,22 @@
   letter-spacing: 0.02em;
 }
 
+/* v1.12.0: chevron on submenu rows + active-row tint. */
+.noteometry-ctx-chevron {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nm-ink-muted);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.noteometry-ctx-item.has-submenu:hover:not(.disabled) .noteometry-ctx-chevron,
+.noteometry-ctx-item.submenu-open .noteometry-ctx-chevron {
+  color: var(--nm-accent);
+}
+.noteometry-ctx-item.submenu-open {
+  background: var(--nm-accent-light);
+}
+
 .noteometry-ctx-sep {
   height: 1px;
   margin: 3px 8px;
@@ -4216,5 +4232,76 @@
   .nm-pages-search,
   .nm-pages-sort {
     transition: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   v1.12.0 — Top-of-canvas page-name breadcrumb readout
+   ════════════════════════════════════════════════════════ */
+
+.noteometry-breadcrumb {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(60vw, 720px);
+  padding: 5px 12px;
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: var(--nm-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nm-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    color 100ms ease,
+    border-color 100ms ease,
+    background 100ms ease;
+  user-select: none;
+}
+
+.noteometry-breadcrumb:hover {
+  color: var(--nm-ink);
+  border-color: var(--nm-accent);
+  background: var(--nm-accent-light);
+}
+
+.noteometry-breadcrumb-seg {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.noteometry-breadcrumb-seg:last-child {
+  color: var(--nm-ink);
+  font-weight: 700;
+}
+
+.noteometry-breadcrumb-sep {
+  opacity: 0.45;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+@media (max-width: 768px) {
+  .noteometry-breadcrumb {
+    max-width: 80vw;
+    font-size: 10px;
+    padding: 4px 10px;
+  }
+  .noteometry-breadcrumb-seg {
+    max-width: 12ch;
   }
 }
