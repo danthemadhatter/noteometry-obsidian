@@ -29,6 +29,10 @@ import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
 import { useAIActivity } from "../features/aiActivity";
+import { useLayerManager } from "../features/layerManager";
+import { useLayerGestures } from "../features/gestures/useLayerGestures";
+import { ToolLayer } from "./layers/ToolLayer";
+import { MetaLayer } from "./layers/MetaLayer";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -195,6 +199,26 @@ export default function NoteometryApp({
    * clone so later edits to the original don't mutate the clipboard. */
   const objectClipboardRef = useRef<CanvasObject | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /* ── v1.11.0 phase-1 sub-PR 1.4: 3D layers wiring ────────────────
+   * useLayerGestures binds 3F-swipe / 4F-tap recognition to the
+   * container and routes results into LayerManager (paper | tool |
+   * meta | frozen). Layer shells live below; CSS classes derived
+   * from the layer state dim/lock the paper plane.
+   *
+   * Pen / 1F / 2F gestures pass through untouched — the recognizer's
+   * peak-count rule means single-finger ink and 2F pan never
+   * classify, and pen events only update the lockout clock. */
+  const { layer: activeLayer } = useLayerManager();
+  useLayerGestures(containerRef);
+  const paperDimClass =
+    activeLayer === "tool"
+      ? " noteometry-paper-dim-tool"
+      : activeLayer === "meta"
+        ? " noteometry-paper-dim-meta"
+        : activeLayer === "frozen"
+          ? " noteometry-paper-frozen"
+          : "";
 
   // Swipe blocking is handled in NoteometryView.ts at the view boundary
 
@@ -1173,8 +1197,15 @@ export default function NoteometryApp({
 
   return (
     <div ref={containerRef} className="noteometry-container noteometry-container-native-explorer">
+      {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
+          mount; their visibility is driven by LayerManager state via
+          useLayerManager() inside the components. They sit OUTSIDE
+          .noteometry-main so the dim class applied to main doesn't
+          dim them too. */}
+      <ToolLayer />
+      <MetaLayer />
       {/* ── Main area ── (Obsidian's file explorer is the page navigator) */}
-      <div className="noteometry-main">
+      <div className={`noteometry-main${paperDimClass}`}>
         <div className="noteometry-split">
           {/* ── Canvas area ── */}
           <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}${pendingSymbol ? " noteometry-placing-symbol" : ""}`}
