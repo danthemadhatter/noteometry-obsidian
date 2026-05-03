@@ -45,3 +45,34 @@ export function nextWheelZoom(input: WheelZoomInput): number {
   const rounded = Math.round(raw * 1000) / 1000;
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, rounded));
 }
+
+export interface ZoomAnchorInput {
+  scrollX: number;
+  scrollY: number;
+  oldZoom: number;
+  newZoom: number;
+  /** Anchor point in canvas-local screen coordinates — i.e. clientX/Y
+   *  with the canvas container's bounding-rect top-left subtracted. */
+  canvasX: number;
+  canvasY: number;
+}
+
+/**
+ * Compute the new scroll values that keep the world point currently
+ * under (canvasX, canvasY) at the same screen position after a zoom
+ * change. v1.12.2 fix for "pinch zooms to the upper-left corner" on
+ * Z Fold — without this, every zoom step effectively grew/shrank the
+ * canvas around world (0, 0) instead of around the user's fingers.
+ *
+ * Math: worldX = scrollX + canvasX/zoom. Set new worldX equal to old
+ * worldX, solve for newScrollX → adds canvasX * (1/oldZoom − 1/newZoom).
+ * Pure function so the invariant is testable without standing up the
+ * canvas DOM.
+ */
+export function scrollForZoomAnchor(input: ZoomAnchorInput): { scrollX: number; scrollY: number } {
+  const k = 1 / input.oldZoom - 1 / input.newZoom;
+  return {
+    scrollX: input.scrollX + input.canvasX * k,
+    scrollY: input.scrollY + input.canvasY * k,
+  };
+}

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.12.2 — 2026-05-03
+
+Z Fold audit: v1.12.1 fixed two-finger hold (gestures reach JS now). Two follow-on issues surfaced:
+1. **Pinch zoom anchored to the upper-left corner** instead of the user's fingers.
+2. **Two-finger drag did not pan the canvas.**
+3. **Math palette popup cut off at the bottom** with no way to reach the lower symbol rows.
+
+### Fixed
+- **Pinch zoom anchors to the centroid of the two fingers.** New pure helper `scrollForZoomAnchor(scroll, oldZoom, newZoom, canvasX, canvasY)` in `src/lib/wheelZoom.ts` returns the scroll values that keep the world point under the anchor pixel at the same screen position across the zoom step. Wired into the InkCanvas two-finger move path: each frame applies the zoom delta AND adjusts scroll so the world under the centroid stays put. Pre-1.12.2 every zoom step grew/shrank around world (0, 0) — that's why the Z Fold pinch read as "snap to top-left."
+- **Two-finger pan works.** The InkCanvas two-finger move handler is restructured to apply zoom + pan in the same pass: pinch ratio updates zoom (anchored), centroid delta updates scroll. Pan velocity is `delta / zoom` so the canvas slides at the same world-units-per-pixel regardless of zoom level. Works in both default and finger-drawing mode.
+- **Wheel / trackpad-pinch zoom anchors to the cursor.** Same `scrollForZoomAnchor` helper, anchor = `e.clientX/Y`. Chromium synthesises trackpad pinches as wheel events at the pointer position, so trackpad pinch anchors correctly too.
+- **Keyboard / button zoom anchors to the viewport center.** New `zoomAroundCenter` callback in `NoteometryApp` — `+ / −` buttons and command-palette zoom commands now grow/shrink around what the user is looking at. `Reset 100%` keeps its identity behaviour (zoom = 1, scroll preserved) since "100%" is canonically a snap.
+- **Math palette popup no longer clips.** Desktop variant gains `max-height: calc(100vh - 100px); overflow-y: auto`. Mobile variant bumps `max-height: 45vh → 60vh` and pins `touch-action: pan-y` so the popup scrolls cleanly when the symbol grid exceeds available height. Pre-1.12.2 desktop had no max-height; on smaller laptop displays the grid grew past the top edge with no way to reach the cut-off rows.
+
+### Tests
+- 5 new cases in `tests/unit/zoomAnchor.test.ts` pinning the anchored-zoom invariant: `worldX = scrollX + canvasX/zoom` is preserved across every zoom step. Round-trip zoom-in-then-out lands back at the start within fp epsilon.
+- 512/512 passing (was 507, +5).
+
 ## 1.12.1 — 2026-05-03
 
 Hotfix to v1.12.0. Dan: "gestures don't work on Z Fold 7."

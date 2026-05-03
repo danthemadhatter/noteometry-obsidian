@@ -947,7 +947,10 @@
 .nm-right-pane-input { flex: 1; overflow: hidden; }
 .nm-right-pane-chat { flex-shrink: 0; }
 
-/* Floating math palette — desktop: centered bottom overlay; mobile overridden */
+/* Floating math palette — desktop: centered bottom overlay; mobile overridden.
+   v1.12.2: cap height + scroll on desktop too. Pre-1.12.2 the popup was
+   unconstrained; on smaller laptop displays the symbol grid could grow
+   past the top edge with no way to reach the cut-off rows. */
 .nm-math-palette-popup {
   position: fixed;
   bottom: 60px;
@@ -955,6 +958,9 @@
   transform: translateX(-50%);
   max-width: 460px;
   width: 90vw;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Tools FAB — visibility is gated in JSX via Platform.isMobile. CSS only
@@ -2438,7 +2444,10 @@
   .nm-desktop-only { display: none !important; }
 
   /* Math palette as a top-anchored sheet on mobile so it never sits on top
-   * of the right panel's input bar. */
+   * of the right panel's input bar.
+   * v1.12.2: max-height bumped 45vh → 60vh so the symbol grid + tabs
+   * fit on Z Fold without the bottom rows getting clipped. Scroll
+   * still kicks in if a single tab overflows. */
   .nm-math-palette-popup {
     bottom: auto !important;
     top: 56px !important;
@@ -2447,8 +2456,9 @@
     transform: none !important;
     width: auto !important;
     max-width: none !important;
-    max-height: 45vh;
+    max-height: 60vh;
     overflow-y: auto;
+    touch-action: pan-y;
   }
   .noteometry-right-inner[data-mobile-tab="input"] .nm-right-pane-chat { display: none; }
   .noteometry-right-inner[data-mobile-tab="chat"] .nm-right-pane-input { display: none; }
