@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NOTEOMETRY · DEPTH PROTOTYPE</title>
+<style>
+  /* ─────────────────────────────────────────────────────────────────
+   * Noteometry depth prototype — standalone HTML for feeling the
+   * Z-axis dive paradigm without touching the plugin. Dark Bridges
+   * palette, hairline geometry, tracked-uppercase breadcrumb, scale
+   * + aperture transitions on every dive, ghost-parent watermark
+   * baked into child layers. Pure CSS + ~150 lines of JS, no deps.
+   *
+   * Test loop:
+   *   double-click / double-tap a portal → dive
+   *   click any breadcrumb segment       → fly to that depth
+   *   Esc                                → pull up one level
+   *
+   * Six total layers (one root, three top-level portals, four
+   * second-level portals nested inside one of them). Enough to feel
+   * the interaction; not enough to get lost.
+   * ────────────────────────────────────────────────────────────── */
+
+  :root {
+    --ds-surface-base: #0A0F14;
+    --ds-surface-1:    #0F1620;
+    --ds-surface-2:    #121A26;
+    --ds-surface-3:    #1A2435;
+    --ds-text-primary: #C8D4E0;
+    --ds-text-muted:   #5A6B7A;
+    --ds-line-soft:    #1F2A33;
+    --ds-strand-cyan:  #5FD9FF;
+    --ds-cargo-orange: #E59B45;
+    --ds-chiral-green: #7CD992;
+
+    --ds-font-display: "Bebas Neue","Oswald","Inter Display","Helvetica Neue Condensed","Arial Narrow",system-ui,sans-serif;
+    --ds-font-body:    "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --ds-font-mono:    "JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ds-surface-base); color: var(--ds-text-primary); font-family: var(--ds-font-body); -webkit-font-smoothing: antialiased; }
+  body { user-select: none; -webkit-user-select: none; }
+
+  /* Top breadcrumb gauge — the depth anchor */
+  .breadcrumb {
+    position: fixed; top: 0; left: 0; right: 0; height: 40px;
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 14px;
+    background: linear-gradient(180deg, var(--ds-surface-2) 0%, var(--ds-surface-1) 100%);
+    border-bottom: 1px solid var(--ds-line-soft);
+    font-family: var(--ds-font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+    z-index: 100;
+  }
+  .breadcrumb::after {
+    content: "";
+    position: absolute; left: 0; bottom: 0;
+    width: 32%; height: 1px;
+    background: linear-gradient(90deg, var(--ds-strand-cyan) 0%, var(--ds-strand-cyan) 60%, transparent 100%);
+    opacity: 0.6;
+  }
+  .crumb {
+    cursor: pointer;
+    padding: 4px 6px;
+    transition: color 80ms ease;
+  }
+  .crumb:hover { color: var(--ds-strand-cyan); }
+  .crumb.current { color: var(--ds-text-primary); }
+  .crumb-sep { color: var(--ds-text-muted); opacity: 0.5; }
+
+  /* Depth indicator — vertical pip stack on the right */
+  .depth-pips {
+    position: fixed; top: 50%; right: 14px;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 4px;
+    z-index: 100;
+  }
+  .pip {
+    width: 12px; height: 2px;
+    background: var(--ds-line-soft);
+    transition: background 120ms ease, width 120ms ease;
+  }
+  .pip.active { background: var(--ds-strand-cyan); width: 18px; box-shadow: 0 0 6px var(--ds-strand-cyan); }
+  .pip.passed { background: color-mix(in srgb, var(--ds-strand-cyan) 35%, transparent); width: 14px; }
+
+  /* Stack of layers — they render absolute, only one visible at a time */
+  .stack { position: fixed; inset: 40px 0 0 0; }
+
+  .layer {
+    position: absolute; inset: 0;
+    background: var(--ds-surface-base);
+    transform-origin: 50% 50%;
+    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms cubic-bezier(0.32, 0.72, 0, 1), filter 220ms ease;
+    will-change: transform, opacity;
+    overflow: hidden;
+  }
+  /* States — the dive transitions */
+  .layer.is-current  { transform: scale(1);    opacity: 1; pointer-events: auto; }
+  .layer.is-zooming-in  { transform: scale(1.6);  opacity: 0; pointer-events: none; filter: blur(4px); }
+  .layer.is-stashed     { transform: scale(0.6); opacity: 0; pointer-events: none; filter: blur(2px); }
+  .layer.is-emerging    { transform: scale(0.6); opacity: 0; pointer-events: none; }
+
+  /* Ghost-parent watermark — child layers carry a faint outline of the
+     portal they came from, so context is always present */
+  .layer .ghost-parent {
+    position: absolute;
+    border: 1px solid var(--ds-strand-cyan);
+    opacity: 0.06;
+    pointer-events: none;
+    border-radius: 4px;
+  }
+
+  /* Portal cards on the canvas */
+  .canvas {
+    position: absolute; inset: 0;
+    padding: 56px 40px 40px;
+    overflow: hidden;
+  }
+  .portal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  .portal {
+    position: relative;
+    background: var(--ds-surface-1);
+    border: 1px solid var(--ds-line-soft);
+    padding: 18px 18px 18px 24px;
+    cursor: pointer;
+    transition: background 100ms ease, border-color 100ms ease, transform 120ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 120ms ease;
+    min-height: 110px;
+  }
+  .portal::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, transparent 0%, var(--portal-accent, var(--ds-strand-cyan)) 12%, var(--portal-accent, var(--ds-strand-cyan)) 88%, transparent 100%);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--portal-accent, var(--ds-strand-cyan)) 30%, transparent);
+  }
+  .portal:hover {
+    background: var(--ds-surface-2);
+    border-color: color-mix(in srgb, var(--portal-accent, var(--ds-strand-cyan)) 40%, transparent);
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--portal-accent, var(--ds-strand-cyan)) 18%, transparent);
+  }
+  .portal-label {
+    font-family: var(--ds-font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--portal-accent, var(--ds-strand-cyan));
+    margin-bottom: 6px;
+  }
+  .portal-title {
+    font-family: var(--ds-font-display);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .portal-meta {
+    font-family: var(--ds-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+  }
+
+  /* Leaf content — when a layer has no children, it's just a workspace */
+  .leaf {
+    height: 100%; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      linear-gradient(var(--ds-line-soft) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--ds-line-soft) 1px, transparent 1px) 0 0/40px 40px,
+      var(--ds-surface-base);
+    color: var(--ds-text-muted);
+    font-family: var(--ds-font-mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 40px;
+  }
+  .leaf-title {
+    font-family: var(--ds-font-display);
+    font-size: 28px;
+    color: var(--ds-text-primary);
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+  .leaf-hint {
+    margin-top: 18px;
+    font-size: 9px;
+    opacity: 0.6;
+  }
+
+  /* Hint footer */
+  .hints {
+    position: fixed; bottom: 12px; left: 14px; right: 14px;
+    display: flex; justify-content: space-between; gap: 12px;
+    font-family: var(--ds-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ds-text-muted);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .hints kbd {
+    color: var(--ds-strand-cyan);
+    font-family: inherit;
+  }
+
+  /* Aperture — full-screen vignette pulse on dive */
+  .aperture {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 0%, transparent 40%, rgba(0,0,0,0.85) 100%);
+    opacity: 0;
+    transition: opacity 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 90;
+  }
+  .aperture.is-firing { opacity: 1; }
+</style>
+</head>
+<body>
+  <nav class="breadcrumb" id="breadcrumb"></nav>
+  <div class="depth-pips" id="depthPips"></div>
+  <div class="stack" id="stack"></div>
+  <div class="aperture" id="aperture"></div>
+  <div class="hints">
+    <span><kbd>DBL-TAP</kbd> · DIVE</span>
+    <span><kbd>ESC</kbd> · PULL UP</span>
+    <span><kbd>CRUMB</kbd> · FLY</span>
+  </div>
+
+<script>
+/* Tree of layers. Each node has id, label, accent, optional children. */
+const TREE = {
+  id: 'root',
+  label: 'NOTEOMETRY',
+  accent: 'var(--ds-strand-cyan)',
+  children: [
+    {
+      id: 'ee301', label: 'EE 301 · Op-Amp Lab', accent: '#5FD9FF',
+      children: [
+        { id: 'opamp1', label: 'Inverting Stage', accent: '#5FD9FF' },
+        { id: 'opamp2', label: 'Filter Stage',    accent: '#7CD992' },
+        { id: 'opamp3', label: 'Output Buffer',   accent: '#E59B45' },
+        { id: 'opampNotes', label: 'Lab Notes',   accent: '#C8D4E0' },
+      ],
+    },
+    {
+      id: 'calc3', label: 'Calc III · Integrals', accent: '#7CD992',
+      children: [
+        { id: 'triple', label: 'Triple Integrals', accent: '#7CD992' },
+        { id: 'cyl',    label: 'Cylindrical',      accent: '#5FD9FF' },
+      ],
+    },
+    {
+      id: 'quick', label: 'Quick Notes', accent: '#E59B45',
+    },
+  ],
+};
+
+/* App state — path of nodes from root to current. */
+let path = [TREE];
+
+const stack = document.getElementById('stack');
+const aperture = document.getElementById('aperture');
+const breadcrumb = document.getElementById('breadcrumb');
+const depthPips = document.getElementById('depthPips');
+
+function findNode(root, id) {
+  if (root.id === id) return root;
+  if (!root.children) return null;
+  for (const c of root.children) {
+    const f = findNode(c, id);
+    if (f) return f;
+  }
+  return null;
+}
+
+function pathTo(root, id, acc = []) {
+  if (root.id === id) return [...acc, root];
+  if (!root.children) return null;
+  for (const c of root.children) {
+    const p = pathTo(c, id, [...acc, root]);
+    if (p) return p;
+  }
+  return null;
+}
+
+function maxDepth(node, d = 0) {
+  if (!node.children) return d;
+  return Math.max(d, ...node.children.map(c => maxDepth(c, d + 1)));
+}
+const MAX_DEPTH = maxDepth(TREE);
+
+function renderBreadcrumb() {
+  breadcrumb.innerHTML = '';
+  path.forEach((node, i) => {
+    const span = document.createElement('span');
+    span.className = 'crumb' + (i === path.length - 1 ? ' current' : '');
+    span.textContent = i === 0 ? '·' : node.label;
+    span.addEventListener('click', () => flyTo(node.id));
+    breadcrumb.appendChild(span);
+    if (i < path.length - 1) {
+      const sep = document.createElement('span');
+      sep.className = 'crumb-sep';
+      sep.textContent = '/';
+      breadcrumb.appendChild(sep);
+    }
+  });
+}
+
+function renderPips() {
+  depthPips.innerHTML = '';
+  const currentDepth = path.length - 1;
+  for (let i = 0; i <= MAX_DEPTH; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'pip';
+    if (i === currentDepth) pip.classList.add('active');
+    else if (i < currentDepth) pip.classList.add('passed');
+    depthPips.appendChild(pip);
+  }
+}
+
+function buildLayer(node, parentAccent) {
+  const layer = document.createElement('div');
+  layer.className = 'layer';
+  layer.dataset.id = node.id;
+
+  if (node.children && node.children.length > 0) {
+    const canvas = document.createElement('div');
+    canvas.className = 'canvas';
+    const grid = document.createElement('div');
+    grid.className = 'portal-grid';
+    node.children.forEach((child, idx) => {
+      const card = document.createElement('div');
+      card.className = 'portal';
+      card.style.setProperty('--portal-accent', child.accent || 'var(--ds-strand-cyan)');
+      card.innerHTML = `
+        <div class="portal-label">PORTAL · DEPTH ${path.length}</div>
+        <div class="portal-title">${child.label}</div>
+        <div class="portal-meta">${(child.children?.length ?? 0)} pages · double-tap to dive</div>
+      `;
+      card.addEventListener('dblclick', () => dive(child.id));
+      // Touch double-tap detection
+      let lastTap = 0;
+      card.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) { e.preventDefault(); dive(child.id); }
+        lastTap = now;
+      });
+      grid.appendChild(card);
+    });
+    canvas.appendChild(grid);
+    layer.appendChild(canvas);
+  } else {
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    leaf.innerHTML = `
+      <div>
+        <div class="leaf-title">${node.label}</div>
+        <div>You're at depth ${path.length - 1}. This is a leaf.<br/>Imagine an oscilloscope, a circuit, a math derivation.</div>
+        <div class="leaf-hint">ESC TO PULL UP · CRUMB TO FLY</div>
+      </div>
+    `;
+    layer.appendChild(leaf);
+  }
+
+  // Ghost parent watermark — only on non-root layers, faint outline
+  if (parentAccent) {
+    const ghost = document.createElement('div');
+    ghost.className = 'ghost-parent';
+    ghost.style.setProperty('--portal-accent', parentAccent);
+    ghost.style.borderColor = parentAccent;
+    ghost.style.left = '8%'; ghost.style.right = '8%';
+    ghost.style.top = '8%'; ghost.style.bottom = '8%';
+    layer.appendChild(ghost);
+  }
+
+  return layer;
+}
+
+let inFlight = false;
+
+function render() {
+  if (inFlight) return;
+  stack.innerHTML = '';
+  const current = path[path.length - 1];
+  const parentAccent = path.length > 1 ? path[path.length - 2].accent : null;
+  const layer = buildLayer(current, parentAccent);
+  layer.classList.add('is-current');
+  stack.appendChild(layer);
+  renderBreadcrumb();
+  renderPips();
+}
+
+function fireAperture() {
+  aperture.classList.add('is-firing');
+  setTimeout(() => aperture.classList.remove('is-firing'), 220);
+}
+
+async function dive(childId) {
+  if (inFlight) return;
+  const current = path[path.length - 1];
+  const child = (current.children || []).find(c => c.id === childId);
+  if (!child) return;
+
+  inFlight = true;
+  fireAperture();
+
+  // Phase 1: zoom-in current layer out + vanish (220ms)
+  const cur = stack.querySelector('.layer.is-current');
+  if (cur) {
+    cur.classList.remove('is-current');
+    cur.classList.add('is-zooming-in');
+  }
+
+  await new Promise(r => setTimeout(r, 220));
+
+  // Phase 2: swap path + render new layer in is-emerging state
+  path.push(child);
+  stack.innerHTML = '';
+  const layer = buildLayer(child, current.accent);
+  layer.classList.add('is-emerging');
+  stack.appendChild(layer);
+  renderBreadcrumb();
+  renderPips();
+
+  // Force reflow then transition to current
+  void layer.offsetWidth;
+  layer.classList.remove('is-emerging');
+  layer.classList.add('is-current');
+
+  await new Promise(r => setTimeout(r, 220));
+  inFlight = false;
+}
+
+async function pullUp() {
+  if (inFlight) return;
+  if (path.length <= 1) return;
+
+  inFlight = true;
+  fireAperture();
+
+  // Phase 1: shrink current away
+  const cur = stack.querySelector('.layer.is-current');
+  if (cur) {
+    cur.classList.remove('is-current');
+    cur.classList.add('is-stashed');
+  }
+
+  await new Promise(r => setTimeout(r, 220));
+
+  // Phase 2: pop path, render parent
+  path.pop();
+  const parent = path[path.length - 1];
+  const grandAccent = path.length > 1 ? path[path.length - 2].accent : null;
+  stack.innerHTML = '';
+  const layer = buildLayer(parent, grandAccent);
+  layer.classList.add('is-zooming-in'); // start scaled-up
+  stack.appendChild(layer);
+  renderBreadcrumb();
+  renderPips();
+
+  void layer.offsetWidth;
+  layer.classList.remove('is-zooming-in');
+  layer.classList.add('is-current');
+
+  await new Promise(r => setTimeout(r, 220));
+  inFlight = false;
+}
+
+async function flyTo(nodeId) {
+  if (inFlight) return;
+  const newPath = pathTo(TREE, nodeId);
+  if (!newPath || newPath.length === 0) return;
+  if (newPath.length === path.length && newPath[newPath.length - 1].id === path[path.length - 1].id) return;
+
+  inFlight = true;
+  fireAperture();
+
+  const cur = stack.querySelector('.layer.is-current');
+  if (cur) {
+    cur.classList.remove('is-current');
+    // Direction depends on whether we're going up or down
+    const goingDeeper = newPath.length > path.length;
+    cur.classList.add(goingDeeper ? 'is-zooming-in' : 'is-stashed');
+  }
+
+  await new Promise(r => setTimeout(r, 220));
+
+  path = newPath;
+  const target = path[path.length - 1];
+  const parentAccent = path.length > 1 ? path[path.length - 2].accent : null;
+  stack.innerHTML = '';
+  const layer = buildLayer(target, parentAccent);
+  layer.classList.add('is-emerging');
+  stack.appendChild(layer);
+  renderBreadcrumb();
+  renderPips();
+
+  void layer.offsetWidth;
+  layer.classList.remove('is-emerging');
+  layer.classList.add('is-current');
+
+  await new Promise(r => setTimeout(r, 220));
+  inFlight = false;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); pullUp(); }
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>
