@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect } from "react";
 import type { Stroke, StrokePoint, Stamp } from "../lib/inkEngine";
 import { newStrokeId, smoothPoints, pointNearStroke, stampBBox, type BBox } from "../lib/inkEngine";
 import { setupCanvas, drawGrid, drawAllStrokes, drawAllStamps, drawStroke } from "../lib/canvasRenderer";
-import { nextWheelZoom } from "../lib/wheelZoom";
+import { nextWheelZoom, scrollForZoomAnchor } from "../lib/wheelZoom";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
 import { resolveInkCursor } from "../features/ink/cursorColor";
 import { LONG_PRESS_MS, LONG_PRESS_SLOP_SQ } from "../features/gestures/longPress";
@@ -603,6 +603,23 @@ export default function InkCanvas({
       return Math.hypot(b!.x - a!.x, b!.y - a!.y);
     };
 
+    // v1.12.2: centroid of all current touches; used by the two-finger
+    // pan path so the canvas slides with the fingers' average motion
+    // (independent of pinch ratio, which only changes zoom). Also used
+    // as the anchor for the pinch-zoom scroll-compensation.
+    const getCentroid = (): { x: number; y: number } | null => {
+      const vals = Array.from(touchesRef.current.values());
+      if (vals.length === 0) return null;
+      const sx = vals.reduce((s, v) => s + v.x, 0);
+      const sy = vals.reduce((s, v) => s + v.y, 0);
+      return { x: sx / vals.length, y: sy / vals.length };
+    };
+
+    // v1.12.2: tracks the previous centroid between move events so we
+    // can apply a per-frame delta as a pan. Reset on every onDown that
+    // arms a 2-finger gesture, cleared on size <2.
+    let twoFingerCentroid: { x: number; y: number } | null = null;
+
     // v1.12.0: two-finger hold → context menu. Same gesture pattern as
     // the v1.6.9 pen long-press but driven by fingers, so iPad users
     // without an Apple Pencil can reach the right-click hub. Fires at
@@ -637,7 +654,7 @@ export default function InkCanvas({
 
       if (fingerDrawingRef.current) {
         // Finger-drawing mode: single finger draws via the pen handler;
-        // only arm pan/pinch once a second finger joins.
+        // pan + pinch + tap-undo arm once a second finger joins.
         if (touchesRef.current.size === 2) {
           // Abort any in-progress single-finger stroke so the user can't
           // accidentally leave a tick-mark when they pinch to zoom.
@@ -649,6 +666,7 @@ export default function InkCanvas({
           pinchStartDistRef.current = getPinchDist();
           pinchStartZoomRef.current = zoomRef.current;
           lastPanRef.current = null;
+          twoFingerCentroid = getCentroid();
           armTwoFingerHold();
         }
         return;
@@ -658,11 +676,13 @@ export default function InkCanvas({
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         pinchStartDistRef.current = null;
       } else if (touchesRef.current.size === 2) {
-        // Second finger landed — start a pinch. Freeze the single-finger
-        // pan so pinch and pan don't fight for the same scroll delta.
+        // Second finger landed — start pan + pinch. Freeze the single-
+        // finger pan so 1-finger and 2-finger paths don't both push
+        // scroll deltas.
         pinchStartDistRef.current = getPinchDist();
         pinchStartZoomRef.current = zoomRef.current;
         lastPanRef.current = null;
+        twoFingerCentroid = getCentroid();
         armTwoFingerHold();
       }
     };
@@ -681,23 +701,66 @@ export default function InkCanvas({
         }
       }
 
-      // Pinch-zoom path (2 fingers)
-      if (touchesRef.current.size >= 2 && pinchStartDistRef.current !== null) {
-        if (zoomLockedRef.current) return;
-        const currentDist = getPinchDist();
-        if (currentDist <= 0) return;
-        const ratio = currentDist / pinchStartDistRef.current;
-        // Clamp to [0.5, 4] matching the Cmd+wheel limits in NoteometryApp.
-        const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
-        if (Math.abs(newZoom - zoomRef.current) < 0.001) return;
-        // Update ref + redraw synchronously so the canvas tracks fingers
-        // without waiting for a React re-render round-trip.
-        zoomRef.current = newZoom;
-        redrawGrid();
-        redrawInk();
-        // Tell the parent so object layer, zoom percent readout, and
-        // everything else that mirrors the state stays in sync.
-        onZoomChangeRef.current?.(newZoom);
+      // Two-finger path (zoom + pan). v1.12.2: pan added so the canvas
+      // slides with the finger centroid even while pinching, AND pinch
+      // zoom now anchors to the centroid so the world point under the
+      // user's fingers stays put across the zoom step. Pre-1.12.2 the
+      // canvas zoomed toward world (0, 0) and never panned with two
+      // fingers, which on Z Fold read as "zoom snaps to top-left, pan
+      // doesn't work."
+      if (touchesRef.current.size >= 2) {
+        let dirty = false;
+
+        // Pinch zoom from the distance ratio, anchored to centroid.
+        if (pinchStartDistRef.current !== null && !zoomLockedRef.current) {
+          const currentDist = getPinchDist();
+          if (currentDist > 0) {
+            const ratio = currentDist / pinchStartDistRef.current;
+            const newZoom = Math.max(0.5, Math.min(4, pinchStartZoomRef.current * ratio));
+            if (Math.abs(newZoom - zoomRef.current) >= 0.001) {
+              const ctrAnchor = getCentroid();
+              if (ctrAnchor) {
+                const rect = container.getBoundingClientRect();
+                const anchored = scrollForZoomAnchor({
+                  scrollX: scrollRef.current.x,
+                  scrollY: scrollRef.current.y,
+                  oldZoom: zoomRef.current,
+                  newZoom,
+                  canvasX: ctrAnchor.x - rect.left,
+                  canvasY: ctrAnchor.y - rect.top,
+                });
+                scrollRef.current = { x: anchored.scrollX, y: anchored.scrollY };
+                onViewportChange(anchored.scrollX, anchored.scrollY);
+              }
+              zoomRef.current = newZoom;
+              onZoomChangeRef.current?.(newZoom);
+              dirty = true;
+            }
+          }
+        }
+
+        // Centroid pan: scroll moves by the average finger delta, in
+        // world units (delta / zoom) so panning velocity is consistent
+        // regardless of zoom level.
+        const centroid = getCentroid();
+        if (centroid && twoFingerCentroid) {
+          const z = zoomRef.current;
+          const dx = (centroid.x - twoFingerCentroid.x) / z;
+          const dy = (centroid.y - twoFingerCentroid.y) / z;
+          if (dx !== 0 || dy !== 0) {
+            const newX = scrollRef.current.x - dx;
+            const newY = scrollRef.current.y - dy;
+            scrollRef.current = { x: newX, y: newY };
+            onViewportChange(newX, newY);
+            dirty = true;
+          }
+        }
+        if (centroid) twoFingerCentroid = centroid;
+
+        if (dirty) {
+          redrawGrid();
+          redrawInk();
+        }
         return;
       }
 
@@ -725,7 +788,12 @@ export default function InkCanvas({
       if (e.pointerType !== "touch") return;
       touchesRef.current.delete(e.pointerId);
       // v1.12.0: any drop below 2 fingers cancels the hold timer.
-      if (touchesRef.current.size < 2) cancelTwoFingerHold();
+      // v1.12.2: also clear the centroid so it doesn't leak across
+      // gestures (next 2-finger gesture re-captures from getCentroid).
+      if (touchesRef.current.size < 2) {
+        cancelTwoFingerHold();
+        twoFingerCentroid = null;
+      }
       if (touchesRef.current.size === 0) {
         lastPanRef.current = null;
         pinchStartDistRef.current = null;
@@ -792,6 +860,21 @@ export default function InkCanvas({
           metaKey: e.metaKey,
         });
         if (Math.abs(next - zoomRef.current) < 0.0001) return;
+        // v1.12.2: anchor wheel zoom to the cursor so the world point
+        // under the pointer stays put across the zoom step. Trackpad
+        // pinches anchor here too — Chromium synthesises wheel events
+        // at the pointer's last reported position.
+        const rect = container.getBoundingClientRect();
+        const anchored = scrollForZoomAnchor({
+          scrollX: scrollRef.current.x,
+          scrollY: scrollRef.current.y,
+          oldZoom: zoomRef.current,
+          newZoom: next,
+          canvasX: e.clientX - rect.left,
+          canvasY: e.clientY - rect.top,
+        });
+        scrollRef.current = { x: anchored.scrollX, y: anchored.scrollY };
+        onViewportChange(anchored.scrollX, anchored.scrollY);
         zoomRef.current = next;
         redrawGrid();
         redrawInk();
