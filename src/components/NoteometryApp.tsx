@@ -28,6 +28,7 @@ import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
 import { useObjects } from "../features/objects/useObjects";
+import { useAIActivity } from "../features/aiActivity";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -110,6 +111,13 @@ export default function NoteometryApp({
     lassoActive, lassoMode, setLassoActive, setLassoMode, regions: lassoRegions,
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
+
+  /* ── v1.11 phase-0: AI activity context handle ──────────────
+     The app shell wraps NoteometryApp in <AIActivityProvider> in
+     NoteometryView so this returns the live aggregator. Outside that
+     provider (i.e. unit tests that mount NoteometryApp directly) it
+     falls back to the no-op default and begin/end become free. */
+  const aiActivity = useAIActivity();
 
   /* ── Double-click / double-tap tool cycle ──────────────
    * Used by both Apple Pencil double-tap (iPad) and mouse double-click
@@ -496,6 +504,9 @@ export default function NoteometryApp({
 
     // Lazy import to avoid pulling lib/ai into modules that don't need it.
     const { readInk } = await import("../lib/ai");
+    // v1.11 phase-0: ping AI activity context so the app-level ribbon and
+    // any future freeze observer can see this vision call as live.
+    const callId = aiActivity.begin();
     try {
       const res = await readInk(composite, plugin.settings);
       setCanvasObjects((prev) => prev.map((o) =>
@@ -510,8 +521,10 @@ export default function NoteometryApp({
         o.id === obj.id && o.type === "math" ? { ...o, pending: false } : o,
       ));
       new Notice("123 failed — see console", 6000);
+    } finally {
+      aiActivity.end(callId);
     }
-  }, [lassoRegions, clearStack, setLassoActive, scrollX, scrollY, setCanvasObjects, setSelectedObjectId, plugin]);
+  }, [lassoRegions, clearStack, setLassoActive, scrollX, scrollY, setCanvasObjects, setSelectedObjectId, plugin, aiActivity]);
 
   /* ── Lasso ABC ── Ask a Question
      Composite the stack → spawn an empty ChatDropin with the image pinned.

@@ -27,6 +27,7 @@ import { IconSend, IconPaperclip, IconX, IconCopy, IconCheck } from "../Icons";
 import { renderAsMathML, toMathMLForClipboard } from "../../lib/mathml";
 import { chat } from "../../lib/ai";
 import { DEFAULT_PRESETS } from "../../features/pipeline/presets";
+import { useAIActivity } from "../../features/aiActivity";
 import type { ChatMessage, Attachment } from "../../types";
 import type NoteometryPlugin from "../../main";
 
@@ -67,9 +68,16 @@ export default function ChatDropin({
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
+  // v1.11 phase-0: AI activity context observation. Each send pings
+  // begin/end so the app-level ribbon and any future freeze-state
+  // observer can see this drop-in as live.
+  const aiActivity = useAIActivity();
+
   // Cancel token for in-flight requests. Fresh object per send so a
-  // later send can't get confused with an earlier abort.
-  const abortRef = useRef<{ cancelled: boolean } | null>(null);
+  // later send can't get confused with an earlier abort. The activity
+  // callId travels with the token so end() fires correctly even if
+  // stop() races completion.
+  const abortRef = useRef<{ cancelled: boolean; callId: string } | null>(null);
 
   // Ref mirror of the canonical messages so async callbacks can read
   // the freshest history without stale closures. Same pattern as the
@@ -96,7 +104,8 @@ export default function ChatDropin({
     const nextHistory = [...messagesRef.current, userMsg];
     onChange({ messages: nextHistory, pending: true });
 
-    const token = { cancelled: false };
+    const callId = aiActivity.begin();
+    const token = { cancelled: false, callId };
     abortRef.current = token;
 
     try {
@@ -116,17 +125,26 @@ export default function ChatDropin({
         pending: false,
       });
     } finally {
+      // Always end the activity record, even if the call was soft-aborted.
+      // The bytes may still be in flight (requestUrl can't be cancelled),
+      // but the EFFECT is done — no observer should see this as live.
+      aiActivity.end(callId);
       if (abortRef.current === token) abortRef.current = null;
     }
-  }, [plugin, onChange]);
+  }, [plugin, onChange, aiActivity]);
 
   const stop = useCallback(() => {
     const t = abortRef.current;
     if (!t) return;
     t.cancelled = true;
+    // Mirror end() here so the activity count drops immediately on stop
+    // rather than waiting for the network round-trip to land. The finally
+    // block in send() is idempotent — end() on an already-ended id is a
+    // no-op, so this double-call is safe.
+    aiActivity.end(t.callId);
     abortRef.current = null;
     onChange({ pending: false });
-  }, [onChange]);
+  }, [onChange, aiActivity]);
 
   /** Solve-seeded drop-ins auto-fire their first turn once on mount.
    *  The seedLatex is cleared afterwards so re-hydrating the page

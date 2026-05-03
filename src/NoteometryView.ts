@@ -2,6 +2,7 @@ import { FileView, TFile, WorkspaceLeaf } from "obsidian";
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import NoteometryApp from "./components/NoteometryApp";
+import { AIActivityProvider } from "./features/aiActivity";
 import type { CanvasData } from "./lib/pageFormat";
 import { loadPageFromFile, savePageToFile, EMPTY_PAGE } from "./lib/persistence";
 import type NoteometryPlugin from "./main";
@@ -114,23 +115,32 @@ export class NoteometryView extends FileView {
    *  tearing down the tree. */
   private rerenderReactTree(): void {
     if (!this.root) return;
+    // v1.11.0 phase-0: AIActivityProvider wraps the entire app tree so any
+    // drop-in (current and future) can ping begin/end on its AI calls and
+    // observers like the upcoming AI activity ribbon can subscribe at the
+    // app shell level. Provider is purely observation; cancellation stays
+    // per-call-site (see features/aiActivity.tsx for the soft-abort note).
     this.root.render(
-      React.createElement(NoteometryApp, {
-        plugin: this.plugin,
-        app: this.app,
-        file: this.file ?? null,
-        initialData: this.currentData,
-        initialDataToken: this.dataToken,
-        onSaveData: (data: CanvasData) => this.handleSaveData(data),
-        registerInitialDataSetter: (
-          setter: (data: CanvasData | null, token: number) => void,
-        ) => {
-          this.reactSetInitialData = setter;
-        },
-        registerFlushSave: (fn: (() => Promise<void>) | null) => {
-          this.flushMyTree = fn;
-        },
-      })
+      React.createElement(
+        AIActivityProvider,
+        null,
+        React.createElement(NoteometryApp, {
+          plugin: this.plugin,
+          app: this.app,
+          file: this.file ?? null,
+          initialData: this.currentData,
+          initialDataToken: this.dataToken,
+          onSaveData: (data: CanvasData) => this.handleSaveData(data),
+          registerInitialDataSetter: (
+            setter: (data: CanvasData | null, token: number) => void,
+          ) => {
+            this.reactSetInitialData = setter;
+          },
+          registerFlushSave: (fn: (() => Promise<void>) | null) => {
+            this.flushMyTree = fn;
+          },
+        }),
+      )
     );
   }
 
