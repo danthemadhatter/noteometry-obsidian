@@ -33,6 +33,9 @@ import { useLayerManager } from "../features/layerManager";
 import { useLayerGestures } from "../features/gestures/useLayerGestures";
 import { ToolLayer } from "./layers/ToolLayer";
 import { MetaLayer } from "./layers/MetaLayer";
+import { EdgeGlow } from "./ambient/EdgeGlow";
+import { SaveDot } from "./ambient/SaveDot";
+import { AIActivityRibbon } from "./ambient/AIActivityRibbon";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -209,7 +212,7 @@ export default function NoteometryApp({
    * Pen / 1F / 2F gestures pass through untouched — the recognizer's
    * peak-count rule means single-finger ink and 2F pan never
    * classify, and pen events only update the lockout clock. */
-  const { layer: activeLayer } = useLayerManager();
+  const { layer: activeLayer, store: layerStore } = useLayerManager();
   useLayerGestures(containerRef);
   const paperDimClass =
     activeLayer === "tool"
@@ -429,7 +432,11 @@ export default function NoteometryApp({
       lastSaved: new Date().toISOString(),
     };
     await onSaveDataRef.current(data);
-  }, [strokes, stamps, canvasObjects, scrollX, scrollY, scope]);
+    // v1.11.0 phase-2: SaveDot reads dirty from LayerManager. Flip
+    // clean once the bytes are flushed. The dirty flip happens below
+    // on every edit-driven save schedule.
+    layerStore.setDirty(false);
+  }, [strokes, stamps, canvasObjects, scrollX, scrollY, scope, layerStore]);
 
   useEffect(() => { saveNowRef.current = saveNow; }, [saveNow]);
 
@@ -442,7 +449,22 @@ export default function NoteometryApp({
     }, plugin.settings.autoSaveDelay);
   }, [saveNow, plugin]);
 
-  useEffect(() => { if (!loadingPageRef.current) doSave(); }, [strokes, stamps, canvasObjects]);
+  // v1.11.0 phase-2: edit-driven autosave path. We flip dirty=true
+  // synchronously when the user edits, then let the saveTimer flip it
+  // back to false in saveNow when the bytes hit disk. The 2s autosave
+  // debounce IS the dirty→clean window per design doc §4 cue 4.
+  useEffect(() => {
+    if (loadingPageRef.current) return;
+    layerStore.setDirty(true);
+    doSave();
+  }, [strokes, stamps, canvasObjects]);
+
+  // v1.11.0 phase-2: tell LayerManager which page is bound so per-page
+  // frozen scope works. Navigating clears frozen + collapses any
+  // tool/meta layer back to paper.
+  useEffect(() => {
+    layerStore.setPageId(file?.path ?? null);
+  }, [file?.path, layerStore]);
   useEffect(() => { return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }; }, []);
 
   useEffect(() => {
@@ -1197,6 +1219,15 @@ export default function NoteometryApp({
 
   return (
     <div ref={containerRef} className="noteometry-container noteometry-container-native-explorer">
+      {/* v1.11.0 phase-2 sub-PR 2.1: ambient cues. EdgeGlows hint
+          summonable layers (1px, 8% opacity). SaveDot reflects dirty
+          state. AIActivityRibbon pulses while any AI call is in
+          flight. All four are absolutely positioned, no layout cost,
+          no event handlers. Calm-tech: peripheral glance only. */}
+      <EdgeGlow side="top" />
+      <EdgeGlow side="left" />
+      <SaveDot />
+      <AIActivityRibbon />
       {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
           mount; their visibility is driven by LayerManager state via
           useLayerManager() inside the components. They sit OUTSIDE
