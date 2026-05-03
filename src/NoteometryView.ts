@@ -3,6 +3,7 @@ import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import NoteometryApp from "./components/NoteometryApp";
 import { AIActivityProvider } from "./features/aiActivity";
+import { LayerManagerProvider } from "./features/layerManager";
 import type { CanvasData } from "./lib/pageFormat";
 import { loadPageFromFile, savePageToFile, EMPTY_PAGE } from "./lib/persistence";
 import type NoteometryPlugin from "./main";
@@ -120,11 +121,19 @@ export class NoteometryView extends FileView {
     // observers like the upcoming AI activity ribbon can subscribe at the
     // app shell level. Provider is purely observation; cancellation stays
     // per-call-site (see features/aiActivity.tsx for the soft-abort note).
+    //
+    // v1.11.0 phase-1 sub-PR 1.2: LayerManagerProvider sits INSIDE
+    // AIActivityProvider so the freeze gesture (phase-3) can read both —
+    // freeze flips its own state AND iterates active AI tokens. Layer
+    // chrome is no-op until the gesture hooks land in sub-PR 1.3.
     this.root.render(
       React.createElement(
         AIActivityProvider,
         null,
-        React.createElement(NoteometryApp, {
+        React.createElement(
+          LayerManagerProvider,
+          null,
+          React.createElement(NoteometryApp, {
           plugin: this.plugin,
           app: this.app,
           file: this.file ?? null,
@@ -139,7 +148,8 @@ export class NoteometryView extends FileView {
           registerFlushSave: (fn: (() => Promise<void>) | null) => {
             this.flushMyTree = fn;
           },
-        }),
+          }),
+        ),
       )
     );
   }
