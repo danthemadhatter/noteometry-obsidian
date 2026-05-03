@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.12.0 — 2026-05-03
+
+The leaf-management war ends. After v1.11.1–v1.11.5 spent five releases fighting Obsidian's workspace manager to make the Pages panel behave in the left split (file-explorer displacement, stacked duplicates, "Plugin no longer active" orphans), Dan's call: scrap the panel, layer navigation into the right-click hub. **Right-click is the OS.**
+
+### Added
+- **📚 Pages submenu in the canvas right-click hub.** Pinned at the very top. Submenu structure:
+  - "Recent" → last 6 pages by mtime, across all folders.
+  - One submenu per folder (course), pages sorted recency-first, count shown on the right.
+  - "+ New page" at the bottom. Empty-vault fallback: a disabled "No pages yet" row.
+  - The currently-open page is marked with a ✓ icon.
+  - Tap a page → opens in the current leaf via `getLeaf(false).openFile`.
+  - Single-folder vault-root-only with ≤6 pages flattens — no point in nesting one bucket.
+- **`ContextMenuItem.submenu` mechanism.** Items can carry a `submenu: ContextMenuItem[]` array; rows with a submenu show a chevron and spawn a child menu on hover (mouse) or tap (touch). Submenus position to the right of the parent row, flipping to the left when they would overflow. Recursive — submenus can have submenus arbitrarily deep. Outside-click closes the chain; Esc closes one level at a time.
+- **Two-finger hold gesture on iPad.** 550ms with no finger movement past 12px → fires `onRequestContextMenu` at the centroid. Same threshold as the v1.6.9 pen long-press, adapted for fingers so iPad users without an Apple Pencil can reach the right-click hub. Cancels on pinch-or-pan motion or finger lift before the threshold.
+- **Top-of-canvas page-name breadcrumb readout.** Tracked-uppercase mono pill at top-center showing current parent path + filename (e.g. `EE 301 · WEEK 4 · LECTURE`). Tap → opens the canvas right-click menu just below it. Doubles as orientation cue and primary navigation entry point.
+
+### Removed
+- **`PagesPanel.tsx` (248 lines) and `registerPagesPanel.ts` (97 lines) deleted.** The panel view-type is no longer registered. Workspace `revealPagesPanel`, "Noteometry pages" ribbon icon, and `noteometry-open-pages-panel` command all gone. Five releases of leaf-management bug-fighting deleted in one ship.
+- **`pagesPanelEnabled` setting + its UI toggle.** No setting needed when there's no panel.
+- **`detachDuplicatePagesPanelLeaves` replaced by `detachLegacyPagesPanelLeaves`.** The new sweep detaches EVERY noteometry-pages-panel leaf left behind by v1.11.x workspace.json so users upgrading from v1.11.x don't see "Plugin no longer active" placeholders. Idempotent — sweeps once on first load and finds nothing thereafter.
+- **`tests/unit/v1113Regressions.test.ts`** and **`tests/unit/v1115Regressions.test.ts`** deleted — they pinned PagesPanel-specific bugs that no longer exist.
+
+### Kept
+- `src/components/pages/pagesPanelLogic.ts`. The pure data layer (`filterAndSort`, `folderChips`, `chipLabel`) is still consumed by the new `buildPagesMenu` helper. Same data, new render surface.
+
+### Tests
+- 507/507 passing. Net -345 lines of code.
+
 ## 1.11.5 — 2026-05-03
 
 Dan's report: "this is impossible to use" with a screenshot showing **three stacked Noteometry Pages panels** plus a dead **"Plugin no longer active (file-explorer)"** leaf filling the entire left sidebar. v1.11.4 made things worse: my file-explorer auto-restore fallback created an orphan leaf, and every plugin reload through v1.11.1–v1.11.4 accumulated another Pages panel because the de-dup check raced with workspace.json restore.

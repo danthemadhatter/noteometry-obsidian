@@ -1,6 +1,6 @@
 {
 	"name": "noteometry",
-	"version": "1.11.5",
+	"version": "1.12.0",
 	"description": "EE workstation — canvas, ink, AI, and drop-ins for electrical engineering students",
 	"main": "main.js",
 	"type": "module",
