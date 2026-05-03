@@ -2138,6 +2138,22 @@
   letter-spacing: 0.02em;
 }
 
+/* v1.12.0: chevron on submenu rows + active-row tint. */
+.noteometry-ctx-chevron {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nm-ink-muted);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.noteometry-ctx-item.has-submenu:hover:not(.disabled) .noteometry-ctx-chevron,
+.noteometry-ctx-item.submenu-open .noteometry-ctx-chevron {
+  color: var(--nm-accent);
+}
+.noteometry-ctx-item.submenu-open {
+  background: var(--nm-accent-light);
+}
+
 .noteometry-ctx-sep {
   height: 1px;
   margin: 3px 8px;
