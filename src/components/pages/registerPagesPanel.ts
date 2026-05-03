@@ -67,6 +67,14 @@ export function registerPagesPanelView(plugin: NoteometryPlugin): void {
  * focus the leaf so the user sees it; if false, the panel attaches
  * silently (used by onLayoutReady so the side panel exists without
  * stealing focus from the canvas).
+ *
+ * v1.11.3 Bug A fix: previously used `getLeftLeaf(false)` which REUSES
+ * an existing empty leaf in the left split — in practice that is the
+ * file-explorer leaf, whose view gets overwritten by setViewState and
+ * the file tree disappears from the vault entirely. Use `getLeftLeaf(true)`
+ * so Obsidian splits a brand new leaf next to the file explorer instead
+ * of hijacking it. Users can then drag the panel wherever they like, and
+ * the file explorer stays intact.
  */
 export async function revealPagesPanel(
   plugin: NoteometryPlugin,
@@ -78,7 +86,8 @@ export async function revealPagesPanel(
     if (reveal) void ws.revealLeaf(existing);
     return;
   }
-  const leaf = ws.getLeftLeaf(false);
+  // `true` → always split a NEW leaf; never reuse the file-explorer leaf.
+  const leaf = ws.getLeftLeaf(true);
   if (!leaf) return;
   await leaf.setViewState({
     type: PAGES_PANEL_VIEW_TYPE,

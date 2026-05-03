@@ -256,6 +256,27 @@
   --text-faint: rgba(26, 35, 53, 0.52);
 }
 
+/* v1.11.3 Bug D fix: in dark mode the cream-surface scope above
+ * over-rode --text-faint with a dark-navy semi-transparent value
+ * (rgba(26, 35, 53, 0.52)). On dark surfaces that's effectively black
+ * paint on a near-black background — placeholder text
+ * ("Type here…"), table action chevrons, and disabled chat copy
+ * indicators all became invisible. Re-flip --text-faint to a light
+ * counterpart inside dark mode so faint text stays barely-visible
+ * instead of completely invisible. */
+.theme-dark .noteometry-ctx-menu,
+.theme-dark .noteometry-table-editor,
+.theme-dark .noteometry-richtext,
+.theme-dark .noteometry-panel-box,
+.theme-dark .noteometry-panel-textarea,
+.theme-dark .noteometry-chat-textarea,
+.theme-dark .noteometry-chat-bubble.assistant,
+.theme-dark .noteometry-canvas-object,
+.theme-dark .noteometry-mathpal,
+.theme-dark .noteometry-mathpal-btn {
+  --text-faint: rgba(232, 232, 236, 0.55);
+}
+
 /* Chat text — dark ink on cream/paper background. */
 .noteometry-chat,
 .noteometry-chat-header,
@@ -1051,7 +1072,18 @@
   background: transparent;
   font-size: 13px;
   font-family: var(--nm-font);
-  color: var(--text-normal);
+  /* v1.11.3 Bug B fix: was `color: var(--text-normal)`, which chains
+   * through --text-normal → --nm-paper-ink → hex. Several Obsidian
+   * dark themes also redefine --text-normal, and the chain occasionally
+   * resolved to the wrong value, leaving table text near-white on a
+   * near-white surface. Pull the color from --nm-paper-ink directly so
+   * there is no third party in the chain.
+   *
+   * The browser default for <input> on macOS is system text color, which
+   * in a dark Electron window with no explicit color is also near-white;
+   * !important forces ours to win against that user-agent default. */
+  color: var(--nm-paper-ink) !important;
+  -webkit-text-fill-color: var(--nm-paper-ink);
   box-sizing: border-box;
   outline: none;
 }
@@ -1169,7 +1201,14 @@
   padding: 10px 14px;
   overflow-y: auto;
   line-height: 1.6;
-  color: var(--text-normal);
+  /* v1.11.3 Bug B fix: pull text color from --nm-paper-ink directly
+   * instead of routing through --text-normal. The contenteditable
+   * surface inherits from the canvas object which sets --nm-paper-ink
+   * to a paper-appropriate ink color in both light and dark mode; this
+   * guarantees readable contrast even if --text-normal gets shadowed
+   * by an Obsidian theme. */
+  color: var(--nm-paper-ink) !important;
+  -webkit-text-fill-color: var(--nm-paper-ink);
   outline: none;
   min-height: 40px;
 }
