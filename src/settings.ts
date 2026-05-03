@@ -180,21 +180,9 @@ export class NoteometrySettingTab extends PluginSettingTab {
       );
 
     /* ── v1.11.1: Custom pages panel ──────────────────── */
-    new Setting(containerEl)
-      .setName("Show Noteometry pages panel")
-      .setDesc(
-        "Adds a custom file tree to the left sidebar showing only .nmpage files, with search, folder filter chips, and large tap targets. Obsidian's default file explorer still works in parallel.",
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.pagesPanelEnabled).onChange(async (v) => {
-          this.plugin.settings.pagesPanelEnabled = v;
-          await this.plugin.saveSettings();
-          new Notice(
-            "Reload Obsidian (or toggle the plugin) to apply this change.",
-            5000,
-          );
-        }),
-      );
+    /* v1.12.0: 'Show pages panel' setting removed. The pages panel is
+       gone — navigation lives in the canvas right-click hub now (📚
+       Pages submenu). No setting required. */
 
     /* ── v1.11.1: Global theme ───────────────────────── */
     new Setting(containerEl)
