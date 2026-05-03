@@ -83,6 +83,13 @@ export default class NoteometryPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
+      // v1.11.3 Bug A cleanup: prior versions could land the canvas view
+      // in the left sidebar (via revealPagesPanel displacing the file
+      // explorer, or via getLeaf(false) when workspace.json restored a
+      // blank leaf there). Once saved to workspace.json that state
+      // persists. Relocate those leaves to the main editor area so the
+      // sidebar goes back to the file explorer / pages panel.
+      this.relocateNoteometryLeavesOutOfSidebar();
       void this.notifyIfLegacyPagesPresent();
       this.handleLaunchOpen();
       // v1.11.1: open the pages panel by default (left split, collapsed).
@@ -153,7 +160,45 @@ export default class NoteometryPlugin extends Plugin {
     // Open the most-recent page directly. getLeaf(false) reuses an
     // existing empty leaf when possible; if Obsidian restored a blank
     // tab, we land in it instead of stacking a second one.
-    void this.app.workspace.getLeaf(false).openFile(mostRecent);
+    //
+    // v1.11.3 Bug C fix: workspace.json from a prior session can place
+    // an empty noteometry-view leaf in the left or right sidebar. When
+    // that happens, getLeaf(false) returns the sidebar leaf and the
+    // canvas opens inside the narrow sidebar pane instead of the main
+    // editor area. Detect that case and force a new tab in the main
+    // (root) split.
+    const leaf = this.app.workspace.getLeaf(false);
+    if (this.isLeafInSidebar(leaf)) {
+      void this.app.workspace.getLeaf("tab").openFile(mostRecent);
+      return;
+    }
+    void leaf.openFile(mostRecent);
+  }
+
+  /** Return true when `leaf` lives in the left or right sidebar split
+   *  (i.e. NOT in the main editor area / rootSplit). Used to avoid
+   *  opening canvas pages inside a narrow sidebar pane. */
+  private isLeafInSidebar(leaf: WorkspaceLeaf): boolean {
+    const ws = this.app.workspace as unknown as {
+      leftSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
+      rightSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
+      rootSplit?: { containsLeaf?: (l: WorkspaceLeaf) => boolean } | null;
+    };
+    // Prefer the explicit containsLeaf check when Obsidian exposes it.
+    if (ws.leftSplit?.containsLeaf?.(leaf)) return true;
+    if (ws.rightSplit?.containsLeaf?.(leaf)) return true;
+    // Fallback: walk up the leaf's parents and look for the sidebar
+    // split classes Obsidian uses on the parent containers. This
+    // survives Obsidian internals churn since `containsLeaf` is
+    // technically private API.
+    let node: { parent?: unknown; containerEl?: HTMLElement } | null =
+      leaf as unknown as { parent?: unknown; containerEl?: HTMLElement };
+    while (node) {
+      const el = (node as { containerEl?: HTMLElement }).containerEl;
+      if (el?.closest(".mod-left-split, .mod-right-split")) return true;
+      node = (node as { parent?: typeof node }).parent ?? null;
+    }
+    return false;
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
@@ -187,6 +232,34 @@ export default class NoteometryPlugin extends Plugin {
       if (!view.file) stale.push(leaf);
     });
     for (const leaf of stale) leaf.detach();
+  }
+
+  /** v1.11.3: if any canvas (noteometry-view or noteometry-home) leaf
+   *  ended up in the left or right sidebar in a prior session, detach
+   *  it and reopen the file in a fresh main-area tab. The sidebar pane
+   *  is too narrow for canvas work and this is never what the user
+   *  intended — it's always the result of a plugin bug (fixed in this
+   *  release) or a workspace.json restore chain. */
+  private relocateNoteometryLeavesOutOfSidebar(): void {
+    const toRelocate: { leaf: WorkspaceLeaf; file: TFile | null; type: string }[] = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const type = leaf.view.getViewType();
+      if (type !== VIEW_TYPE && type !== HOME_VIEW_TYPE) return;
+      if (!this.isLeafInSidebar(leaf)) return;
+      const view = leaf.view as { file?: TFile | null };
+      toRelocate.push({ leaf, file: view.file ?? null, type });
+    });
+    for (const { leaf, file, type } of toRelocate) {
+      leaf.detach();
+      if (type === VIEW_TYPE && file) {
+        void this.app.workspace.getLeaf("tab").openFile(file);
+      } else if (type === HOME_VIEW_TYPE) {
+        void this.app.workspace.getLeaf("tab").setViewState({
+          type: HOME_VIEW_TYPE,
+          active: true,
+        });
+      }
+    }
   }
 
   /** On load, if the vault still has legacy .md pages containing

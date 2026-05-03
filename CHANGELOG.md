@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.3 — 2026-05-03
+
+Followup to 1.11.2. Dan's report: "Text in the text box and table are white on white so it's invisible. I think all text is that way. The file tree is messed up." Two distinct bugs, both traced from the screenshot + code read.
+
+### Fixed
+- **File tree no longer disappears when the Pages panel loads.** `revealPagesPanel` used `workspace.getLeftLeaf(false)`, which returns an existing empty leaf in the left split — in practice that was Obsidian's own file-explorer leaf. `leaf.setViewState({ type: PAGES_PANEL_VIEW_TYPE })` then overwrote it, effectively deleting the file tree. Switched to `getLeftLeaf(true)` so Obsidian splits a brand-new leaf next to the file explorer instead of hijacking it.
+- **Canvas no longer opens inside the narrow sidebar pane.** `handleLaunchOpen` called `getLeaf(false)` without checking where the returned leaf lived. If workspace.json restored a blank `noteometry-view` leaf in the left or right split (which it did for any user upgraded through the 1.11.1 → 1.11.2 window), the most-recent `.nmpage` opened inside that ~240px sidebar pane and the main area showed "New tab". Added `isLeafInSidebar` guard that falls back to a fresh main-area tab, plus a one-shot `relocateNoteometryLeavesOutOfSidebar` sweep on layout-ready that rescues any canvas leaves already stuck in the sidebar from a prior session.
+- **Drop-in text is no longer white-on-white.** `.noteometry-richtext-content` and `.noteometry-table-cell` routed their text color through `var(--text-normal)`, which chained through a user-theme-owned variable. On certain dark themes (and inside `<input>` elements on macOS Electron), that chain resolved to near-white even though the surface was also near-white. Pulled `color` directly from `--nm-paper-ink` with `!important` and added `-webkit-text-fill-color` to beat the macOS input default.
+- **Placeholder / faint text readable in dark mode drop-ins.** The cream-surface scope (`.noteometry-canvas-object`, `.noteometry-richtext`, `.noteometry-table-editor`, …) hard-coded `--text-faint: rgba(26, 35, 53, 0.52)` — dark navy at 52% — which is effectively black paint on the dark-mode surface. Added a `.theme-dark` override that re-flips it to `rgba(232, 232, 236, 0.55)` so "Type here…" and other faint labels stay visible.
+
+### Tests
+- 501/497 (+4 regression guards in `v1113Regressions.test.ts`: `revealPagesPanel` must not use `getLeftLeaf(false)`; dropin `color` declarations must come from `--nm-paper-ink`; `handleLaunchOpen` must check for sidebar leaves; dark-mode `--text-faint` override must exist).
+
 ## 1.11.2 — 2026-05-03
 
 Drop-in interaction bugfixes. Dan's report: "the text drop in disappears when you mess with it. There are tons of bugs all over." Five concrete bugs traced from a deep code read of every drop-in path; one root focus issue was driving most of the visible chaos.
