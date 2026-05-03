@@ -27,6 +27,20 @@ export function getRecentPages(app: App, rootFolder: string, limit = 6): RecentP
   }));
 }
 
+/** v1.11.1: most-recently-edited .nmpage, or null if none exist.
+ *  Used by the new auto-open-on-launch flow that replaces the Home
+ *  view as the default. */
+export function getMostRecentNmpage(app: App, rootFolder: string): TFile | null {
+  const files = findAllNmpages(app, rootFolder);
+  if (files.length === 0) return null;
+  let best = files[0]!;
+  for (let i = 1; i < files.length; i++) {
+    const f = files[i]!;
+    if (f.stat.mtime > best.stat.mtime) best = f;
+  }
+  return best;
+}
+
 /** Coarse buckets, no false precision. "2 weeks ago" is intentionally
  *  absent — at that range an absolute date is more grounding than a
  *  relative offset. */

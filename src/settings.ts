@@ -166,6 +166,56 @@ export class NoteometrySettingTab extends PluginSettingTab {
           })
       );
 
+    /* ── v1.11.1: Launch behavior ────────────────────── */
+    new Setting(containerEl)
+      .setName("Show home view on launch")
+      .setDesc(
+        "When ON, opening Obsidian shows the Noteometry home (Resume / New page / Recents). When OFF (default), opens the most-recent page directly.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.homeViewOnLaunch).onChange(async (v) => {
+          this.plugin.settings.homeViewOnLaunch = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    /* ── v1.11.1: Custom pages panel ──────────────────── */
+    new Setting(containerEl)
+      .setName("Show Noteometry pages panel")
+      .setDesc(
+        "Adds a custom file tree to the left sidebar showing only .nmpage files, with search, folder filter chips, and large tap targets. Obsidian's default file explorer still works in parallel.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.pagesPanelEnabled).onChange(async (v) => {
+          this.plugin.settings.pagesPanelEnabled = v;
+          await this.plugin.saveSettings();
+          new Notice(
+            "Reload Obsidian (or toggle the plugin) to apply this change.",
+            5000,
+          );
+        }),
+      );
+
+    /* ── v1.11.1: Global theme ───────────────────────── */
+    new Setting(containerEl)
+      .setName("Apply Noteometry theme to all of Obsidian")
+      .setDesc(
+        "Re-skins Obsidian's sidebar, tab bar, ribbon, command palette, and modals to match Noteometry. Respects your light/dark mode choice. Removed cleanly when off.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.globalThemeEnabled).onChange(async (v) => {
+          this.plugin.settings.globalThemeEnabled = v;
+          await this.plugin.saveSettings();
+          // Apply/remove immediately — no reload needed.
+          // We import lazily to avoid cycles in the settings module.
+          const { applyGlobalTheme, removeGlobalTheme } = await import(
+            "./lib/globalTheme"
+          );
+          if (v) applyGlobalTheme();
+          else removeGlobalTheme();
+        }),
+      );
+
     /* ── Reset gesture tutorial ───────────────────────── */
     /* v1.11.0 phase-4 sub-PR 4.2: design doc §6b mitigation for the
      * "gesture recall + object-permanence crash" failure mode. Always

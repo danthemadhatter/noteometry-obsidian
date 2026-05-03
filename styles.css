@@ -3949,3 +3949,223 @@
     transition: none;
   }
 }
+
+/* ============================================================
+ * v1.11.1 — Pages panel (custom file tree).
+ * Replaces the user's complaint: "the file tree structure is
+ * really hard to navigate". Shows ONLY .nmpage files, large tap
+ * targets (44px on coarse pointers), recency-sort default,
+ * folder filter chips, search box. Theme-aware via Obsidian
+ * vars (so dark mode is automatic).
+ * ============================================================ */
+.noteometry-pages-root {
+  padding: 0;
+  background: var(--background-secondary);
+  height: 100%;
+  overflow: hidden;
+}
+
+.nm-pages-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: var(--nm-font, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.nm-pages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+}
+
+.nm-pages-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.nm-pages-new {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--interactive-accent);
+  color: var(--nm-on-accent, #fff);
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.nm-pages-new:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.nm-pages-search-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.nm-pages-search {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  outline: none;
+  transition: border-color 120ms ease-out;
+}
+
+.nm-pages-search:focus {
+  border-color: var(--interactive-accent);
+}
+
+.nm-pages-sort {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease-out;
+}
+
+.nm-pages-sort:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.nm-pages-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.nm-pages-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-chip.is-active {
+  background: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.nm-pages-chip-count {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.nm-pages-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.nm-pages-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin: 1px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 36px;
+  transition: background 100ms ease-out;
+  outline: none;
+}
+
+.nm-pages-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-row:focus-visible {
+  background: var(--background-modifier-hover);
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.nm-pages-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nm-pages-row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nm-pages-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Bigger tap targets on touch devices (iPad). */
+@media (pointer: coarse) {
+  .nm-pages-row {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+  .nm-pages-chip {
+    min-height: 32px;
+    padding: 6px 12px;
+  }
+  .nm-pages-new {
+    min-height: 36px;
+    padding: 8px 14px;
+  }
+  .nm-pages-search,
+  .nm-pages-sort {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nm-pages-new,
+  .nm-pages-chip,
+  .nm-pages-row,
+  .nm-pages-search,
+  .nm-pages-sort {
+    transition: none;
+  }
+}

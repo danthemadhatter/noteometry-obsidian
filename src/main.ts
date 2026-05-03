@@ -10,6 +10,13 @@ import {
   findLegacyMdPages,
   rootDir,
 } from "./lib/persistence";
+import { getMostRecentNmpage } from "./lib/recentPages";
+import {
+  registerPagesPanelView,
+  PAGES_PANEL_VIEW_TYPE,
+  revealPagesPanel,
+} from "./components/pages/registerPagesPanel";
+import { applyGlobalTheme, removeGlobalTheme } from "./lib/globalTheme";
 
 export default class NoteometryPlugin extends Plugin {
   settings: NoteometrySettings = { ...DEFAULT_SETTINGS };
@@ -56,11 +63,39 @@ export default class NoteometryPlugin extends Plugin {
       callback: () => this.runConvertLegacyCommand(),
     });
 
+    // v1.11.1: register the new Pages panel view (custom file tree).
+    registerPagesPanelView(this);
+
+    // v1.11.1: "Open Pages panel" command + ribbon icon.
+    this.addRibbonIcon("folder-tree", "Noteometry pages", () => {
+      void revealPagesPanel(this);
+    });
+    this.addCommand({
+      id: "noteometry-open-pages-panel",
+      name: "Noteometry: Open pages panel",
+      callback: () => void revealPagesPanel(this),
+    });
+
+    // v1.11.1: apply global theme if enabled.
+    if (this.settings.globalThemeEnabled) {
+      applyGlobalTheme();
+    }
+
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
       void this.notifyIfLegacyPagesPresent();
-      this.maybeAutoOpenHome();
+      this.handleLaunchOpen();
+      // v1.11.1: open the pages panel by default (left split, collapsed).
+      if (this.settings.pagesPanelEnabled) {
+        void revealPagesPanel(this, /*reveal*/ false);
+      }
     });
+  }
+
+  onunload() {
+    // v1.11.1: clean up global theme injection so toggling the plugin
+    // off restores Obsidian's normal appearance.
+    removeGlobalTheme();
   }
 
   private resolveNewPageParentFolder(): string {
@@ -89,15 +124,36 @@ export default class NoteometryPlugin extends Plugin {
     await leaf.setViewState({ type: HOME_VIEW_TYPE, active: true });
   }
 
-  /** Don't ambush a fresh vault — only auto-open when the user has at
-   *  least one .nmpage somewhere. */
-  private maybeAutoOpenHome(): void {
+  /** v1.11.1: replaces maybeAutoOpenHome. New default behavior:
+   *    - if a Noteometry tab is already open (workspace.json restore),
+   *      do nothing.
+   *    - if homeViewOnLaunch === true, open the Home view (legacy).
+   *    - else open the most-recently-edited .nmpage directly.
+   *    - if there are no .nmpage files at all, do nothing (don't
+   *      ambush a fresh vault).
+   *
+   *  Why the default flip: the user said "the opening file thing is
+   *  stupid". The Home view added an extra tap to the most common
+   *  intention (resume the page I was just on). We satisfy the
+   *  intention directly; users who want the menu can re-enable it. */
+  private handleLaunchOpen(): void {
     const hasPageTab = this.app.workspace.getLeavesOfType(VIEW_TYPE).length > 0;
     const hasHomeTab = this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE).length > 0;
     if (hasPageTab || hasHomeTab) return;
-    const anyNmpage = this.app.vault.getFiles().some(f => f.extension === "nmpage");
-    if (!anyNmpage) return;
-    void this.openHome();
+
+    const root = rootDir(this);
+    const mostRecent = getMostRecentNmpage(this.app, root);
+    if (!mostRecent) return; // empty vault — don't ambush
+
+    if (this.settings.homeViewOnLaunch) {
+      void this.openHome();
+      return;
+    }
+
+    // Open the most-recent page directly. getLeaf(false) reuses an
+    // existing empty leaf when possible; if Obsidian restored a blank
+    // tab, we land in it instead of stacking a second one.
+    void this.app.workspace.getLeaf(false).openFile(mostRecent);
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
