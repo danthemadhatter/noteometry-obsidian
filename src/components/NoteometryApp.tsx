@@ -55,22 +55,10 @@ import {
   boundsToWorld,
 } from "../features/lasso/selection";
 
-/* ── Color and width presets for context-menu cycling ───────────── */
-const INK_COLORS = [
-  { color: "#202124", label: "Black" },
-  { color: "#d93025", label: "Red" },
-  { color: "#1a73e8", label: "Blue" },
-  { color: "#188038", label: "Green" },
-  { color: "#e8710a", label: "Orange" },
-  { color: "#9334e6", label: "Purple" },
-];
-
-const STROKE_WIDTHS = [
-  { width: 1.5, label: "Fine" },
-  { width: 3, label: "Medium" },
-  { width: 5, label: "Thick" },
-  { width: 8, label: "Marker" },
-];
+/* v1.11.0 phase-5: palettes moved to src/features/ink/palettes.ts so
+ * the ToolLayer toolbar and right-click context-menu cycling share
+ * the same source of truth. */
+import { INK_COLORS, STROKE_WIDTHS } from "../features/ink/palettes";
 
 interface Props {
   plugin: NoteometryPlugin;
@@ -226,6 +214,22 @@ export default function NoteometryApp({
         : activeLayer === "frozen"
           ? " noteometry-paper-frozen"
           : "";
+
+  // v1.11.0 phase-5: stable clear-canvas handler so the ToolLayer
+  // toolbar can reuse the same destructive flow as the right-click
+  // context-menu Clear item. Uses double-confirm + pushUndo +
+  // setStrokes/Stamps/Objects/Selection clears (mirrors the inline
+  // closure in the context-menu builder).
+  const handleClearCanvasFromToolLayer = useCallback(() => {
+    if (!confirm("Clear everything from this page — strokes, stamps, and all drop-ins?")) return;
+    if (!confirm("Are you SURE? This wipes every stroke, stamp, and drop-in on this page. Click OK only if you really mean it.")) return;
+    pushUndo();
+    setStrokes([]);
+    setStamps([]);
+    setCanvasObjects([]);
+    setSelectedObjectId(null);
+    setSelectedStampId(null);
+  }, [pushUndo, setStrokes, setStamps, setCanvasObjects, setSelectedObjectId, setSelectedStampId]);
 
   // v1.11.0 phase-4 sub-PR 4.2: first-run gesture cheatsheet.
   // Mirror the persisted flag in local state so dismissal flips the
@@ -1304,7 +1308,22 @@ export default function NoteometryApp({
           useLayerManager() inside the components. They sit OUTSIDE
           .noteometry-main so the dim class applied to main doesn't
           dim them too. */}
-      <ToolLayer />
+      {/* v1.11.0 phase-5: ToolLayer now renders the actual toolbar
+          (pen / eraser / select, color swatches, stroke widths, math
+          palette toggle, clear). The right-click context menu still
+          has the same actions — it stays the depressive slow path per
+          design doc §6b. The tool layer is the hypomanic fast path. */}
+      <ToolLayer
+        tool={tool}
+        onToolChange={setTool}
+        activeColor={activeColor}
+        onColorChange={setActiveColor}
+        strokeWidth={strokeWidth}
+        onStrokeWidthChange={setStrokeWidth}
+        mathPaletteOpen={mathPaletteOpen}
+        onToggleMathPalette={() => setMathPaletteOpen((p) => !p)}
+        onClearCanvas={handleClearCanvasFromToolLayer}
+      />
       <MetaLayer />
       {/* ── Main area ── (Obsidian's file explorer is the page navigator) */}
       <div className={`noteometry-main${paperDimClass}`}>

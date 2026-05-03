@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.11.0 — 2026-05-03
+
+3D layers. The canvas is now three planes: the paper you draw on (always present), the **tool layer** (3-finger swipe down), and the **meta layer** (3-finger swipe right). Plus a hard-stop **freeze** (4-finger tap) for hypomanic-mind brakes. ADHD-tuned: anti-amnesia ambient cues, anti-modal everywhere, no menu hunting, calm-tech peripheral signaling. Bipolar-tuned: dual-sided coverage — long-press contextual menu = depressive slow path; 4-finger freeze = hypomanic kill switch. Both always available, neither requires layer state.
+
+### New — 3D layer architecture
+- **Tool layer** (top, 150ms slide-down) holds pen / eraser / select toggles, 6 ink colors, 4 stroke widths, math palette toggle, clear-canvas. Summon with 3-finger swipe down; dismiss with 3-finger swipe up, tap canvas, or 2-second idle. Right-click context menu still has the same actions — it's the depressive slow path; the layer is the hypomanic fast path.
+- **Meta layer** (left, 200ms slide-right) holds page metadata. Same summon/dismiss model.
+- **Freeze** (4-finger tap) shows a `PAUSED — TAP CANVAS TO RESUME` badge with [Brain dump] [Resume] buttons. Brain dump spawns a ChatDropin pre-seeded with `[brain dump @ <iso>]` and cursor pre-focused at the end — racing thought capture without losing the page state. Per-page scope; freeze on Page A doesn't follow you to Page B.
+
+### New — ambient cues (calm-tech, peripheral only)
+- **Edge glow** — 1px hairlines on the top/left edges hint summonable layers (8% opacity, no event handlers, zero layout cost).
+- **Cursor color** — inkable surface cursor reflects current ink color (`buildPenCursorUri`). Out-of-sight stops being out-of-mind.
+- **Save dot** — dirty-state indicator, no save spinner anxiety.
+- **AI activity ribbon** — single observable for "is any AI call in flight right now". Pulses when active, idle otherwise.
+- **Ghost-echo** — translucent emblem at dismiss origin (400ms hold + 800ms fade). Solves the object-permanence crash for ADHD users in deep hyperfocus.
+
+### New — onboarding
+- First-run gesture cheatsheet modal: grouped 3-finger / 4-finger / pen long-press / lasso recap. Dismiss with `Got it`, Esc, or backdrop tap.
+- **Settings → Reset gesture tutorial** button replays the cheatsheet on next canvas open. Day-30 re-learning safety net.
+
+### Changed
+- **Long-press recognizer unified.** v1.6.9's pen-only 550ms long-press extracted into `src/features/gestures/longPress.ts` (pure state machine, exports `LONG_PRESS_MS=550`, `LONG_PRESS_SLOP_PX=8`, `LONG_PRESS_POINTER_TYPES=Set(['pen'])`). InkCanvas consumes the same module. Single source of truth.
+- **Soft-abort for AI calls on freeze.** `requestUrl`-backed paths (Claude / Perplexity / OpenAI on iPad — load-bearing for CORS) cannot be aborted at the network layer. Soft-abort via token invalidation in `aiActivity` means responses arrive but are dropped. Native `fetch` paths (LM Studio) get a real `AbortController`.
+- **Drop-in z-index under the tool layer.** Drop-ins dim AND become non-interactive while the tool layer is open. They're still visible — just not stealing focus.
+- **Palette source of truth moved to `src/features/ink/palettes.ts`.** Tool layer toolbar and right-click context-menu cycling shortcuts share the same arrays.
+
+### Tests
+- 460/460 unit tests, including 9 LCG-seeded gesture-recognizer fuzz scenarios across palm-during-Pencil, sloppy 3→4 finger bursts, trackpad slow-drag, and random PointerEvent storms (anti-false-positive **and** anti-false-negative pinned).
+- Fuzz tests run deterministically (200 iterations per scenario) so regressions are reproducible from a seed.
+
+### Notes
+- Z Fold Android Chromium WebView: the `useGestureRecognizer` hook is hardware-feature-detected; on Z Fold the Samsung gesture conflicts (screenshot, split-screen) intercept first — we don't fight them. Fuzz coverage stays in for when the test hardware shows up.
+- Pencil double-tap: WebKit feature-detect retained; if the WebView drops it, the 550ms pen long-press is the fallback.
+
 ## 1.10.0 — 2026-05-02
 
 The big cull. Ten drop-ins and the right-side AI sidebar are gone. The chat box is reborn as a canvas drop-in. Lasso flow collapses to a binary 123/ABC choice. Everything optimized for ADHD/bipolar use — anti-amnesia, anti-modal, fast and smooth.
