@@ -3350,3 +3350,108 @@
   transition: opacity 200ms ease-out;
   pointer-events: none;
 }
+
+/* ========================================================================
+   v1.11.0 phase-2 sub-PR 2.1: ambient cues — EdgeGlow, SaveDot, AIRibbon.
+   Calm-tech philosophy from design doc §4: every cue is observable at
+   peripheral glance, invisible at gaze. No spinners, no toasts, no
+   modals. Total motion budget across all five ambient cues stays
+   well under a single CSS animation frame.
+   ======================================================================== */
+
+/* EdgeGlow — 1px line on a summonable side. 8% opacity at rest. The
+   color picks up the active accent via CSS custom property (whatever
+   the current theme defines). */
+.noteometry-edge-glow {
+  position: absolute;
+  pointer-events: none;
+  z-index: 40; /* below layer shells (50), above canvas */
+  background: var(--interactive-accent, var(--nm-paper-ink));
+  opacity: 0.08;
+  transition: opacity 200ms ease-out;
+}
+
+.noteometry-edge-glow-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.noteometry-edge-glow-left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+}
+
+.noteometry-edge-glow-hidden {
+  opacity: 0;
+}
+
+/* SaveDot — 4px circle, bottom-right. Hollow = clean, filled = dirty.
+   Fades dirty→clean per design doc §4 (≤2s after last edit; the
+   autosave debounce in NoteometryApp drives this). */
+.noteometry-save-dot {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--text-faint);
+  background: transparent;
+  z-index: 40;
+  pointer-events: none;
+  transition: background 300ms ease-out, opacity 200ms ease-out;
+  opacity: 0.6;
+}
+
+.noteometry-save-dot-dirty {
+  background: var(--interactive-accent, var(--nm-paper-ink));
+  border-color: var(--interactive-accent, var(--nm-paper-ink));
+  opacity: 1;
+}
+
+.noteometry-save-dot-hidden {
+  opacity: 0;
+}
+
+/* AIActivityRibbon — 1px bottom edge. Pulses while any AI call is
+   in flight. The pulse is opacity-only (cheaper than transform) and
+   eases over 2s. */
+.noteometry-ai-ribbon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--interactive-accent, var(--nm-paper-ink));
+  opacity: 0;
+  z-index: 40;
+  pointer-events: none;
+  transition: opacity 200ms ease-out;
+}
+
+.noteometry-ai-ribbon-active {
+  animation: noteometry-ai-pulse 2000ms ease-in-out infinite;
+}
+
+.noteometry-ai-ribbon-hidden {
+  opacity: 0;
+  animation: none;
+}
+
+@keyframes noteometry-ai-pulse {
+  0%   { opacity: 0.15; }
+  50%  { opacity: 0.55; }
+  100% { opacity: 0.15; }
+}
+
+/* Honor reduced-motion preference: replace pulse with static low-opacity. */
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-ai-ribbon-active {
+    animation: none;
+    opacity: 0.35;
+  }
+}
