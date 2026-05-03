@@ -191,6 +191,10 @@
   padding: 0;
   box-sizing: border-box;
   gap: 0;
+  /* v1.11.0 phase-1: relative positioning so the absolutely-positioned
+     ToolLayer (top edge) and MetaLayer (left edge) anchor to this
+     container, not the body. */
+  position: relative;
 }
 
 /* Give the main (canvas + toolbar) area its own explicit gap so the
@@ -3227,4 +3231,122 @@
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ========================================================================
+   v1.11.0 phase-1 sub-PR 1.4: 3D-layers shells.
+   Tool layer (z=+1) summoned by 3F swipe down; meta layer (z=-1) by
+   3F swipe right. Both are positioned absolutely over the container so
+   their visibility doesn't reflow the canvas. Slides + dims only —
+   no blur (blur is expensive, dim is free per design doc §3).
+   Phase 5 wires real content into the placeholders.
+   ======================================================================== */
+
+/* Tool layer — top edge, slides DOWN on summon. */
+.noteometry-tool-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50; /* above canvas, below context menus / modals */
+  /* Hidden default: translated up by its own height. Animated DOWN
+     150ms when visible per design doc §3. */
+  transform: translateY(-100%);
+  transition: transform 150ms ease-out, opacity 150ms ease-out;
+  opacity: 0;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  /* Translucent: 92% opacity is enough that the canvas peeks through
+     at 70% dim (which is the paper layer's job, not ours). */
+  background-color: color-mix(in srgb, var(--background-primary) 92%, transparent);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.noteometry-tool-layer-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.noteometry-tool-layer-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.noteometry-tool-layer-emblem {
+  font-size: 18px;
+  opacity: 0.6;
+}
+
+/* Meta layer — left edge, slides RIGHT on summon (200ms per design
+   doc §3). For the shell we just slide it in; the "canvas shrinks to
+   60%" treatment arrives in phase 5 when the shell is replaced with
+   real settings/file-tree content. */
+.noteometry-meta-layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  width: min(320px, 75vw);
+  transform: translateX(-100%);
+  transition: transform 200ms ease-out, opacity 200ms ease-out;
+  opacity: 0;
+  background: var(--background-primary);
+  border-right: 1px solid var(--background-modifier-border);
+  background-color: color-mix(in srgb, var(--background-primary) 92%, transparent);
+  display: flex;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.noteometry-meta-layer-visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.noteometry-meta-layer-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.noteometry-meta-layer-emblem {
+  font-size: 22px;
+  opacity: 0.6;
+}
+
+/* Paper layer dimming: when ToolLayer is up, the canvas + drop-ins
+   dim to 70% AND become non-interactive. Two interactive layers
+   running simultaneously = accidentally typing in a chat box while
+   picking a pen color (design doc §5 step 5a — LOCKED).
+   For MetaLayer we use a slightly lighter dim (90%) since it's a
+   reveal-from-the-side, not a drape-over-the-top. */
+.noteometry-paper-dim-tool {
+  opacity: 0.7;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+}
+
+.noteometry-paper-dim-meta {
+  opacity: 0.9;
+  transition: opacity 200ms ease-out;
+  /* Meta is to the side; paper stays interactive (tap-to-dismiss
+     handled separately in phase 2). */
+}
+
+/* Frozen state placeholder — phase 3 ships the real treatment.
+   For sub-PR 1.4 we mark the class so the gesture wiring is observable
+   in devtools without leaving the canvas in a broken-looking state. */
+.noteometry-paper-frozen {
+  opacity: 0.85;
+  transition: opacity 200ms ease-out;
+  pointer-events: none;
 }
