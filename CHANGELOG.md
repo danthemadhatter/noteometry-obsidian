@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.11.1 — 2026-05-03
+
+UX overhaul. Four user-reported pain points fixed in one ship.
+
+### Fixed
+- **Dark mode is now readable.** The whole stylesheet had zero `.theme-dark` overrides plus 46 hard-coded `#FFFFFF` / `#fff` / `#333` literals that bypassed the token system, so on dark theme drop-ins, modals, and the math toolbar stayed white-on-dark with dark text — effectively invisible. Added 14 new surface tokens, swept all 46 literals through them, and added a full `.theme-dark` override block (deep graphite canvas `#1E1E22`, chrome `#25252B`, accent lifted to `#5AA0E8` for contrast). Dan's 2026-04-11 "all text is black" rule was a light-mode rule and now scopes to light mode only; dark mode routes text through Obsidian's `--text-normal` so the user theme can fine-tune.
+
+### Changed
+- **No more home-view detour on launch.** Opening Obsidian now opens the most-recently-edited `.nmpage` directly. The Home view (Resume / New page / Recents) is one tap away via the home ribbon icon and the `Noteometry: Open home` command, and Settings → "Show home view on launch" brings back the old behavior.
+
+### Added
+- **Custom Pages panel** in the left sidebar: only `.nmpage` files (no `.md` / `.canvas` noise), folder filter chips at top with counts, search box, sort toggle (Recent ↔ A→Z ↔ Z→A), context menu (Open / Open in new tab / Rename… / Delete), inline `+ New` button. Tap targets bump to 44px on touch devices. Toggle in Settings → "Show Noteometry pages panel".
+- **Global Noteometry theme** (default ON) re-skins all of Obsidian — sidebar, tab bar, ribbon, status bar, command palette, modals, and the default file explorer — to match the canvas. Respects light/dark choice, removes cleanly when toggled off, runtime-injected so no manual install. Toggle in Settings → "Apply Noteometry theme to all of Obsidian".
+
+### Tests
+- 486/486 (was 460, +26 covering pages panel filter/sort/chips, global theme apply/remove lifecycle, most-recent-nmpage resolver).
+
+### Notes
+- Toggling the Pages panel off requires a reload (or plugin re-toggle) to fully detach the registered view; the global theme toggle applies/removes live without reload.
+
 ## 1.11.0 — 2026-05-03
 
 3D layers. The canvas is now three planes: the paper you draw on (always present), the **tool layer** (3-finger swipe down), and the **meta layer** (3-finger swipe right). Plus a hard-stop **freeze** (4-finger tap) for hypomanic-mind brakes. ADHD-tuned: anti-amnesia ambient cues, anti-modal everywhere, no menu hunting, calm-tech peripheral signaling. Bipolar-tuned: dual-sided coverage — long-press contextual menu = depressive slow path; 4-finger freeze = hypomanic kill switch. Both always available, neither requires layer state.

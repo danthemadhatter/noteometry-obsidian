@@ -95,6 +95,119 @@
   --nm-font: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
   --nm-font-mono: "IBM Plex Mono", "SF Mono", "Menlo", "Courier New", monospace;
   --nm-font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+
+  /* v1.11.1: surfaces that previously used hard-coded #FFFFFF (drop-in
+   * cards, floating panels, math toolbar). Routed through a token so
+   * theme-dark can flip them. */
+  --nm-surface: #FFFFFF;
+  --nm-surface-alt: #F0F0F0;
+  --nm-surface-active: #E0E0E0;
+  --nm-on-accent: #FFFFFF;
+  --nm-paper-bg: #FFFFFF;
+  --nm-paper-margin-bg: #e8e4d0;
+  --nm-overlay-scrim: rgba(0, 0, 0, 0.45);
+  --nm-row-tint: rgba(0, 0, 0, 0.04);
+  --nm-row-tint-strong: rgba(0, 0, 0, 0.08);
+  --nm-warning-tint: rgba(226, 85, 85, 0.08);
+  --nm-warning-tint-strong: rgba(226, 85, 85, 0.14);
+  --nm-blur-bg: rgba(255, 255, 255, 0.9);
+  --nm-pill-bg: #2C2C2E;
+  --nm-pill-bg-hover: #48484A;
+  --nm-pill-fg: #FFFFFF;
+  --nm-text-on-light: #333333;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * v1.11.1 — Dark mode overrides.
+ *
+ * Obsidian sets `.theme-dark` on <body> when dark mode is active. We
+ * scope to `.theme-dark .noteometry-container` and to a few specific
+ * floating surfaces (drop-ins, freeze, onboarding) that mount OUTSIDE
+ * the container's React tree. Every `--nm-*` token that has any
+ * brightness baked in gets a dark counterpart here. The structure of
+ * the design (token names, components, spacing) is unchanged — only
+ * the values flip.
+ *
+ * Dan's rule from 2026-04-11 ("ALL text should be black") was a
+ * LIGHT-MODE rule. In dark mode "black on dark" is unreadable, so
+ * we route text through Obsidian's `--text-normal` instead, which
+ * already adapts: dark navy in light, near-white in dark.
+ * ════════════════════════════════════════════════════════════════════ */
+.theme-dark .noteometry-container,
+.theme-dark .nm-floating-panel,
+.theme-dark .nm-dropin,
+.theme-dark .nm-dropin-card,
+.theme-dark .nm-mt-popout,
+.theme-dark .nm-mt-toolbar,
+.theme-dark .nm-onboarding-dialog,
+.theme-dark .noteometry-freeze-overlay,
+.theme-dark .noteometry-ctx-menu {
+  /* Canvas surface — deep graphite, not pitch black (eye fatigue). */
+  --nm-canvas-bg: #1E1E22;
+  --nm-canvas-bg-edge: #18181B;
+  --nm-grid-color: #2A2A30;
+  --nm-grid-major-color: #353540;
+
+  /* Chrome */
+  --nm-faceplate: #25252B;
+  --nm-faceplate-light: #2D2D34;
+  --nm-faceplate-alt: #2A2A31;
+  --nm-faceplate-recessed: #1B1B20;
+  --nm-sidebar-bg: #1E1E22;
+  --nm-chassis: #25252B;
+  --nm-chassis-light: #2D2D34;
+  --nm-chassis-dark: #1B1B20;
+  --nm-chassis-deep: #16161A;
+  --nm-chassis-fg: #E8E8EC;
+
+  /* Text — routed through Obsidian's vars so user theme can fine-tune */
+  --nm-ink: var(--text-normal, #E8E8EC);
+  --nm-ink-muted: var(--text-muted, #A0A0A8);
+  --nm-paper-ink: var(--text-normal, #E8E8EC);
+  --nm-text-on-light: var(--text-normal, #E8E8EC);
+
+  /* Accent retained — steel blue reads well on dark */
+  --nm-accent: #5AA0E8;
+  --nm-accent-light: rgba(90, 160, 232, 0.18);
+  --nm-accent-hover: #6AB0F0;
+
+  /* Active/selected — amber, slightly muted */
+  --nm-phosphor: #E89B1F;
+  --nm-phosphor-light: rgba(232, 155, 31, 0.22);
+
+  /* Borders */
+  --nm-paper-border: #3A3A42;
+  --nm-warm-border: rgba(255, 255, 255, 0.08);
+  --nm-warm-border-strong: rgba(255, 255, 255, 0.16);
+  --nm-dropin-border: #3A3A42;
+  --nm-dropin-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --nm-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5);
+  --nm-shadow-toolbar: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 1px rgba(0, 0, 0, 0.6);
+
+  /* Surfaces (formerly hard-coded #FFFFFF) */
+  --nm-surface: #2A2A31;
+  --nm-surface-alt: #34343C;
+  --nm-surface-active: #3F3F48;
+  --nm-on-accent: #FFFFFF; /* still readable on accent */
+  --nm-paper-bg: #1E1E22;
+  --nm-paper-margin-bg: #2A2620;
+  --nm-overlay-scrim: rgba(0, 0, 0, 0.65);
+  --nm-row-tint: rgba(255, 255, 255, 0.04);
+  --nm-row-tint-strong: rgba(255, 255, 255, 0.08);
+  --nm-warning-tint: rgba(226, 85, 85, 0.18);
+  --nm-warning-tint-strong: rgba(226, 85, 85, 0.26);
+  --nm-blur-bg: rgba(30, 30, 34, 0.85);
+  --nm-pill-bg: #1A1A1E;
+  --nm-pill-bg-hover: #2A2A30;
+  --nm-pill-fg: #E8E8EC;
+}
+
+/* In dark mode, force the React canvas container to inherit the
+ * normal text color so the legacy "all text is black" rule from
+ * 2026-04-11 doesn't bleed through. */
+.theme-dark .noteometry-container {
+  color: var(--text-normal, #E8E8EC);
+  --text-faint: rgba(232, 232, 236, 0.55);
 }
 
 /* Dan's rule (2026-04-11): "ALL of the text should be black." No
@@ -341,7 +454,7 @@
 }
 
 .nm-sidebar-tab:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--nm-row-tint);
 }
 
 .nm-sidebar-tab.active {
@@ -381,7 +494,7 @@
 .nm-sidebar-tab-del:hover {
   opacity: 1 !important;
   color: var(--nm-danger);
-  background: rgba(226, 85, 85, 0.08);
+  background: var(--nm-warning-tint);
 }
 
 /* Show delete on touch devices (no hover) */
@@ -461,7 +574,7 @@
 }
 
 .noteometry-sidebar-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--nm-row-tint);
 }
 
 .noteometry-sidebar-item.active {
@@ -501,7 +614,7 @@
 .noteometry-sidebar-item-del:hover {
   opacity: 1 !important;
   color: var(--nm-danger);
-  background: rgba(226, 85, 85, 0.08);
+  background: var(--nm-warning-tint);
 }
 
 /* Show delete on touch devices (no hover) */
@@ -663,7 +776,7 @@
 .noteometry-sidebar-input-ok {
   padding: 4px 10px;
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
   border: none;
   border-radius: var(--nm-radius-sm);
   font-size: 12px;
@@ -874,7 +987,7 @@
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--nm-blur-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -890,7 +1003,7 @@
 }
 .noteometry-canvas-action-btn.active {
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
   border-color: var(--nm-accent);
 }
 
@@ -951,7 +1064,7 @@
 }
 .noteometry-table-action button:hover {
   color: var(--nm-danger);
-  background: rgba(226, 85, 85, 0.06);
+  background: var(--nm-warning-tint);
 }
 
 .noteometry-table-controls {
@@ -1073,7 +1186,7 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  color: #fff;
+  color: var(--nm-on-accent);
   background: var(--nm-accent);
   border: none;
   border-radius: var(--nm-radius-sm);
@@ -1095,15 +1208,15 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  color: #fff;
-  background: #2C2C2E;
+  color: var(--nm-on-accent);
+  background: var(--nm-pill-bg);
   border: none;
   border-radius: var(--nm-radius-sm);
   cursor: pointer;
   transition: all 0.12s;
 }
 .noteometry-panel-solve:hover {
-  background: #48484A;
+  background: var(--nm-pill-bg-hover);
 }
 
 /* ── Panel — warm cards with subtle depth ─────────────────── */
@@ -1200,7 +1313,7 @@
 }
 .noteometry-panel-clear:hover {
   color: var(--nm-danger);
-  background: rgba(226, 85, 85, 0.06);
+  background: var(--nm-warning-tint);
 }
 .noteometry-panel-action:hover {
   background: var(--nm-accent-light);
@@ -1278,7 +1391,7 @@
 }
 .noteometry-mathpal-tab:hover {
   color: var(--text-normal);
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--nm-row-tint);
 }
 .noteometry-mathpal-tab.active {
   color: var(--nm-accent);
@@ -1290,7 +1403,7 @@
   margin-left: auto;
   padding: 2px 8px;
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
   border: none;
   border-radius: 4px;
   font-size: 11px;
@@ -1597,7 +1710,7 @@
   display: flex;
   padding: 7px;
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -1630,7 +1743,7 @@
   transform: translateX(-50%);
   padding: 6px 16px;
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
@@ -1678,7 +1791,7 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: #ffffff;
+  background: var(--nm-surface);
   color: var(--nm-paper-ink);
   overflow: hidden;
 }
@@ -1728,14 +1841,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  background: #e8e4d0;
+  background: var(--nm-paper-margin-bg);
   padding: 4px;
 }
 
 .noteometry-pdf-canvas {
   display: block;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  background: #ffffff;
+  background: var(--nm-surface);
   max-width: 100%;
 }
 
@@ -1784,7 +1897,7 @@
   cursor: inherit;
 }
 .noteometry-object-title-input:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--nm-row-tint);
   border-color: var(--nm-paper-border);
 }
 .noteometry-object-title-input:focus {
@@ -1887,7 +2000,7 @@
   transition: background 0.15s ease;
 }
 .noteometry-signal-link-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--nm-row-tint);
 }
 .noteometry-signal-link-btn.noteometry-signal-linked {
   background: var(--nm-accent-light);
@@ -2549,7 +2662,7 @@
 
 .nm-script-btn.nm-script-active {
   background: var(--nm-accent);
-  color: #fff;
+  color: var(--nm-on-accent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2565,7 +2678,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  background: #FFFFFF;
+  background: var(--nm-surface);
   border: 1px solid var(--nm-dropin-border);
   border-radius: 20px;
   box-shadow: var(--nm-dropin-shadow);
@@ -2599,7 +2712,7 @@
 .nm-pen-panel {
   position: fixed;
   z-index: 1200;
-  background: #FFFFFF;
+  background: var(--nm-surface);
   border: 1px solid var(--nm-dropin-border);
   border-radius: var(--nm-radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -2692,7 +2805,7 @@
   padding: 3px 10px;
   border: 1px solid var(--nm-dropin-border);
   border-radius: 12px;
-  background: #FFFFFF;
+  background: var(--nm-surface);
   color: var(--nm-ink);
   font-size: 11px;
   font-family: var(--nm-font);
@@ -2706,7 +2819,7 @@
 }
 .nm-preset-btn.nm-preset-active {
   background: var(--nm-accent);
-  color: #FFFFFF;
+  color: var(--nm-on-accent);
   border-color: var(--nm-accent);
 }
 .nm-slash-toast {
@@ -2720,7 +2833,7 @@
 
 /* ── P1-7: Floating AI Panel ───────────────────────────────────── */
 .nm-floating-panel {
-  background: #FFFFFF;
+  background: var(--nm-surface);
   border: 1px solid var(--nm-dropin-border);
   border-radius: var(--nm-radius);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
@@ -2834,7 +2947,7 @@
   padding: 4px 12px;
   border: 1px solid var(--nm-dropin-border);
   border-radius: var(--nm-radius);
-  background: #FFFFFF;
+  background: var(--nm-surface);
   color: var(--nm-ink);
   font-size: 12px;
   font-family: var(--nm-font);
@@ -2858,7 +2971,7 @@
 }
 .nm-script-btn {
   border: none;
-  background: #FFFFFF;
+  background: var(--nm-surface);
   cursor: pointer;
   font-size: 12px;
   font-family: serif;
@@ -2873,7 +2986,7 @@
 }
 .nm-script-btn.nm-script-active {
   background: var(--nm-accent);
-  color: #FFFFFF;
+  color: var(--nm-on-accent);
 }
 
 /* ── PDF Re-link button ────────────────────────────────────────── */
@@ -2891,7 +3004,7 @@
 }
 .noteometry-pdf-relink:hover {
   background: var(--nm-accent);
-  color: #FFFFFF;
+  color: var(--nm-on-accent);
 }
 
 /* (Sidebar course button styles are in the main sidebar block above) */
@@ -2907,8 +3020,8 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--nm-surface);
+  border: 1px solid var(--nm-dropin-border);
   border-radius: 20px;
   width: 44px;
   padding: 4px 0;
@@ -2927,7 +3040,7 @@
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: #333333;
+  color: var(--nm-text-on-light);
   cursor: pointer;
   padding: 0;
   transition: background 0.12s, color 0.12s;
@@ -2935,16 +3048,16 @@
 }
 
 .nm-mt-btn:hover {
-  background: #F0F0F0;
+  background: var(--nm-surface-alt);
 }
 
 .nm-mt-btn:active {
-  background: #E0E0E0;
+  background: var(--nm-surface-active);
 }
 
 .nm-mt-btn.nm-mt-active {
-  background: #F5A623;
-  color: #FFFFFF;
+  background: var(--nm-phosphor);
+  color: var(--nm-on-accent);
 }
 
 .nm-mt-btn:disabled {
@@ -2969,8 +3082,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
+  background: var(--nm-surface);
+  border: 1px solid var(--nm-dropin-border);
   border-radius: 12px;
   padding: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
@@ -2987,7 +3100,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #333333;
+  color: var(--nm-text-on-light);
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
@@ -2996,11 +3109,11 @@
 }
 
 .nm-mt-popout-btn:hover {
-  background: #F0F0F0;
+  background: var(--nm-surface-alt);
 }
 
 .nm-mt-popout-btn:active {
-  background: #E0E0E0;
+  background: var(--nm-surface-active);
 }
 
 /* ── Circuit Sniper: hover-reveal rotate button (desktop) ── */
@@ -3522,7 +3635,7 @@
   justify-content: center;
   cursor: not-allowed;
   /* Subtle dim on top of paper-frozen filter — helps the badge pop. */
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--nm-row-tint);
 }
 
 .noteometry-freeze-badge {
@@ -3599,7 +3712,7 @@
 .nm-onboarding-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--nm-overlay-scrim);
   z-index: 6000;
   display: flex;
   align-items: center;
@@ -3833,6 +3946,226 @@
   .nm-tool-btn,
   .nm-tool-swatch,
   .nm-tool-width {
+    transition: none;
+  }
+}
+
+/* ============================================================
+ * v1.11.1 — Pages panel (custom file tree).
+ * Replaces the user's complaint: "the file tree structure is
+ * really hard to navigate". Shows ONLY .nmpage files, large tap
+ * targets (44px on coarse pointers), recency-sort default,
+ * folder filter chips, search box. Theme-aware via Obsidian
+ * vars (so dark mode is automatic).
+ * ============================================================ */
+.noteometry-pages-root {
+  padding: 0;
+  background: var(--background-secondary);
+  height: 100%;
+  overflow: hidden;
+}
+
+.nm-pages-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: var(--nm-font, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.nm-pages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+}
+
+.nm-pages-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.nm-pages-new {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--interactive-accent);
+  color: var(--nm-on-accent, #fff);
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.nm-pages-new:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.nm-pages-search-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.nm-pages-search {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  outline: none;
+  transition: border-color 120ms ease-out;
+}
+
+.nm-pages-search:focus {
+  border-color: var(--interactive-accent);
+}
+
+.nm-pages-sort {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease-out;
+}
+
+.nm-pages-sort:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.nm-pages-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.nm-pages-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-chip.is-active {
+  background: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.nm-pages-chip-count {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.nm-pages-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.nm-pages-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin: 1px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  min-height: 36px;
+  transition: background 100ms ease-out;
+  outline: none;
+}
+
+.nm-pages-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.nm-pages-row:focus-visible {
+  background: var(--background-modifier-hover);
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.nm-pages-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nm-pages-row-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nm-pages-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Bigger tap targets on touch devices (iPad). */
+@media (pointer: coarse) {
+  .nm-pages-row {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+  .nm-pages-chip {
+    min-height: 32px;
+    padding: 6px 12px;
+  }
+  .nm-pages-new {
+    min-height: 36px;
+    padding: 8px 14px;
+  }
+  .nm-pages-search,
+  .nm-pages-sort {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nm-pages-new,
+  .nm-pages-chip,
+  .nm-pages-row,
+  .nm-pages-search,
+  .nm-pages-sort {
     transition: none;
   }
 }
