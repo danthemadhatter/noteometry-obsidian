@@ -3,7 +3,7 @@
  *  versions.json so the user can confirm at a glance that Obsidian isn't
  *  serving a stale cached main.js. Rendered into the Settings tab and the
  *  tools FAB title. */
-export const NOTEOMETRY_VERSION = "1.10.0";
+export const NOTEOMETRY_VERSION = "1.11.0";
 
 /** Called once at plugin onload — writes a banner line to the console so
  *  Dan can open DevTools and verify the running build without needing to

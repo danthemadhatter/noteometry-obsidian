@@ -3715,3 +3715,124 @@
     animation: none;
   }
 }
+
+/* ============================================================
+ * v1.11.0 phase-5: ToolLayer toolbar styling.
+ * Extends the phase-1 tool-layer shell with real toolbar widgets
+ * (tool buttons, color swatches, stroke-width pips, math toggle).
+ * Theme-aware via Obsidian CSS variables; no hard-coded colors
+ * outside the palette swatches themselves.
+ * ============================================================ */
+.nm-tool-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.nm-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  border-right: 1px solid var(--background-modifier-border, rgba(0,0,0,0.08));
+}
+
+.nm-tool-group:last-child,
+.nm-tool-group-end {
+  border-right: none;
+  margin-left: auto;
+}
+
+.nm-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.nm-tool-btn:hover {
+  background: var(--background-modifier-hover, rgba(0,0,0,0.06));
+}
+
+.nm-tool-btn.is-active {
+  background: var(--background-modifier-active-hover, rgba(74, 144, 226, 0.18));
+  border-color: var(--interactive-accent, #4a90e2);
+}
+
+.nm-tool-btn-warn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-error, #c0392b);
+}
+
+.nm-tool-btn-warn:hover {
+  background: color-mix(in srgb, var(--text-error, #c0392b) 14%, transparent);
+}
+
+.nm-tool-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline-offset: 2px;
+  transition: transform 100ms ease-out, border-color 100ms ease-out;
+}
+
+.nm-tool-swatch:hover {
+  transform: scale(1.08);
+}
+
+.nm-tool-swatch.is-active {
+  border-color: var(--interactive-accent, #4a90e2);
+  transform: scale(1.1);
+}
+
+.nm-tool-width {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.nm-tool-width:hover {
+  background: var(--background-modifier-hover, rgba(0,0,0,0.06));
+}
+
+.nm-tool-width.is-active {
+  border-color: var(--interactive-accent, #4a90e2);
+  background: color-mix(in srgb, var(--interactive-accent, #4a90e2) 12%, transparent);
+}
+
+.nm-tool-width-pip {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nm-tool-btn,
+  .nm-tool-swatch,
+  .nm-tool-width {
+    transition: none;
+  }
+}
