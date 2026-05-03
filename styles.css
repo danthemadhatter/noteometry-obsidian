@@ -160,10 +160,20 @@
   --nm-chassis-deep: #16161A;
   --nm-chassis-fg: #E8E8EC;
 
-  /* Text — routed through Obsidian's vars so user theme can fine-tune */
+  /* Text — routed through Obsidian's vars so user theme can fine-tune.
+   *
+   * v1.11.2 Fix 4: --nm-paper-ink uses a LITERAL fallback, not
+   * var(--text-normal). The .noteometry-container rule below sets
+   * --text-normal: var(--nm-paper-ink), so routing through --text-normal
+   * here creates a circular reference. CSS resolves cycles to the
+   * guaranteed-invalid value, causing color to fall back to inherit and
+   * (depending on ancestor scope) potentially render as transparent or
+   * the wrong shade. The other tokens are intentionally still routed
+   * through Obsidian vars so user themes can tune them — they're not
+   * caught in the cycle. */
   --nm-ink: var(--text-normal, #E8E8EC);
   --nm-ink-muted: var(--text-muted, #A0A0A8);
-  --nm-paper-ink: var(--text-normal, #E8E8EC);
+  --nm-paper-ink: #E8E8EC;
   --nm-text-on-light: var(--text-normal, #E8E8EC);
 
   /* Accent retained — steel blue reads well on dark */

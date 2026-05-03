@@ -24,6 +24,7 @@ import type { CanvasObject } from "../lib/canvasObjects";
 import { makePastedObject } from "../lib/objectClipboard";
 import { getAllTableData, loadAllTableData, getAllTextBoxData, loadAllTextBoxData, setOnChangeCallback, clearScope } from "../lib/tableStore";
 import { shouldYieldToNativeScroll } from "../lib/wheelRouting";
+import { shouldSuppressDelete } from "../lib/dropinFocusGuards";
 import { useInk } from "../features/ink/useInk";
 import { useLassoStack } from "../features/lasso/useLassoStack";
 import type { LassoRegion } from "../features/lasso/useLassoStack";
@@ -266,6 +267,12 @@ export default function NoteometryApp({
         const tag = (e.target as HTMLElement)?.tagName;
         const editable = (e.target as HTMLElement)?.isContentEditable;
         if (tag === "INPUT" || tag === "TEXTAREA" || editable) return;
+
+        // v1.11.2 Fix 1: if focus is anywhere inside the selected dropin
+        // (e.g. chrome buttons stole focus from a contenteditable), do NOT
+        // delete. Tag check above misses BUTTON, so clicking Snapshot/
+        // Download/Duplicate then pressing Backspace was nuking the dropin.
+        if (shouldSuppressDelete(document)) return;
 
         if (selectedObjectId) {
           e.preventDefault();
