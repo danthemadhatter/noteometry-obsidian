@@ -3342,13 +3342,17 @@
      handled separately in phase 2). */
 }
 
-/* Frozen state placeholder — phase 3 ships the real treatment.
-   For sub-PR 1.4 we mark the class so the gesture wiring is observable
-   in devtools without leaving the canvas in a broken-looking state. */
+/* Frozen state — design doc §7 Q2 lock.
+   Triple-cue: ~35% desaturation + 80% opacity + disabled-pointer cursor
+   over the canvas, plus the prominent badge rendered by FreezeOverlay.
+   The text on the badge does the heavy lift; the desat/dim signals
+   "this is intentional" against "the view is broken." */
 .noteometry-paper-frozen {
-  opacity: 0.85;
-  transition: opacity 200ms ease-out;
+  filter: saturate(0.35);
+  opacity: 0.8;
+  transition: filter 200ms ease-out, opacity 200ms ease-out;
   pointer-events: none;
+  cursor: not-allowed;
 }
 
 /* ========================================================================
@@ -3501,4 +3505,87 @@
 @keyframes noteometry-ghost-echo-fade-reduced {
   0%   { opacity: 0.25; }
   100% { opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------
+ * v1.11.0 phase-3 sub-PR 3.1 — FreezeOverlay
+ * Top-center badge with PAUSED text + Brain dump / Resume actions.
+ * Tap-anywhere-to-resume: the overlay covers the entire app shell so
+ * any pointer event outside the badge bubbles to onClick = resume.
+ * ------------------------------------------------------------------- */
+.noteometry-freeze-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60; /* above ambient cues (40) and layer shells (50) */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  cursor: not-allowed;
+  /* Subtle dim on top of paper-frozen filter — helps the badge pop. */
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.noteometry-freeze-badge {
+  margin-top: 12vh;
+  background: var(--background-primary, #fff);
+  color: var(--text-normal, #222);
+  border: 1px solid var(--background-modifier-border, rgba(0,0,0,0.15));
+  border-radius: 8px;
+  padding: 14px 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  cursor: auto;
+  /* Don't let the not-allowed cursor leak in. */
+  pointer-events: auto;
+}
+
+.noteometry-freeze-badge-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.noteometry-freeze-badge-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.noteometry-freeze-btn {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border, rgba(0,0,0,0.15));
+  background: var(--background-secondary, #f4f4f4);
+  color: var(--text-normal, #222);
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.noteometry-freeze-btn:hover {
+  background: var(--background-modifier-hover, #e8e8e8);
+}
+
+.noteometry-freeze-btn-resume {
+  background: var(--interactive-accent, #4a90e2);
+  color: var(--text-on-accent, #fff);
+  border-color: transparent;
+}
+
+.noteometry-freeze-btn-resume:hover {
+  filter: brightness(1.08);
+  background: var(--interactive-accent-hover, var(--interactive-accent, #4a90e2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noteometry-paper-frozen {
+    transition: none;
+  }
+  .noteometry-freeze-btn {
+    transition: none;
+  }
 }

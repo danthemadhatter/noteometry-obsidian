@@ -37,6 +37,7 @@ import { EdgeGlow } from "./ambient/EdgeGlow";
 import { SaveDot } from "./ambient/SaveDot";
 import { AIActivityRibbon } from "./ambient/AIActivityRibbon";
 import GhostEcho from "./ambient/GhostEcho";
+import FreezeOverlay from "./freeze/FreezeOverlay";
 import { rasterizeRegion } from "../features/lasso/rasterize";
 import { compositeRegions } from "../features/lasso/composite";
 import {
@@ -1235,6 +1236,13 @@ export default function NoteometryApp({
           on. Solves object-permanence crash for ADHD users in deep
           hyperfocus who won't see the 1px edge glow. */}
       <GhostEcho />
+      {/* v1.11.0 phase-3 sub-PR 3.1: freeze overlay. Renders only when
+          LayerManager.layer === "frozen". PAUSED badge + Brain dump /
+          Resume actions; tap-anywhere-on-overlay also resumes. The
+          paper-frozen class on .noteometry-main supplies desat + dim
+          + disabled-pointer; this component supplies the badge.
+          Sub-PR 3.2 will wire onBrainDump to spawn a ChatDropin. */}
+      <FreezeOverlay />
       {/* v1.11.0 phase-1 sub-PR 1.4: layer shells. Both layers always
           mount; their visibility is driven by LayerManager state via
           useLayerManager() inside the components. They sit OUTSIDE
