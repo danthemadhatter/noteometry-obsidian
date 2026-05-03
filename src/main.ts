@@ -87,12 +87,27 @@ export default class NoteometryPlugin extends Plugin {
       // from prior buggy sessions, then restore the file explorer if
       // it was displaced by the pages panel before the v1.11.3 fix.
       this.relocateNoteometryLeavesOutOfSidebar();
+      // v1.11.5: aggressive cleanup of accumulated junk leaves.
+      // Multiple plugin reloads through v1.11.1–v1.11.4 stacked extra
+      // pages-panel leaves and a dead "Plugin no longer active"
+      // file-explorer leaf in workspace.json. Detach duplicates and
+      // empty-view leaves in the sidebar before doing anything else.
+      this.detachDuplicatePagesPanelLeaves();
+      this.detachDeadEmptyLeavesInSidebar();
       void this.ensureFileExplorerVisible();
       void this.notifyIfLegacyPagesPresent();
       this.handleLaunchOpen();
       // v1.11.1: open the pages panel by default (left split, collapsed).
+      // v1.11.5: only reveal IF none exists yet — the de-dup check
+      // inside revealPagesPanel does this too, but we keep it explicit
+      // here so the auto-reveal stops adding leaves once we have one.
       if (this.settings.pagesPanelEnabled) {
-        void revealPagesPanel(this, /*reveal*/ false);
+        const existing = this.app.workspace.getLeavesOfType(
+          PAGES_PANEL_VIEW_TYPE,
+        );
+        if (existing.length === 0) {
+          void revealPagesPanel(this, /*reveal*/ false);
+        }
       }
     });
   }
@@ -210,41 +225,67 @@ export default class NoteometryPlugin extends Plugin {
     return false;
   }
 
-  /** v1.11.4: restore Obsidian's file-explorer leaf if no file-explorer
-   *  view is currently mounted. Users upgrading through v1.11.1–1.11.3
-   *  may have had their file-explorer leaf hijacked by the pages panel
-   *  (Bug A). Once that happened, workspace.json no longer contains a
-   *  file-explorer leaf and Obsidian doesn't auto-recreate one. We do
-   *  it here — idempotent: skips when the explorer is already present.
+  /** v1.11.5: detach extra pages-panel leaves so at most ONE remains.
+   *  Multiple plugin reloads through v1.11.1–1.11.4 stacked duplicates
+   *  in the sidebar (every onLayoutReady created another one because
+   *  the de-dup check raced with workspace.json restore). Keep the
+   *  first leaf so the user's chosen position is preserved; drop the
+   *  rest. */
+  private detachDuplicatePagesPanelLeaves(): void {
+    const leaves = this.app.workspace.getLeavesOfType(
+      PAGES_PANEL_VIEW_TYPE,
+    );
+    // Keep [0], detach [1..n].
+    for (let i = 1; i < leaves.length; i++) {
+      leaves[i]!.detach();
+    }
+  }
+
+  /** v1.11.5: detach "Plugin no longer active" / empty-view leaves
+   *  that v1.11.4's manual file-explorer creation accidentally left
+   *  behind. setViewState({ type: "file-explorer" }) on a fresh leaf
+   *  in the left split, before the file-explorer core plugin had
+   *  registered its view type, produced an orphan leaf that Obsidian
+   *  paints as the "Plugin no longer active" placeholder. We detect
+   *  these leaves by view type — "empty" is what Obsidian uses for
+   *  any leaf whose view type isn't registered. We only touch leaves
+   *  in the SIDEBAR; empty leaves in the main area are normal (e.g.
+   *  the New Tab page) and must be left alone. */
+  private detachDeadEmptyLeavesInSidebar(): void {
+    const dead: WorkspaceLeaf[] = [];
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const type = leaf.view.getViewType();
+      // "empty" is Obsidian's fallback for unregistered/missing view
+      // types AND for the New Tab page — hence the sidebar guard.
+      if (type !== "empty") return;
+      if (!this.isLeafInSidebar(leaf)) return;
+      dead.push(leaf);
+    });
+    for (const leaf of dead) leaf.detach();
+  }
+
+  /** v1.11.4 (rewritten in v1.11.5): restore Obsidian's file-explorer
+   *  leaf if no file-explorer view is currently mounted.
    *
-   *  Important: this is BEST EFFORT. Some users have intentionally
-   *  closed the explorer; we only re-create it when there's literally
-   *  zero file-explorer leaf, which is the broken state. We never
-   *  re-create one if any explorer leaf already exists somewhere. */
+   *  v1.11.4 originally tried `setViewState({ type: "file-explorer" })`
+   *  on a fresh leaf as a fallback when the `file-explorer:open` command
+   *  wasn't available. That produced "Plugin no longer active" orphan
+   *  leaves because Obsidian only mounts the file-explorer view through
+   *  its core-plugin lifecycle, not through `setViewState` on an
+   *  arbitrary leaf. v1.11.5 drops the manual fallback entirely — the
+   *  only safe path is the command. If the command isn't registered
+   *  (the user disabled the file-explorer core plugin), we leave it
+   *  alone; users who deliberately disabled it don't want us re-enabling
+   *  it on their behalf. */
   private async ensureFileExplorerVisible(): Promise<void> {
     const ws = this.app.workspace;
     const existing = ws.getLeavesOfType("file-explorer");
     if (existing.length > 0) return;
-    // Prefer asking the file-explorer internal plugin to open itself —
-    // that way Obsidian uses its own placement logic instead of us
-    // guessing. Falls back to creating a leaf manually if the command
-    // isn't available (older Obsidian builds, or plugin disabled).
     const cmd = (this.app as unknown as {
       commands?: { executeCommandById?: (id: string) => boolean };
     }).commands;
-    if (cmd?.executeCommandById?.("file-explorer:open")) return;
-    try {
-      const leaf = ws.getLeftLeaf(true);
-      if (!leaf) return;
-      await leaf.setViewState({ type: "file-explorer", active: false });
-    } catch (err) {
-      // Don't break plugin load if the file-explorer view type isn't
-      // registered (e.g. user disabled the core plugin). Log only.
-      console.warn(
-        "[Noteometry] Could not auto-restore file explorer:",
-        err,
-      );
-    }
+    cmd?.executeCommandById?.("file-explorer:open");
+    // Intentionally no fallback. See doc comment above.
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
