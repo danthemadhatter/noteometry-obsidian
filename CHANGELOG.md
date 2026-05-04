@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.14.2 — 2026-05-04
+
+Dan: "Lets put the math block inside the text block, that way it all formats correctly. for sub and super scripts, the math tools will take care of it." Done.
+
+### Added — math atoms inside the TextBox
+- **Insert inline math button (`√x`)** in the RichTextEditor toolbar. Tap → prompt for LaTeX → renders via KaTeX inline at the cursor.
+- **Insert display math button (`Σ`)**. Same flow, `displayMode: true`, gets its own block with centered KaTeX-display layout.
+- **Click-to-edit any math atom.** Tap a rendered math element → prompt pre-filled with the original LaTeX → empty deletes it, edited string re-renders in place. Works on chat-exported math too because `chatToHtml` now uses the same wrapper.
+- **`src/lib/renderMath.ts`** — new shared helper. Wraps KaTeX output in `<span class="nm-math nm-math-{inline,display}" data-latex="…" data-display="…" contenteditable="false">`. The `data-*` attrs round-trip the source through every save / reload, and `contenteditable="false"` makes the math a single atom inside the contenteditable host (cursor navigates around it; Backspace deletes the whole thing cleanly).
+
+### Changed
+- **`chatToHtml` now uses `renderMathHtml`** — every chat export becomes editable in the destination TextBox. Click any KaTeX-rendered fraction or integral → re-prompt with the original LaTeX.
+
+### Removed
+- **Sub/Superscript buttons**. The math tools (insert + edit) own that surface now — `H_2O` and `x^2` go through math atoms instead of `<sub>` / `<sup>`.
+
+### Why
+Standalone Math dropins on the canvas remain (lasso → vision → LaTeX → Solve workflow is unchanged), but **in-document math** belongs INSIDE the document — i.e. the TextBox. A solved problem's write-up should flow as one editable text+math block, not a TextBox awkwardly anchored next to a separate Math dropin. v1.14.2 makes that the default.
+
 ## 1.14.1 — 2026-05-04
 
 Dan: "I also want to fully enrich the text box with formatting options, minus the margins and graphics and stuff. It will be powerful." Done.
