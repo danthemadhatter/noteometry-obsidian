@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.14.0 — 2026-05-04
+
+Dan: "I want to add an export button to the AI pane at the bottom with the output box. I want it to send the information from the chat box results, directly to a text box that it opens. It MUST format Latex properly in the text box, and that's where i want to move the export to word box."
+
+### Added
+- **Chat → TextBox export.** New "📄 Export to text box" button at the bottom of every `ChatDropin` (between the message list and the input row). Clicking spawns a TextBox dropin to the right of the chat, pre-filled with the conversation rendered as HTML — `**You:**` / `**AI:**` per turn — and **with all `$...$` and `$$...$$` LaTeX rendered through KaTeX**, so the user reads real math, not raw `$\frac{1}{2}$`. The new dropin selects itself so the user can immediately style/copy/paste-to-Word from there.
+- **`src/lib/chatToHtml.ts`.** Two-pass tokenizer — display blocks first (`$$...$$`), then inline (`$...$`) — runs each segment through KaTeX with `throwOnError: false` (malformed LaTeX falls back to escaped raw text inside a `katex-error` span). Plain text segments are HTML-escaped, newlines become `<br>`. Output is one `<p>` per turn so RichTextEditor's contenteditable can paragraph-edit naturally.
+
+### Removed
+- **Per-message "Copy for Word" buttons inside ChatDropin.** The export workflow is now Chat → TextBox → existing TextBox copy-as-rich-text button. One button, one path, editable mid-flow, paste-to-Word from a place that's actually styled like a document.
+
+### Why this matters
+- KaTeX renders **at export time**, not on TextBox blur. The TextBox stores pre-rendered HTML in `tableStore`, so reloading a page brings the math back exactly as exported — no on-blur re-render dependency.
+- The user can now iterate inside the TextBox (font, bold, lists) before copying to Word, instead of being trapped in the read-only chat bubbles.
+- Sets up the v1.14.x roadmap: TextBox formatting toolbar gets richer (v1.14.1), Excel export via CSV → Table dropin (v1.14.2), image tools (v1.14.3+).
+
 ## 1.13.3 — 2026-05-03
 
 Hotfix to v1.13.2. Dan: "It clicks now, but doesnt drop down. This file structure should be: APUS, then course template that can be copied, and also the course names, then the week. Ultimately, we will be working on the 'week' folder."

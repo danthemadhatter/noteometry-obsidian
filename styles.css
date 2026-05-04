@@ -1682,6 +1682,34 @@
   filter: brightness(1.08);
 }
 
+/* v1.14.0: export footer — sits between the message list and the input
+ * row so the "next step" after reading an answer is right where the eye
+ * lands. Quiet by default, brightens on hover. */
+.noteometry-chat-export-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 14px 0;
+  flex-shrink: 0;
+}
+.noteometry-chat-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--nm-warm-bg-alt);
+  border: 1px solid var(--nm-warm-border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.noteometry-chat-export-btn:hover {
+  background: var(--nm-faceplate-light, var(--nm-warm-bg-alt));
+  color: var(--text-normal);
+  border-color: var(--nm-accent, var(--nm-warm-border));
+}
+
 .noteometry-chat-attachments {
   display: flex;
   flex-wrap: wrap;

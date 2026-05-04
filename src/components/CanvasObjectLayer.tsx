@@ -1,11 +1,13 @@
 import React, { useRef, useCallback, useState, useEffect } from "react";
 import { Notice } from "obsidian";
 import type { CanvasObject } from "../lib/canvasObjects";
-import { defaultObjectName, createImageObject } from "../lib/canvasObjects";
+import { defaultObjectName, createImageObject, createTextBox } from "../lib/canvasObjects";
 import { shouldStartObjectDrag } from "../lib/objectDragHitTest";
 import { shouldSkipBringToFront } from "../lib/dropinFocusGuards";
 import { sanitizeDownloadName, htmlToPlainText, buildRichTextClipboardBlobs } from "../lib/dropinExport";
-import { getTextBoxData } from "../lib/tableStore";
+import { getTextBoxData, setTextBoxData } from "../lib/tableStore";
+import { chatToHtml } from "../lib/chatToHtml";
+import type { ChatMessage } from "../types";
 import type { CanvasTool } from "./InkCanvas";
 import type NoteometryPlugin from "../main";
 import { loadImageFromVault, saveImageBytesTo } from "../lib/persistence";
@@ -772,6 +774,21 @@ export default function CanvasObjectLayer({
                   onObjectsChange(objects.map(o =>
                     o.id === obj.id && o.type === "chat" ? { ...o, ...u } : o
                   ));
+                }}
+                onExportToTextBox={(messages: ChatMessage[]) => {
+                  const html = chatToHtml(messages);
+                  if (!html) {
+                    new Notice("Nothing to export yet.");
+                    return;
+                  }
+                  // Drop the new TextBox just to the right of the chat,
+                  // vertically aligned with its top edge. The user can
+                  // drag it wherever afterwards.
+                  const tb = createTextBox(obj.x + obj.w + 24, obj.y, "Chat export");
+                  setTextBoxData(scope, tb.id, html);
+                  onObjectsChange([...objects, tb]);
+                  onSelectObject(tb.id);
+                  new Notice("Exported chat to text box.");
                 }}
               />
             )}
