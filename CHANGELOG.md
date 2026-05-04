@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.13.3 — 2026-05-03
+
+Hotfix to v1.13.2. Dan: "It clicks now, but doesnt drop down. This file structure should be: APUS, then course template that can be copied, and also the course names, then the week. Ultimately, we will be working on the 'week' folder."
+
+### Fixed
+- **PageHeader supports arbitrary breadcrumb depth.** v1.13.0–v1.13.2 hardcoded two segments (notebook + course) and could only render `APUS · ELEN201`. Refactored `parseSegments` to produce an `ancestors[]` array of any length, so a file at `Noteometry/APUS/ELEN201/Week 1/Lecture.nmpage` now displays `APUS · ELEN201 · Week 1` and the picker shows the pages inside `Week 1/`. The breadcrumb adapts to whatever folder depth the vault actually has.
+- **Path-mismatch bug in the popover queries.** v1.13.0's `buildPageList` constructed `${root}/${coursePath}` to find sibling pages — but when the user's file lived outside the configured root (or the rootFolder had a `findAllNmpages` prefix-fallback), the filter looked for the wrong parent path and got nothing back, so the popover rendered as empty / "doesn't drop down." All sibling/page queries now use vault-absolute parent paths derived from the file's actual location, with no root-relative re-joining.
+- **Each ancestor button → flyout of siblings at THAT level.** Tap `APUS` → flyout of other notebooks. Tap `ELEN201` → flyout of other courses. Tap `Week 1` → flyout of other weeks. Picking a sibling navigates to the first depth-first leaf in that subtree.
+
+### Storage layout
+- `<vault>/Noteometry/APUS/<Course>/<Week>/<Page>.nmpage` (4-level — full Course → Week → Page hierarchy)
+- `<vault>/Noteometry/APUS/<Course>/<Week>.nmpage` (3-level — week IS the page)
+- `<vault>/Noteometry/APUS/<file>.nmpage` (2-level)
+- The header adapts; no hardcoded shape.
+
 ## 1.13.2 — 2026-05-03
 
 Hotfix to v1.13.1. Dan: "Band showed up, doesnt work" → "does nothing when clicked." Picker buttons render but tapping fires no popover.
