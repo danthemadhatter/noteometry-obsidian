@@ -4255,72 +4255,134 @@
 }
 
 /* ════════════════════════════════════════════════════════
-   v1.12.0 — Top-of-canvas page-name breadcrumb readout
+   v1.13.0 — Page header band (replaces v1.12 floating breadcrumb)
+
+   Sits ABOVE the canvas in the canvas-area flex column. Has its
+   own height + bottom border so it reads as a separate region,
+   not as floating chrome on the drawing surface. Left side =
+   notebook · course breadcrumb (each segment is a flyout
+   trigger). Right side = page-picker button (flyout trigger).
    ════════════════════════════════════════════════════════ */
 
-.noteometry-breadcrumb {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 200;
+.noteometry-page-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  background: var(--nm-faceplate);
+  border-bottom: 1px solid var(--nm-paper-border);
+  user-select: none;
+  /* Sits above any canvas overlays (lasso, ai-frame, etc.) so the
+   * picker is always reachable. */
+  z-index: 25;
+}
+
+.noteometry-page-header-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.noteometry-page-header-segment {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: min(60vw, 720px);
-  padding: 5px 12px;
-  background: var(--nm-faceplate);
-  border: 1px solid var(--nm-paper-border);
-  border-radius: 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm, 4px);
+  padding: 3px 8px;
   cursor: pointer;
   font-family: var(--nm-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--nm-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition:
-    color 100ms ease,
-    border-color 100ms ease,
-    background 100ms ease;
-  user-select: none;
+  max-width: 22ch;
+  transition: color 100ms ease, background 100ms ease, border-color 100ms ease;
 }
 
-.noteometry-breadcrumb:hover {
+.noteometry-page-header-segment:hover {
   color: var(--nm-ink);
-  border-color: var(--nm-accent);
   background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
 }
 
-.noteometry-breadcrumb-seg {
-  display: inline-block;
-  max-width: 18ch;
+.noteometry-page-header-sep {
+  font-family: var(--nm-font-mono, ui-monospace, monospace);
+  color: var(--nm-ink-muted);
+  opacity: 0.5;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.noteometry-page-header-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  background: var(--nm-faceplate-light);
+  border: 1px solid var(--nm-paper-border);
+  border-radius: var(--nm-radius, 6px);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nm-ink);
+  min-height: 32px;
+  min-width: 120px;
+  max-width: 280px;
+  transition: background 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+}
+
+.noteometry-page-header-picker:hover {
+  background: var(--nm-accent-light);
+  border-color: var(--nm-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.noteometry-page-header-picker-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  vertical-align: middle;
+  white-space: nowrap;
+  text-align: left;
 }
 
-.noteometry-breadcrumb-seg:last-child {
-  color: var(--nm-ink);
-  font-weight: 700;
-}
-
-.noteometry-breadcrumb-sep {
-  opacity: 0.45;
+.noteometry-page-header-picker-chevron {
   font-size: 12px;
-  letter-spacing: 0;
+  color: var(--nm-ink-muted);
+  flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
-  .noteometry-breadcrumb {
-    max-width: 80vw;
-    font-size: 10px;
-    padding: 4px 10px;
+.noteometry-page-header-picker:hover .noteometry-page-header-picker-chevron {
+  color: var(--nm-accent);
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .noteometry-page-header {
+    padding: 4px 8px;
+    gap: 6px;
   }
-  .noteometry-breadcrumb-seg {
-    max-width: 12ch;
+  .noteometry-page-header-segment {
+    font-size: 10px;
+    padding: 3px 6px;
+    max-width: 14ch;
+  }
+  .noteometry-page-header-picker {
+    min-width: 100px;
+    max-width: 180px;
+    padding: 6px 8px 6px 12px;
+    font-size: 12.5px;
+    /* Big tap target on touch devices. */
+    min-height: 36px;
   }
 }

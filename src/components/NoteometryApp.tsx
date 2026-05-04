@@ -18,8 +18,7 @@ import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
-import { buildPagesMenu } from "./menu/buildPagesMenu";
-import PageBreadcrumb from "./PageBreadcrumb";
+import PageHeader from "./PageHeader";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
@@ -961,32 +960,10 @@ export default function NoteometryApp({
     } else {
       /* ── Right-clicked on empty canvas — full tool interface ── */
 
-      // v1.12.0: 📚 Pages submenu pinned at the top. Replaces the v1.11.x
-      // leaf-based PagesPanel as the primary navigation surface. Same
-      // nav data (recent + folder buckets + new-page), rendered as a
-      // submenu of the right-click hub instead of an Obsidian sidebar
-      // leaf. Tap a page → opens in the current leaf, replacing whatever
-      // was here. New page → uses the plugin helper that picks a folder
-      // based on the active file.
-      items.push(
-        {
-          label: "Pages",
-          icon: "📚",
-          submenu: buildPagesMenu({
-            app,
-            rootDir: rootDir(plugin),
-            currentPath: file?.path ?? null,
-            onPick: (target) => {
-              const leaf = app.workspace.getLeaf(false);
-              void leaf.openFile(target);
-            },
-            onCreateNew: () => {
-              void plugin.createAndOpenNewPage();
-            },
-          }),
-        },
-        { label: "", separator: true },
-      );
+      // v1.13.0: 📚 Pages submenu removed from the right-click hub.
+      // Navigation lives in the always-visible PageHeader band above
+      // the canvas (notebook · course breadcrumb + page-picker
+      // button). Right-click goes back to being purely tools.
 
       // v1.6.9: pin Clear Canvas at the TOP of the hub, right next to
       // Undo/Redo. Previously it was the last item after Export PNG, so
@@ -1425,19 +1402,16 @@ export default function NoteometryApp({
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
-            {/* v1.12.0: top-of-canvas page-name breadcrumb. Tap → opens
-                the canvas right-click menu (which leads with 📚 Pages),
-                so the breadcrumb is both an orientation cue and the
-                primary navigation entry point. */}
-            <PageBreadcrumb
+            {/* v1.13.0: page header band — sits above the drawing
+                surface in the canvas-area's flex column. NOT floating
+                on the canvas. Has a notebook · course breadcrumb on
+                the left and a page-picker button on the right. Each
+                surface opens a flyout via the existing ContextMenu. */}
+            <PageHeader
+              app={app}
+              plugin={plugin}
               file={file}
-              onClick={(cx, cy) => {
-                const fake = new MouseEvent("contextmenu", {
-                  clientX: cx, clientY: cy, bubbles: true,
-                });
-                Object.defineProperty(fake, "preventDefault", { value: () => {} });
-                handleCanvasContextMenu(fake as unknown as React.MouseEvent);
-              }}
+              onShowFlyout={(items, x, y) => setCtxMenu({ x, y, items })}
             />
             {/* Hidden image input */}
             <input
