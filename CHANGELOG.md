@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.14.1 — 2026-05-04
+
+Dan: "I also want to fully enrich the text box with formatting options, minus the margins and graphics and stuff. It will be powerful." Done.
+
+### Added — TextBox toolbar enrichment
+RichTextEditor's mini-toolbar grew from ~8 controls to ~24 — all the formatting Word users expect, none of the page-layout chrome (no margins, no graphics, no page setup):
+- **Block style dropdown**: Paragraph / Heading 1 / Heading 2 / Heading 3 / Quote / Code block. Powered by `formatBlock`; reflects the cursor position via `queryCommandValue`.
+- **Inline format**: Bold, Italic, Underline, **Strikethrough**, **Superscript**, **Subscript**. Toggle state mirrors `queryCommandState` so glyphs glow when the cursor sits inside them.
+- **Alignment**: Left, Center, Right, Justify. `justifyLeft` / `justifyCenter` / `justifyRight` / `justifyFull`.
+- **Inline code button**: inserts a `<code>` span at the cursor. Lists already existed and stay where they were.
+- **Insert / edit link**: prompts for a URL. With a selection it wraps via `createLink`; with no selection it inserts the URL as the link text. Empty URL → `unlink`.
+- **Text color picker**: native `<input type="color">` so iPad / Z Fold users get the OS color UI. Live updates via `foreColor`.
+- **Highlight color picker**: same UX, drives `hiliteColor` (with `backColor` fallback for browsers that don't honor the WebKit name).
+- **Undo / Redo**: `↶` / `↷`. The contenteditable's native undo stack — covers every `execCommand` and every keystroke.
+- **Clear formatting**: `removeFormat` + reset to paragraph block, so a bold heading reverts cleanly to plain text.
+- **Toolbar wraps to a second row** when the TextBox is narrow, instead of clipping.
+
+### Styling
+- **Real document feel**: H1/H2/H3 sized properly, `<blockquote>` gets an accent left-border + italic muted text, `<pre>` and `<code>` get a monospace font + subtle box, `<a>` gets the accent color underlined.
+- **Color picker chips** render the visible label ("A" for text, "▮" for highlight) and hide the OS chrome behind it — the swatch chip is what you tap.
+
+### Why
+Once chat exports to a TextBox (v1.14.0), the TextBox is where students *finalize* answers before pasting into Word / Docs. The toolbar now matches that role: study notes, headings, color-coded highlights, structured quotes — everything you need to turn an AI answer into a hand-in.
+- Sets up v1.14.2 (Excel via CSV → Table dropin) and v1.14.3+ (image tools).
+
 ## 1.14.0 — 2026-05-04
 
 Dan: "I want to add an export button to the AI pane at the bottom with the output box. I want it to send the information from the chat box results, directly to a text box that it opens. It MUST format Latex properly in the text box, and that's where i want to move the export to word box."
