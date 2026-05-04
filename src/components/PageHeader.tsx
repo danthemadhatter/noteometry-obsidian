@@ -2,7 +2,6 @@ import React, { useRef } from "react";
 import type { App, TFile } from "obsidian";
 import type NoteometryPlugin from "../main";
 import type { ContextMenuItem } from "./ContextMenu";
-import { findAllNmpages } from "../lib/recentPages";
 import { rootDir } from "../lib/persistence";
 
 interface Props {
@@ -16,22 +15,38 @@ interface Props {
   onShowFlyout: (items: ContextMenuItem[], x: number, y: number) => void;
 }
 
-interface PathSegments {
-  /** Top-level folder under the vault's Noteometry root, e.g. "APUS". */
-  notebook: string;
-  /** Sub-folder under the notebook, e.g. "ELEN201". May contain "/"
-   *  when the user nests deeper. */
-  course: string;
-  /** File basename without .nmpage suffix, e.g. "Week 1". */
-  page: string;
-  /** Vault-relative folder paths used to build flyout items. */
-  notebookPath: string;
-  coursePath: string;
+interface AncestorSegment {
+  /** Display label — the folder name. */
+  name: string;
+  /** Full vault-relative path of this ancestor folder. Used as the
+   *  filter target when listing siblings. */
+  path: string;
 }
 
-/** "Week 2" before "Week 10". Splits on numeric runs and compares
- *  numerically when both sides are numeric, lexicographically
- *  otherwise. */
+interface PathSegments {
+  /** Folders above the file, ordered from outermost (notebook) to
+   *  innermost (week). Excludes the configured root folder so the
+   *  breadcrumb doesn't display "Noteometry / APUS / ..." every time.
+   *
+   *  Examples:
+   *    Noteometry/APUS/ELEN201/Week 1/Lecture.nmpage
+   *      → [APUS, ELEN201, Week 1]
+   *    Noteometry/APUS/ELEN201/Week 1.nmpage
+   *      → [APUS, ELEN201]
+   *    Noteometry/Untitled.nmpage
+   *      → []
+   *    Outside-root/file.nmpage
+   *      → [Outside-root]
+   */
+  ancestors: AncestorSegment[];
+  /** File basename without .nmpage suffix. */
+  page: string;
+  /** Vault-relative path of the file's parent folder — used by the
+   *  page-picker flyout to list siblings. */
+  parentFolderPath: string;
+}
+
+/** "Week 2" before "Week 10". */
 function naturalCompare(a: string, b: string): number {
   const ax = a.split(/(\d+)/);
   const bx = b.split(/(\d+)/);
@@ -50,151 +65,104 @@ function naturalCompare(a: string, b: string): number {
   return ax.length - bx.length;
 }
 
-function parseSegments(file: TFile, root: string): PathSegments | null {
-  // file.path = "Noteometry/APUS/ELEN201/Week 1.nmpage" → strip root,
-  // split, drop filename. Files outside the root render with the
-  // parent dir as the notebook so the header still has structure.
-  const rel = file.path.startsWith(root + "/")
-    ? file.path.slice(root.length + 1)
-    : file.path;
-  const parts = rel.split("/");
-  if (parts.length === 0) return null;
+function parseSegments(file: TFile, root: string): PathSegments {
+  const parts = file.path.split("/");
   const filenameWithExt = parts.pop()!;
   const page = filenameWithExt.replace(/\.nmpage$/, "");
 
-  if (parts.length === 0) {
-    return { notebook: "", course: "", page, notebookPath: "", coursePath: "" };
-  } else if (parts.length === 1) {
-    return {
-      notebook: parts[0]!, course: "", page,
-      notebookPath: parts[0]!, coursePath: parts[0]!,
-    };
-  } else {
-    const notebook = parts[0]!;
-    const course = parts.slice(1).join("/");
-    return {
-      notebook, course, page,
-      notebookPath: notebook,
-      coursePath: parts.join("/"),
-    };
+  // Walk up the parent chain, building ancestor entries. Skip the
+  // configured root folder so it doesn't clutter the breadcrumb.
+  const ancestors: AncestorSegment[] = [];
+  let acc = "";
+  for (const part of parts) {
+    acc = acc ? `${acc}/${part}` : part;
+    if (acc === root) continue;
+    ancestors.push({ name: part, path: acc });
   }
+  return { ancestors, page, parentFolderPath: parts.join("/") };
+}
+
+/** All .nmpage files in the vault. Walking by path prefix in this
+ *  component (instead of via findAllNmpages's scoping) avoids the
+ *  rootFolder-prefix fallback that would mask vault-wide files. */
+function allNmpages(app: App): TFile[] {
+  return app.vault.getFiles().filter((f) => f.extension === "nmpage");
 }
 
 /** First .nmpage inside `folderPath` (depth-first), or null. Used as
- *  the landing page when the user picks a notebook or course. */
-function firstPageIn(app: App, root: string, folderPath: string): TFile | null {
-  const all = findAllNmpages(app, root);
-  const fullPrefix = folderPath ? `${root}/${folderPath}/` : `${root}/`;
+ *  the landing page when the user picks a different ancestor. */
+function firstPageIn(app: App, folderPath: string): TFile | null {
+  const all = allNmpages(app);
+  const prefix = folderPath ? `${folderPath}/` : "";
   const inFolder = all
-    .filter((f) => f.path.startsWith(fullPrefix))
+    .filter((f) => (prefix === "" ? true : f.path.startsWith(prefix)))
     .sort((a, b) => naturalCompare(a.path, b.path));
   return inFolder[0] ?? null;
 }
 
-function buildNotebookList(
-  app: App,
-  root: string,
-  currentNotebook: string,
-): ContextMenuItem[] {
-  // A "notebook" = any top-level folder under root that contains at
-  // least one .nmpage anywhere inside it. We derive the list from
-  // findAllNmpages so we don't need to walk the vault separately.
-  const all = findAllNmpages(app, root);
-  const notebooks = new Set<string>();
-  const rootPrefix = `${root}/`;
+/** All .nmpage files whose parent folder path equals `folderPath` —
+ *  i.e. the immediate siblings of any file at that depth. */
+function pagesIn(app: App, folderPath: string): TFile[] {
+  return allNmpages(app)
+    .filter((f) => (f.parent?.path ?? "") === folderPath)
+    .sort((a, b) => naturalCompare(a.basename, b.basename));
+}
+
+/** Distinct child folders that contain at least one .nmpage somewhere
+ *  inside, given a parent folder path. Returns vault-relative paths. */
+function subfoldersWithPages(app: App, parentFolderPath: string): { name: string; path: string }[] {
+  const all = allNmpages(app);
+  const prefix = parentFolderPath ? `${parentFolderPath}/` : "";
+  const subs = new Map<string, string>();
   for (const f of all) {
-    if (!f.path.startsWith(rootPrefix)) continue;
-    const rel = f.path.slice(rootPrefix.length);
-    const top = rel.split("/")[0];
-    if (top && top.endsWith(".nmpage")) {
-      // File directly in root — register an unnamed-notebook bucket
-      notebooks.add("");
-    } else if (top) {
-      notebooks.add(top);
-    }
+    if (parentFolderPath && !f.path.startsWith(prefix)) continue;
+    const rel = parentFolderPath ? f.path.slice(prefix.length) : f.path;
+    const segs = rel.split("/");
+    if (segs.length < 2) continue; // file directly inside parent — not a sub-folder
+    const subName = segs[0]!;
+    const subPath = parentFolderPath ? `${parentFolderPath}/${subName}` : subName;
+    if (!subs.has(subPath)) subs.set(subPath, subName);
   }
+  return [...subs.entries()]
+    .map(([path, name]) => ({ name, path }))
+    .sort((a, b) => naturalCompare(a.name, b.name));
+}
 
-  if (notebooks.size === 0) {
-    return [{ label: "No pages anywhere", icon: "·", disabled: true }];
+/** Items to drop into the flyout when the user taps an ancestor button.
+ *  Lists every sibling folder at that level (folders that have at
+ *  least one .nmpage inside). Picking one navigates to its first
+ *  depth-first leaf. */
+function buildAncestorFlyout(
+  app: App,
+  grandparentPath: string,
+  currentPath: string,
+): ContextMenuItem[] {
+  const siblings = subfoldersWithPages(app, grandparentPath);
+  if (siblings.length === 0) {
+    return [{ label: "No siblings at this level", icon: "·", disabled: true }];
   }
-
-  const sorted = [...notebooks].sort((a, b) => naturalCompare(a, b));
-  return sorted.map((nb) => ({
-    label: nb || "(root)",
-    icon: nb === currentNotebook ? "✓" : "📚",
+  return siblings.map((s) => ({
+    label: s.name,
+    icon: s.path === currentPath ? "✓" : "📁",
     onClick: () => {
-      const target = firstPageIn(app, root, nb);
+      const target = firstPageIn(app, s.path);
       if (target) void app.workspace.getLeaf(false).openFile(target);
     },
   }));
 }
 
-function buildCourseList(
+/** The page-picker popover. Lists every .nmpage in the current
+ *  parent folder, naturally sorted. The high-frequency switch
+ *  (Week N → Week N+1). */
+function buildPagePickerFlyout(
   app: App,
-  root: string,
-  notebookPath: string,
-  currentCoursePath: string,
-): ContextMenuItem[] {
-  // A "course" = the immediate sub-folder of the notebook that
-  // contains the .nmpage. Walk findAllNmpages, filter to those under
-  // the notebook, group by their immediate-after-notebook segment.
-  const all = findAllNmpages(app, root);
-  const notebookPrefix = notebookPath
-    ? `${root}/${notebookPath}/`
-    : `${root}/`;
-  const courses = new Set<string>();
-  for (const f of all) {
-    if (!f.path.startsWith(notebookPrefix)) continue;
-    const rel = f.path.slice(notebookPrefix.length);
-    const top = rel.split("/")[0];
-    if (top && top.endsWith(".nmpage")) {
-      courses.add(""); // root of notebook
-    } else if (top) {
-      courses.add(top);
-    }
-  }
-
-  if (courses.size === 0) {
-    return [{ label: "No courses in this notebook", icon: "·", disabled: true }];
-  }
-
-  const currentCourseSegment = currentCoursePath
-    ? currentCoursePath.split("/").slice(notebookPath ? 1 : 0).join("/")
-    : "";
-
-  const sorted = [...courses].sort((a, b) => naturalCompare(a, b));
-  return sorted.map((c) => {
-    const fullPath = notebookPath ? `${notebookPath}/${c}` : c;
-    return {
-      label: c || "(notebook root)",
-      icon: c === currentCourseSegment ? "✓" : "📁",
-      onClick: () => {
-        const target = firstPageIn(app, root, fullPath);
-        if (target) void app.workspace.getLeaf(false).openFile(target);
-      },
-    };
-  });
-}
-
-function buildPageList(
-  app: App,
-  root: string,
-  coursePath: string,
+  parentFolderPath: string,
   currentFilePath: string,
 ): ContextMenuItem[] {
-  // The page-picker popover — the high-frequency switch. Lists ONLY
-  // the .nmpage files in the current course folder (siblings of the
-  // active page), naturally sorted so "Week 2" lands before "Week 10".
-  const all = findAllNmpages(app, root);
-  const fullFolderPath = coursePath ? `${root}/${coursePath}` : root;
-  const inFolder = all
-    .filter((f) => (f.parent?.path ?? "") === fullFolderPath)
-    .sort((a, b) => naturalCompare(a.basename, b.basename));
-
+  const inFolder = pagesIn(app, parentFolderPath);
   if (inFolder.length === 0) {
     return [{ label: "No pages in this folder", icon: "·", disabled: true }];
   }
-
   return inFolder.map((f) => ({
     label: f.basename,
     icon: f.path === currentFilePath ? "●" : "○",
@@ -205,30 +173,26 @@ function buildPageList(
 }
 
 /**
- * v1.13.0 — Page header band, anchored above the canvas in its own
- * row. Replaces the v1.12 floating PageBreadcrumb pill that was
- * sitting on the canvas. Contains:
+ * v1.13.3 — Page header band, anchored above the canvas.
  *
- *   • Left side: small breadcrumb of the upper levels — notebook ·
- *     course. Each segment is a button; tap → flyout listing the
- *     siblings at that level. Picking lands on the first page in
- *     that notebook / course (depth-first).
+ *   APUS · ELEN201 · Week 1                    [ Lecture ▾ ]
+ *   └────────── ancestors ──────────┘            └─ picker ─┘
  *
- *   • Right side: the page-picker button. Label = current page name +
- *     a chevron, clearly a dropdown affordance. Tap → flyout listing
- *     all pages in the current course folder, naturally sorted.
+ * Renders one button per ancestor folder (any depth, supports the
+ * APUS/Course/Week/Page convention Dan asked for) plus a page-picker
+ * button on the right. Each control opens a flyout via the parent's
+ * ContextMenu host.
  *
- * The popovers are rendered by the parent's existing ContextMenu
- * component (passed via onShowFlyout) so outside-click, Esc, and
- * viewport clamping all work for free.
+ * Ancestor button → flyout listing siblings at that level.
+ * Pick → opens first depth-first leaf inside that subtree.
+ *
+ * Page picker → flyout listing pages in the current parent folder.
+ * Pick → loads in current tab.
  */
 export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
-  const notebookBtnRef = useRef<HTMLButtonElement>(null);
-  const courseBtnRef = useRef<HTMLButtonElement>(null);
+  const ancestorBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const pageBtnRef = useRef<HTMLButtonElement>(null);
 
-  // v1.13.1: console.log on mount so the user can verify in DevTools
-  // that the band is rendering. Throwaway — remove once we're sure.
   React.useEffect(() => {
     console.log("[Noteometry] PageHeader mounted", { hasFile: !!file, filePath: file?.path });
   }, [file]);
@@ -248,10 +212,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
     onShowFlyout(items, x, y);
   };
 
-  // v1.13.1: render even when file is null, so users always see the
-  // band exists. Placeholder makes it clear the picker is waiting on
-  // a page to bind.
-  if (!segs) {
+  if (!segs || !file) {
     return (
       <div className="noteometry-page-header">
         <div className="noteometry-page-header-breadcrumb">
@@ -269,55 +230,44 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
   return (
     <div className="noteometry-page-header">
       <div className="noteometry-page-header-breadcrumb">
-        {segs.notebook && (
-          <>
-            <button
-              ref={notebookBtnRef}
-              className="noteometry-page-header-segment"
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                showFlyoutAt(
-                  notebookBtnRef.current,
-                  buildNotebookList(app, root, segs.notebook),
-                );
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              title={`Switch notebook (current: ${segs.notebook})`}
-            >
-              {segs.notebook}
-            </button>
-            {segs.course && <span className="noteometry-page-header-sep">·</span>}
-          </>
-        )}
-        {segs.course && (
-          <button
-            ref={courseBtnRef}
-            className="noteometry-page-header-segment"
-            onPointerUp={(e) => {
-              e.stopPropagation();
-              showFlyoutAt(
-                courseBtnRef.current,
-                buildCourseList(app, root, segs.notebookPath, segs.coursePath),
-              );
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title={`Switch course (current: ${segs.course})`}
-          >
-            {segs.course}
-          </button>
-        )}
+        {segs.ancestors.map((anc, i) => {
+          const isFirst = i === 0;
+          // Sibling flyout pivots around this ancestor's PARENT folder.
+          // For the outermost (i=0), parent is the configured root.
+          const parentPath = i === 0 ? root : segs.ancestors[i - 1]!.path;
+          return (
+            <React.Fragment key={anc.path}>
+              {!isFirst && <span className="noteometry-page-header-sep">·</span>}
+              <button
+                ref={(el) => { ancestorBtnRefs.current[i] = el; }}
+                className="noteometry-page-header-segment"
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => {
+                  e.stopPropagation();
+                  showFlyoutAt(
+                    ancestorBtnRefs.current[i] ?? null,
+                    buildAncestorFlyout(app, parentPath, anc.path),
+                  );
+                }}
+                title={`Switch ${anc.name} (tap to see siblings)`}
+              >
+                {anc.name}
+              </button>
+            </React.Fragment>
+          );
+        })}
       </div>
       <button
         ref={pageBtnRef}
         className="noteometry-page-header-picker"
+        onPointerDown={(e) => e.stopPropagation()}
         onPointerUp={(e) => {
           e.stopPropagation();
           showFlyoutAt(
             pageBtnRef.current,
-            buildPageList(app, root, segs.coursePath, file!.path),
+            buildPagePickerFlyout(app, segs.parentFolderPath, file.path),
           );
         }}
-        onPointerDown={(e) => e.stopPropagation()}
         title="Switch page"
       >
         <span className="noteometry-page-header-picker-label">{segs.page}</span>
