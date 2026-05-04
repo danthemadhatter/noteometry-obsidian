@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.1 — 2026-05-03
+
+Hotfix to v1.13.0. Dan: "no change but it shows 1.13.0 in obsidian." The v1.13.0 PageHeader band was rendering correctly but was visually too subtle to notice — `--nm-faceplate` background blended into Obsidian's surrounding chrome, no clear separator from canvas, and no min-height meant it collapsed to ~32px tall.
+
+### Fixed
+- **Band is impossible to miss now.** Background bumped to `--nm-faceplate-light`, bottom border bumped from 1px paper-border to 2px solid accent, min-height pinned at 48px, padding bumped from 6px → 8px. Reads as a deliberate piece of chrome, not a slim strip.
+- **Renders even when `file` is null.** v1.13.0 returned `null` if no page was bound (`file === null` on the initial render after a plugin reload). Now shows a placeholder "No page open" so the band's presence is consistent across all states.
+- **Console diagnostic.** Added a one-line `console.log` on PageHeader mount (`[Noteometry] PageHeader mounted { hasFile, filePath }`) so future "no change" reports can be diagnosed in DevTools without code spelunking. Throwaway — removed once we're confident the band always shows.
+- **Defensive against Obsidian themes.** Added `visibility: visible !important; opacity: 1 !important;` so any third-party theme that tries to hide elements in the canvas area can't blank the band.
+
 ## 1.13.0 — 2026-05-03
 
 Dan: "I'd rather have a button I press and out pops 16 weeks, like a mouse over. No shit on the canvas FFS." Got it. Off the canvas entirely; one button → popover.
