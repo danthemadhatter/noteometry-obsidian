@@ -240,6 +240,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
     btn: HTMLButtonElement | null,
     items: ContextMenuItem[],
   ) => {
+    console.log("[Noteometry] PageHeader.showFlyoutAt", { itemCount: items.length, hasButton: !!btn });
     if (items.length === 0) return;
     const rect = btn?.getBoundingClientRect();
     const x = rect ? rect.left : 0;
@@ -273,10 +274,14 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
             <button
               ref={notebookBtnRef}
               className="noteometry-page-header-segment"
-              onClick={() => showFlyoutAt(
-                notebookBtnRef.current,
-                buildNotebookList(app, root, segs.notebook),
-              )}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                showFlyoutAt(
+                  notebookBtnRef.current,
+                  buildNotebookList(app, root, segs.notebook),
+                );
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title={`Switch notebook (current: ${segs.notebook})`}
             >
               {segs.notebook}
@@ -288,10 +293,14 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
           <button
             ref={courseBtnRef}
             className="noteometry-page-header-segment"
-            onClick={() => showFlyoutAt(
-              courseBtnRef.current,
-              buildCourseList(app, root, segs.notebookPath, segs.coursePath),
-            )}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              showFlyoutAt(
+                courseBtnRef.current,
+                buildCourseList(app, root, segs.notebookPath, segs.coursePath),
+              );
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
             title={`Switch course (current: ${segs.course})`}
           >
             {segs.course}
@@ -301,10 +310,14 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
       <button
         ref={pageBtnRef}
         className="noteometry-page-header-picker"
-        onClick={() => showFlyoutAt(
-          pageBtnRef.current,
-          buildPageList(app, root, segs.coursePath, file!.path),
-        )}
+        onPointerUp={(e) => {
+          e.stopPropagation();
+          showFlyoutAt(
+            pageBtnRef.current,
+            buildPageList(app, root, segs.coursePath, file!.path),
+          );
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
         title="Switch page"
       >
         <span className="noteometry-page-header-picker-label">{segs.page}</span>
