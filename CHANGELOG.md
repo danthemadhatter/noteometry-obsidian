@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.2 — 2026-05-03
+
+Hotfix to v1.13.1. Dan: "Band showed up, doesnt work" → "does nothing when clicked." Picker buttons render but tapping fires no popover.
+
+### Fixed
+- **Picker buttons now use `onPointerUp` + `stopPropagation` instead of `onClick`.** React's synthetic `onClick` is fragile on Android Chromium / Samsung WebView — tap delay, click cancellation by minor finger movement, etc. The ContextMenu items already use `onPointerUp` for this exact reason; bringing the picker buttons in line. `onPointerDown` also gets `stopPropagation` so the click doesn't bubble to `noteometry-canvas-area`'s onClick handler (which would re-render and theoretically race the menu).
+
+### Diagnostic
+- Console log added in `showFlyoutAt`: `[Noteometry] PageHeader.showFlyoutAt { itemCount, hasButton }`. If the picker tap still produces nothing after this update, this log tells us whether the handler fired (item-list issue) or didn't fire at all (touch routing still broken).
+
 ## 1.13.1 — 2026-05-03
 
 Hotfix to v1.13.0. Dan: "no change but it shows 1.13.0 in obsidian." The v1.13.0 PageHeader band was rendering correctly but was visually too subtle to notice — `--nm-faceplate` background blended into Obsidian's surrounding chrome, no clear separator from canvas, and no min-height meant it collapsed to ~32px tall.
