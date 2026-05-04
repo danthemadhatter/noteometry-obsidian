@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.13.0 — 2026-05-03
+
+Dan: "I'd rather have a button I press and out pops 16 weeks, like a mouse over. No shit on the canvas FFS." Got it. Off the canvas entirely; one button → popover.
+
+### Added
+- **PageHeader band above the canvas.** New `<PageHeader>` component renders in `.noteometry-canvas-area`'s flex column, ABOVE the drawing surface, with its own background and bottom border. NOT floating on the canvas.
+  - **Left**: tracked-uppercase breadcrumb of upper levels — notebook · course. Each segment is a button.
+    - Tap notebook → flyout listing all top-level folders containing `.nmpage`s. Pick one → opens its first page (depth-first first leaf).
+    - Tap course → flyout listing folders inside the active notebook. Pick one → opens its first page.
+  - **Right**: the page-picker. Label = current page name + chevron, clearly a dropdown affordance.
+    - Tap → flyout listing every `.nmpage` in the current course folder, naturally sorted ("Week 2" before "Week 10"). Active page marked with `●`.
+    - Tap any page → loads in current tab.
+  - All flyouts render via the existing `ContextMenu` component, so outside-click / Esc / viewport-clamping work uniformly.
+
+### Removed
+- **The v1.12.0 floating PageBreadcrumb pill.** Was sitting on the canvas at top-center; the new header band replaces its role with proper chrome separation. `src/components/PageBreadcrumb.tsx` deleted.
+- **The v1.12.0 `📚 Pages` submenu in the right-click hub.** Navigation now lives entirely in the always-visible PageHeader. Right-click goes back to being purely tools (Undo / Clear / Drawing / Select / Insert / Math / Export). `src/components/menu/buildPagesMenu.ts` deleted.
+
+### Path conventions
+- `<vault>/Noteometry/<Notebook>/<Course>/<Page>.nmpage` is the supported shape — APUS / ELEN201 / Week 1, Colby / Sermons / Easter, etc.
+- The header band gracefully handles deeper or shallower nesting: pages directly under a notebook folder show a breadcrumb without the course segment; pages at the vault root show only the page-picker.
+
+### Tests
+- 512/512 passing (no test surface change; component is wholly visual).
+
 ## 1.12.2 — 2026-05-03
 
 Z Fold audit: v1.12.1 fixed two-finger hold (gestures reach JS now). Two follow-on issues surfaced:
