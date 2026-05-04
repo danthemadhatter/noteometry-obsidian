@@ -23,8 +23,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Notice } from "obsidian";
-import { IconSend, IconPaperclip, IconX, IconCopy, IconCheck } from "../Icons";
-import { renderAsMathML, toMathMLForClipboard } from "../../lib/mathml";
+import { IconSend, IconPaperclip, IconX } from "../Icons";
+import { renderAsMathML } from "../../lib/mathml";
 import { chat } from "../../lib/ai";
 import { DEFAULT_PRESETS } from "../../features/pipeline/presets";
 import { useAIActivity } from "../../features/aiActivity";
@@ -53,6 +53,11 @@ interface Props {
     seedLatex?: string;
     seedText?: string;
   }) => void;
+  /** v1.14.0: footer button → export the chat history to a TextBox
+   *  dropin so the user can paste-to-Word from there with KaTeX-
+   *  rendered LaTeX. Caller spawns the TextBox; this component just
+   *  forwards the message list. */
+  onExportToTextBox?: (messages: ChatMessage[]) => void;
 }
 
 export default function ChatDropin({
@@ -63,13 +68,13 @@ export default function ChatDropin({
   seedText,
   pending,
   onChange,
+  onExportToTextBox,
 }: Props) {
   // v1.11.0 phase-3 sub-PR 3.2: seedText pre-fills the textarea (NOT
   // auto-fired). Used by the freeze "Brain dump" path to drop the user
   // straight into typing without the friction of an empty box.
   const [input, setInput] = useState(seedText ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -233,24 +238,11 @@ export default function ChatDropin({
     }
   };
 
-  const copyForWord = useCallback(async (text: string, idx: number) => {
-    try {
-      const mathml = toMathMLForClipboard(text);
-      if (typeof ClipboardItem !== "undefined") {
-        const html = new Blob([mathml], { type: "text/html" });
-        const plain = new Blob([text], { type: "text/plain" });
-        await navigator.clipboard.write([new ClipboardItem({
-          "text/html": html, "text/plain": plain,
-        })]);
-      } else {
-        await navigator.clipboard.writeText(text);
-      }
-      setCopiedIdx(idx);
-      setTimeout(() => setCopiedIdx(null), 1500);
-    } catch {
-      new Notice("Copy failed.");
-    }
-  }, []);
+  // v1.14.0: per-message "Copy for Word" button removed. The export
+  // path now goes Chat → TextBox dropin (rich-text + KaTeX) → existing
+  // TextBox copy-as-rich-text button. Single workflow, editable mid-
+  // stream, paste-to-Word from a place that's actually styled like a
+  // document.
 
   return (
     <div className="noteometry-chat-dropin">
@@ -279,18 +271,6 @@ export default function ChatDropin({
                 className="noteometry-katex-output"
                 dangerouslySetInnerHTML={{ __html: renderAsMathML(m.text) }}
               />
-              {m.role === "assistant" && (
-                <div className="noteometry-chat-bubble-actions">
-                  <button
-                    className="noteometry-chat-copy-btn"
-                    onClick={() => copyForWord(m.text, i)}
-                    title="Copy as MathML (paste into Word)"
-                  >
-                    {copiedIdx === i ? <IconCheck /> : <IconCopy />}
-                    {copiedIdx === i ? "Copied" : "Copy for Word"}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         ))}
@@ -301,6 +281,27 @@ export default function ChatDropin({
         )}
         <div ref={endRef} />
       </div>
+
+      {/* v1.14.0: Export-to-TextBox footer button. Only shown once
+       *  there's at least one assistant turn to export — otherwise
+       *  it'd just produce an empty TextBox. The button sits above
+       *  the input row so it's the natural next step after reading
+       *  a finished answer. */}
+      {onExportToTextBox && messages.some((m) => m.role === "assistant" && m.text.trim().length > 0) && !pending && (
+        <div className="noteometry-chat-export-row">
+          <button
+            className="noteometry-chat-export-btn"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              onExportToTextBox(messages);
+            }}
+            title="Export this conversation to a text box on the canvas (rendered LaTeX, paste-to-Word from there)"
+          >
+            📄 Export to text box
+          </button>
+        </div>
+      )}
 
       {attachments.length > 0 && (
         <div className="noteometry-chat-attachments">
