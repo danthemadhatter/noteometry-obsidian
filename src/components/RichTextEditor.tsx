@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Notice } from "obsidian";
 import { getTextBoxData, setTextBoxData } from "../lib/tableStore";
 import { buildRichTextClipboardBlobs, htmlToPlainText } from "../lib/dropinExport";
+import { renderMathHtml } from "../lib/renderMath";
 
 interface Props {
   textBoxId: string;
@@ -19,7 +20,7 @@ const BLOCK_OPTIONS: { value: string; label: string }[] = [
 ];
 
 /** Inline formatting buttons whose toggle state is read via queryCommandState. */
-type InlineCmd = "bold" | "italic" | "underline" | "strikeThrough" | "subscript" | "superscript";
+type InlineCmd = "bold" | "italic" | "underline" | "strikeThrough";
 type AlignCmd = "justifyLeft" | "justifyCenter" | "justifyRight" | "justifyFull";
 
 export default function RichTextEditor({ textBoxId, scope }: Props) {
@@ -47,7 +48,7 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
    *  selection. Block dropdown reads queryCommandValue("formatBlock"). */
   const refreshState = useCallback(() => {
     const cmds: (InlineCmd | AlignCmd)[] = [
-      "bold", "italic", "underline", "strikeThrough", "subscript", "superscript",
+      "bold", "italic", "underline", "strikeThrough",
       "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
     ];
     const next: Record<string, boolean> = {};
@@ -124,6 +125,53 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
     exec("removeFormat");
     exec("formatBlock", "<p>");
   }, [exec]);
+
+  /** v1.14.2: insert a KaTeX-rendered math atom at the cursor. The atom
+   *  is `contenteditable="false"` and carries `data-latex` so the click
+   *  handler below can re-prompt and replace it. */
+  const handleInsertMath = useCallback((displayMode: boolean) => {
+    const latex = window.prompt(
+      displayMode ? "Display math (LaTeX):" : "Inline math (LaTeX):",
+      "",
+    );
+    if (latex === null) return;
+    const trimmed = latex.trim();
+    if (!trimmed) return;
+    // Trailing &nbsp; for inline so the cursor lands AFTER the math atom
+    // and the user can keep typing without re-positioning. Display gets
+    // a paragraph break instead so the next input starts on its own line.
+    const html = renderMathHtml(trimmed, displayMode)
+      + (displayMode ? "<p><br></p>" : "&nbsp;");
+    exec("insertHTML", html);
+  }, [exec]);
+
+  /** v1.14.2: click-to-edit a math atom. Walks up the click target chain
+   *  to find the nearest `.nm-math` wrapper, prompts with its data-latex,
+   *  and replaces the element with a freshly-rendered atom. */
+  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    refreshState();
+    let el: HTMLElement | null = e.target as HTMLElement | null;
+    while (el && !(el.classList?.contains("nm-math"))) el = el.parentElement;
+    if (!el) return;
+    const current = el.getAttribute("data-latex") ?? "";
+    const wasDisplay = el.getAttribute("data-display") === "true";
+    const next = window.prompt(
+      wasDisplay ? "Edit display math (empty to delete):" : "Edit inline math (empty to delete):",
+      current,
+    );
+    if (next === null) return; // cancel
+    if (next.trim() === "") {
+      el.remove();
+      handleInput();
+      return;
+    }
+    // Replace via DOM swap (insertHTML would lose the position).
+    const tmp = document.createElement("div");
+    tmp.innerHTML = renderMathHtml(next.trim(), wasDisplay);
+    const fresh = tmp.firstElementChild;
+    if (fresh) el.replaceWith(fresh);
+    handleInput();
+  }, [refreshState, handleInput]);
 
   const handleCopy = useCallback(async () => {
     const html = editorRef.current?.innerHTML ?? "";
@@ -209,8 +257,6 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
         {btn("italic",        <em>I</em>,         "Italic")}
         {btn("underline",     <u>U</u>,           "Underline")}
         {btn("strikeThrough", <s>S</s>,           "Strikethrough")}
-        {btn("superscript",   <span>X<sup>2</sup></span>, "Superscript")}
-        {btn("subscript",     <span>X<sub>2</sub></span>, "Subscript")}
 
         <span className="noteometry-richtext-sep" />
 
@@ -248,6 +294,20 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
           title="Insert / edit link"
           aria-label="Insert link"
         >🔗</button>
+
+        {/* v1.14.2: inline + display math. Tap a rendered atom to edit. */}
+        <button
+          className="noteometry-richtext-btn noteometry-richtext-mathbtn"
+          onPointerDown={(e) => { e.preventDefault(); handleInsertMath(false); }}
+          title="Insert inline math (LaTeX) — tap a math atom to edit"
+          aria-label="Insert inline math"
+        ><span><i>√x</i></span></button>
+        <button
+          className="noteometry-richtext-btn noteometry-richtext-mathbtn"
+          onPointerDown={(e) => { e.preventDefault(); handleInsertMath(true); }}
+          title="Insert display math (LaTeX) — tap a math atom to edit"
+          aria-label="Insert display math"
+        >Σ</button>
 
         {/* Native color picker — system UI on iPad / Z Fold. */}
         <label className="noteometry-richtext-color" title="Text color">
@@ -330,7 +390,7 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
         onInput={handleInput}
         onKeyUp={refreshState}
         onMouseUp={refreshState}
-        onClick={refreshState}
+        onClick={handleEditorClick}
         onTouchEnd={(e) => { e.currentTarget.focus(); refreshState(); }}
         onKeyDown={(e) => e.stopPropagation()}
         style={{ fontSize: `${fontSize}px` }}

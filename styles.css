@@ -1281,6 +1281,40 @@
   text-decoration: underline;
 }
 
+/* v1.14.2: inline + display math atoms inside the rich-text editor.
+ * Each atom is contenteditable=false so cursor navigates around it as
+ * a unit. Hover + tap cues that it's editable. */
+.noteometry-richtext-content .nm-math {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: outline 80ms;
+}
+.noteometry-richtext-content .nm-math:hover {
+  outline: 1px dashed var(--nm-accent, #4A90D9);
+  outline-offset: 1px;
+}
+.noteometry-richtext-content .nm-math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+.noteometry-richtext-content .nm-math-display {
+  display: block;
+  text-align: center;
+  margin: 0.5em 0;
+  padding: 0.2em 0;
+}
+/* Math atoms generated outside the editor (e.g. chat exports prior to
+ * v1.14.2) still rendered bare KaTeX. Keep their look consistent. */
+.noteometry-richtext-content .katex { font-size: 1em; }
+.noteometry-richtext-content .katex-display { margin: 0.5em 0; }
+
+/* v1.14.2: math toolbar buttons (inline + display). Slight italic + a
+ * dotted lower border to telegraph "math" without leaning on emoji. */
+.noteometry-richtext-mathbtn {
+  font-style: italic;
+  font-family: var(--font-monospace, ui-monospace, "SF Mono", Menlo, monospace);
+}
+
 /* v1.14.1: native color pickers — render the visible swatch as the
  * button label, hide the OS chrome behind it but keep it tappable. */
 .noteometry-richtext-color {
