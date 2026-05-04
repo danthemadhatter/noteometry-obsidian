@@ -227,10 +227,14 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
   const courseBtnRef = useRef<HTMLButtonElement>(null);
   const pageBtnRef = useRef<HTMLButtonElement>(null);
 
-  if (!file) return null;
+  // v1.13.1: console.log on mount so the user can verify in DevTools
+  // that the band is rendering. Throwaway — remove once we're sure.
+  React.useEffect(() => {
+    console.log("[Noteometry] PageHeader mounted", { hasFile: !!file, filePath: file?.path });
+  }, [file]);
+
   const root = rootDir(plugin);
-  const segs = parseSegments(file, root);
-  if (!segs) return null;
+  const segs = file ? parseSegments(file, root) : null;
 
   const showFlyoutAt = (
     btn: HTMLButtonElement | null,
@@ -242,6 +246,24 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
     const y = rect ? rect.bottom + 4 : 0;
     onShowFlyout(items, x, y);
   };
+
+  // v1.13.1: render even when file is null, so users always see the
+  // band exists. Placeholder makes it clear the picker is waiting on
+  // a page to bind.
+  if (!segs) {
+    return (
+      <div className="noteometry-page-header">
+        <div className="noteometry-page-header-breadcrumb">
+          <span className="noteometry-page-header-segment" style={{ opacity: 0.55, cursor: "default" }}>
+            NOTEOMETRY
+          </span>
+        </div>
+        <span className="noteometry-page-header-picker" style={{ opacity: 0.55, cursor: "default" }}>
+          <span className="noteometry-page-header-picker-label">No page open</span>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="noteometry-page-header">
@@ -281,7 +303,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
         className="noteometry-page-header-picker"
         onClick={() => showFlyoutAt(
           pageBtnRef.current,
-          buildPageList(app, root, segs.coursePath, file.path),
+          buildPageList(app, root, segs.coursePath, file!.path),
         )}
         title="Switch page"
       >

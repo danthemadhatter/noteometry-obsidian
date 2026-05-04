@@ -4270,13 +4270,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 14px;
-  background: var(--nm-faceplate);
-  border-bottom: 1px solid var(--nm-paper-border);
+  padding: 8px 16px;
+  /* v1.13.1: brighter background + thicker border + min-height so the
+   * band is clearly visible against the canvas. v1.13.0's faceplate
+   * tint blended into Obsidian's chrome; users reported "no change"
+   * because the band looked like part of the surrounding UI. */
+  background: var(--nm-faceplate-light);
+  border-bottom: 2px solid var(--nm-accent);
+  min-height: 48px;
   user-select: none;
-  /* Sits above any canvas overlays (lasso, ai-frame, etc.) so the
-   * picker is always reachable. */
   z-index: 25;
+  /* Defensive against Obsidian themes that try to hide things in the
+   * canvas area. */
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .noteometry-page-header-breadcrumb {
