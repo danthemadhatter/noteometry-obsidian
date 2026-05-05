@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.4 — 2026-05-05
+
+Critical hotfix on top of v1.14.3. Dan: "If I do a refresh, it erases the text from the text box. I was smart enough to save it elsewhere."
+
+### Fixed
+- **TextBox edits within ~2s of a refresh / tab switch were silently dropped.** Root cause: React fires effect cleanups in reverse declaration order, so `clearScope(scope)` (which wipes the in-memory `tableStore` Maps) ran BEFORE the saveTimer cleanup could fire the pending save. The 2-second autosave debounce never got to flush; the data was already gone from memory by then.
+- **Fix**: collapsed the flush + scope-clear into a single cleanup that runs in the right order — clear the pending timer, kick off a synchronous save (which captures `getAllTextBoxData(scope)` BEFORE `clearScope` wipes the Maps; the async vault write then completes in the background after unmount), and only then drop the scope.
+- Result: any edit that's been typed gets persisted before the page tears down. No more lost text on refresh.
+
 ## 1.14.3 — 2026-05-05
 
 Mass fix release. Dan: "Color palate for ink is akward to use. Text should default to black, everywhere. Lasso no longer works. It opens a text box instead when you click the numbers, which i want to revert to 'math' and ABC to 'Words' with 2 distinct prompts built in, where 'math' does v12 math. Math tab should be a dropdown in the text box. File tree system does not work at all."
