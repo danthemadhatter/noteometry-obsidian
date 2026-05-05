@@ -295,10 +295,14 @@ export default function NoteometryApp({
 
         if (selectedObjectId) {
           e.preventDefault();
+          // v1.14.6: confirm before destroying — these were keyboard-only
+          // and one stray Backspace was wiping a whole drop-in.
+          if (!confirm("Delete this drop-in? This cannot be undone except via Undo.")) return;
           setCanvasObjects(prev => prev.filter(o => o.id !== selectedObjectId));
           setSelectedObjectId(null);
         } else if (selectedStampId) {
           e.preventDefault();
+          if (!confirm("Delete this stamp? This cannot be undone except via Undo.")) return;
           setStamps(prev => prev.filter(s => s.id !== selectedStampId));
           setSelectedStampId(null);
         }
@@ -972,6 +976,8 @@ export default function NoteometryApp({
         }},
         { label: "", separator: true },
         { label: "Delete", danger: true, onClick: () => {
+          // v1.14.6: confirm before destroying.
+          if (!confirm("Delete this drop-in? This cannot be undone except via Undo.")) return;
           setCanvasObjects((prev) => prev.filter((o) => o.id !== hitObj.id));
           if (selectedObjectId === hitObj.id) setSelectedObjectId(null);
         }},
@@ -989,6 +995,8 @@ export default function NoteometryApp({
         { label: "Normal", shortcut: curSize === "normal" ? "\u2713" : "", onClick: () => setStampSize("normal") },
         { label: "", separator: true },
         { label: "Delete Stamp", danger: true, onClick: () => {
+          // v1.14.6: confirm before destroying.
+          if (!confirm("Delete this stamp? This cannot be undone except via Undo.")) return;
           setStamps((prev) => prev.filter((s) => s.id !== hitStamp.id));
         }},
       );
