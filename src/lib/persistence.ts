@@ -108,6 +108,49 @@ export async function savePageToFile(app: App, file: TFile, data: CanvasData): P
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ * v1.14.5 emergency recovery cache
+ *
+ * Async vault writes can be killed mid-flight when the user X's a tab,
+ * force-reloads, or quits Obsidian. The Promise chain dies and bytes
+ * never reach disk. To survive that, we synchronously stash the
+ * about-to-be-written v3 JSON in localStorage BEFORE the async vault
+ * write, and remove it after the write resolves. On the next
+ * onLoadFile, we check for a stranded cache entry and recover it.
+ *
+ * localStorage is synchronous and persists across Electron renderer
+ * reloads, so it survives the exact failure modes vault.modify can't.
+ * Cache key is the file's vault path so multiple open pages don't collide.
+ * Quota errors are swallowed — recovery is best-effort, not a contract.
+ * ══════════════════════════════════════════════════════════════════ */
+
+const RECOVERY_PREFIX = "nm:cache:";
+
+function safeLocalStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== "undefined") return localStorage;
+  } catch { /* iframes / sandboxed contexts can throw on access */ }
+  return null;
+}
+
+export function cachePageDataSync(filePath: string, packedJson: string): void {
+  const ls = safeLocalStorage();
+  if (!ls) return;
+  try { ls.setItem(RECOVERY_PREFIX + filePath, packedJson); } catch { /* quota */ }
+}
+
+export function getCachedPageData(filePath: string): string | null {
+  const ls = safeLocalStorage();
+  if (!ls) return null;
+  try { return ls.getItem(RECOVERY_PREFIX + filePath); } catch { return null; }
+}
+
+export function clearPageCache(filePath: string): void {
+  const ls = safeLocalStorage();
+  if (!ls) return;
+  try { ls.removeItem(RECOVERY_PREFIX + filePath); } catch { /* ignore */ }
+}
+
 /** Heuristic: does a .md file's content decode as a v3 Noteometry page?
  *  Used by the "Convert legacy .md pages" command — we only rename files
  *  whose first JSON.parse yields a v3 page, so real markdown is never

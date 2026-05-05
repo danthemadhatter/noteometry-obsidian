@@ -1,11 +1,19 @@
-import { FileView, TFile, WorkspaceLeaf } from "obsidian";
+import { FileView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import NoteometryApp from "./components/NoteometryApp";
 import { AIActivityProvider } from "./features/aiActivity";
 import { LayerManagerProvider } from "./features/layerManager";
 import type { CanvasData } from "./lib/pageFormat";
-import { loadPageFromFile, savePageToFile, EMPTY_PAGE } from "./lib/persistence";
+import { packToV3, unpackFromV3, isV3Page } from "./lib/pageFormat";
+import {
+  loadPageFromFile,
+  savePageToFile,
+  EMPTY_PAGE,
+  cachePageDataSync,
+  getCachedPageData,
+  clearPageCache,
+} from "./lib/persistence";
 import type NoteometryPlugin from "./main";
 
 export const VIEW_TYPE = "noteometry-view";
@@ -36,6 +44,11 @@ export class NoteometryView extends FileView {
   /** Per-view flush callback. NoteometryApp registers its own saveNow
    *  here so each tab flushes to its own bound file. */
   private flushMyTree: (() => Promise<void>) | null = null;
+  /** v1.14.5: stable file reference for saves. Obsidian's FileView clears
+   *  `this.file` between onUnloadFile and onClose, so handleSaveData
+   *  needs a copy it controls. Set in onLoadFile, cleared AFTER the flush
+   *  in onUnloadFile so the last save still has a target. */
+  private lastFile: TFile | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: NoteometryPlugin) {
     super(leaf);
@@ -62,7 +75,36 @@ export class NoteometryView extends FileView {
   /** Called by Obsidian when the leaf's file changes — including the
    *  initial bind on open. Reads + decodes + hands off to React. */
   async onLoadFile(file: TFile): Promise<void> {
-    const decoded = await loadPageFromFile(this.app, file);
+    this.lastFile = file;
+    let decoded = await loadPageFromFile(this.app, file);
+
+    // v1.14.5: recover from emergency cache if a prior session's
+    // vault.modify never completed (force reload, Obsidian quit, tab X
+    // before async flush finished). The cache holds the exact v3 JSON
+    // that was about to be written, keyed by file path.
+    const cached = getCachedPageData(file.path);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (isV3Page(parsed)) {
+          decoded = unpackFromV3(parsed);
+          // Persist the recovery to disk right now so the cache is safe
+          // to clear and the file reflects the recovered state.
+          await savePageToFile(this.app, file, decoded);
+          clearPageCache(file.path);
+          new Notice(
+            `Noteometry: Recovered unsaved changes for "${file.basename}" from previous session.`,
+            6000,
+          );
+        } else {
+          // Malformed cache — drop it so we don't loop.
+          clearPageCache(file.path);
+        }
+      } catch {
+        clearPageCache(file.path);
+      }
+    }
+
     this.currentData = decoded ?? { ...EMPTY_PAGE };
     this.dataToken += 1;
     if (this.reactSetInitialData) {
@@ -82,13 +124,31 @@ export class NoteometryView extends FileView {
     if (this.flushMyTree) {
       try { await this.flushMyTree(); } catch { /* best effort */ }
     }
+    // Clear lastFile AFTER the flush so handleSaveData still had a
+    // target while the async save was running.
+    this.lastFile = null;
     this.currentData = null;
   }
 
   private async handleSaveData(data: CanvasData): Promise<void> {
-    const f = this.file;
+    // v1.14.5: Obsidian's FileView nulls `this.file` between onUnloadFile
+    // and onClose. Using lastFile as the primary source keeps saves
+    // working across both lifecycle callbacks. Falls back to this.file
+    // for the normal autosave path where lastFile is always populated.
+    const f = this.lastFile ?? this.file;
     if (!f) return;
+    // v1.14.5: synchronously cache the packed v3 BEFORE the async vault
+    // write. If the window force-reloads or the tab is killed while
+    // vault.modify is still in-flight, the next onLoadFile for this
+    // file recovers from this cache. The cache is cleared after the
+    // vault write resolves so normal saves leave no residue.
+    try {
+      const v3 = packToV3(data);
+      cachePageDataSync(f.path, JSON.stringify(v3, null, 0));
+    } catch { /* packing shouldn't throw, but don't block save if it does */ }
+
     await savePageToFile(this.app, f, data);
+    clearPageCache(f.path);
   }
 
   async onOpen(): Promise<void> {
