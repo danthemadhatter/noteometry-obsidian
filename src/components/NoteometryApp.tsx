@@ -524,11 +524,39 @@ export default function NoteometryApp({
     return () => setOnChangeCallback(scope, null);
   }, [doSave, scope]);
 
-  // When this NoteometryApp unmounts (tab closed or leaf detached), drop
-  // its scope from the store so long-running sessions don't accumulate
-  // Maps for pages the user has closed.
+  // v1.14.4: flush pending save before scope teardown.
+  //
+  // Bug Dan hit: editing a TextBox then refreshing within ~2s of the
+  // last keystroke wiped the edits. React fires effect cleanups in
+  // reverse of declaration order, so without coordination the saveTimer
+  // got killed AND clearScope wiped the in-memory tableStore data
+  // before any save could capture it.
+  //
+  // This effect lives BEFORE the clearScope effect (declaration order)
+  // so its cleanup runs AFTER clearScope's — wait, that's the wrong
+  // direction. We instead co-locate the flush with clearScope so they
+  // run in a single cleanup, with the flush FIRST. saveNow's
+  // synchronous prologue captures getAllTextBoxData/getAllTableData
+  // before clearScope nukes the maps; the async vault write then
+  // proceeds in the background after unmount.
   useEffect(() => {
-    return () => { clearScope(scope); };
+    return () => {
+      // 1. Cancel any debounced save still pending (we're about to fire
+      //    a fresh one immediately, so the delayed copy is redundant).
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = 0;
+      }
+      // 2. Flush whatever's currently in scope to disk. saveNow is
+      //    async; its synchronous prologue grabs textBoxData via
+      //    getAllTextBoxData(scope) BEFORE we call clearScope on the
+      //    next line, so the data is captured even though the maps are
+      //    about to be emptied.
+      void (saveNowRef.current?.());
+      // 3. Drop the scope so long-running sessions don't accumulate
+      //    Maps for closed pages.
+      clearScope(scope);
+    };
   }, [scope]);
 
   useEffect(() => {
