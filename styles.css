@@ -1177,38 +1177,49 @@
 .noteometry-richtext-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   padding: 4px 8px;
   border-bottom: 1px solid var(--nm-paper-border);
   background: var(--nm-faceplate-recessed);
   flex-shrink: 0;
-  /* v1.14.1: toolbar grew from 8 to ~24 controls. Wrap to a second
-   * row instead of clipping when the TextBox is narrow. */
-  flex-wrap: wrap;
-  row-gap: 3px;
+  /* v1.14.6: stop wrapping. The toolbar exploded into a 3-row stack
+   * inside narrow TextBoxes and the row gap looked like "empty boxes".
+   * Single-row scroll matches the rest of the app's pill rows. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .noteometry-richtext-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 26px;
-  border: none;
-  border-radius: 4px;
+  /* v1.14.6: pill-style buttons matching .noteometry-page-header-segment.
+   * Replaces the old fixed 28x26 box that didn't read as clickable. */
+  padding: 2px 7px;
+  min-height: 24px;
+  height: auto;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm, 4px);
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   color: var(--text-muted);
   transition: all 0.1s;
 }
 .noteometry-richtext-btn:hover {
   background: var(--nm-accent-light);
   color: var(--nm-accent);
+  border-color: var(--nm-accent);
 }
 .noteometry-richtext-btn.active {
   background: var(--nm-accent-light);
   color: var(--nm-accent);
+  border-color: var(--nm-accent);
   font-weight: 700;
 }
 
@@ -1217,16 +1228,22 @@
   height: 16px;
   background: var(--nm-warm-border);
   margin: 0 3px;
+  flex-shrink: 0;
 }
 
 .noteometry-richtext-select {
-  padding: 2px 4px;
+  padding: 2px 6px;
   font-size: 11px;
   border: 1px solid var(--nm-paper-border);
-  border-radius: 4px;
-  background: var(--nm-faceplate);
+  border-radius: var(--nm-radius-sm, 4px);
+  /* v1.14.6: was --nm-faceplate which is near-black inside canvas-object
+   * dark-mode override (--nm-paper-ink:#000), giving black-text-on-black
+   * empty-looking selects. --nm-paper IS overridden to #ffffff there. */
+  background: var(--nm-paper, #ffffff);
   color: var(--nm-paper-ink);
   cursor: pointer;
+  flex-shrink: 0;
+  min-height: 24px;
 }
 
 .noteometry-richtext-content {
@@ -2616,13 +2633,15 @@
     padding: 12px 14px;
   }
 
-  /* Rich text editor toolbar buttons */
+  /* Rich text editor toolbar buttons — v1.14.6: pill style on mobile too,
+   * just slightly larger touch targets. Width:44 was crushing the row. */
   .noteometry-richtext-btn {
-    width: 44px;
-    height: 44px;
+    min-height: 36px;
+    padding: 4px 8px;
+    font-size: 13px;
   }
   .noteometry-richtext-select {
-    min-height: 44px;
+    min-height: 36px;
     padding: 6px 10px;
     font-size: 13px;
   }

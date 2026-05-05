@@ -204,11 +204,24 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
     btn: HTMLButtonElement | null,
     items: ContextMenuItem[],
   ) => {
-    console.log("[Noteometry] PageHeader.showFlyoutAt", { itemCount: items.length, hasButton: !!btn });
     if (items.length === 0) return;
     const rect = btn?.getBoundingClientRect();
-    const x = rect ? rect.left : 0;
-    const y = rect ? rect.bottom + 4 : 0;
+    // v1.14.6: zero-rect guard. If the button has no layout yet (detached,
+    // display:none) we'd previously hand (0,0) to ContextMenu which renders
+    // behind Obsidian's chrome. Fall back to a safe in-viewport pos so the
+    // menu is always visible; ContextMenu's clamp handles the rest.
+    const hasRect = !!rect && rect.width > 0 && rect.height > 0;
+    const x = hasRect ? rect.left : 60;
+    const y = hasRect ? rect.bottom + 4 : 60;
+    console.log("[Noteometry] PageHeader.showFlyoutAt", {
+      itemCount: items.length,
+      hasButton: !!btn,
+      hasRect,
+      x,
+      y,
+      viewportW: window.innerWidth,
+      viewportH: window.innerHeight,
+    });
     onShowFlyout(items, x, y);
   };
 

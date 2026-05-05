@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.14.6 — 2026-05-05
+
+Follow-up to v1.14.5. Dan: "File pills don'tg work at all. Still cant test" + "making saving bullet proof by prompting an 'are you sure' typa thing for all boxes. The text box exploded and the toolbar layout needs 'pills'".
+
+### Fixed
+- **PageHeader breadcrumb pills opened nothing despite v1.14.5 swapping to `onClick`.** Console confirmed `setCtxMenu` was being called with valid items — the menu was rendering, just off-screen. Two defensive fixes in `ContextMenu.tsx`:
+  1. **Top/left viewport clamp.** The original clamp only checked `bottom > vh` and `right > vw`. Pills sit at the very top of the canvas band, so a flyout spawned at `y ≈ 0` rendered behind Obsidian's chrome. Now also clamps `top < 8` → `8px` and `left < 8` → `8px`.
+  2. **Outside-click listener deferred by one tick.** The capture-phase `pointerdown` listener registered synchronously inside the same `useEffect` that mounted the menu — the original gesture's pointerup/pointerdown could be caught and immediately close it. `setTimeout(..., 0)` defers registration to the next macrotask.
+- **PageHeader.showFlyoutAt now guards against zero-rect buttons** (detached / `display:none`) by falling back to `(60, 60)` instead of `(0, 0)` and logging the computed coords + viewport size for future diagnosis.
+- **RichText toolbar exploded into 3 rows of cramped controls plus "empty boxes".** Two compounding causes:
+  1. `.noteometry-richtext-toolbar` had `flex-wrap: wrap` so 22+ controls wrapped inside any TextBox narrower than ~600px. Switched to `flex-wrap: nowrap` + `overflow-x: auto` (matches the pill rows elsewhere in the app).
+  2. `.noteometry-richtext-select` background was `var(--nm-faceplate)`, which the v1.14.3 canvas-object override does NOT touch — in dark mode that's near-black, paired with the override's forced `#000` ink, the selects rendered as black-on-black ("empty boxes"). Switched to `var(--nm-paper, #ffffff)`, which IS overridden to white inside canvas objects.
+  3. While there: replaced fixed-size 28x26 buttons with pill-style controls matching `.noteometry-page-header-segment` so they read as clickable. Mobile breakpoint follows suit.
+
+### Added
+- **Bulletproof saving via delete confirmation on every destructive site outside of editing-text-content.** Three call sites in `NoteometryApp.tsx` now gate their mutations behind `confirm()`:
+  1. Backspace/Delete keydown handler (drop-in branch + stamp branch).
+  2. "Delete" item on the canvas-object right-click menu.
+  3. "Delete Stamp" item on the stamp right-click menu.
+  The existing double-confirm on Clear Canvas stays as-is.
+- New unit suites `v1146ContextMenuClamp.test.ts` (pins top/left/right/bottom clamp math) and `v1146DeleteConfirm.test.ts` (pins the confirm-before-mutate contract).
+
 ## 1.14.5 — 2026-05-05
 
 Residual bug sweep on top of v1.14.4. Dan: "Things don't save, ever" + "The tabs are cool but they don't click or do anything."

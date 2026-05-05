@@ -76,10 +76,18 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
         onClose();
       }
     };
-    document.addEventListener("pointerdown", onDown, true);
+    // v1.14.6: defer outside-click registration by one tick so the same
+    // pointerdown that opened the menu (e.g. PageHeader pill click) can't
+    // be caught by this capture-phase listener and immediately close it.
+    let registered = false;
+    const timer = setTimeout(() => {
+      document.addEventListener("pointerdown", onDown, true);
+      registered = true;
+    }, 0);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("pointerdown", onDown, true);
+      clearTimeout(timer);
+      if (registered) document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose, submenu]);
@@ -94,6 +102,11 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     const vh = window.innerHeight;
     if (rect.right > vw) el.style.left = `${Math.max(8, vw - rect.width - 8)}px`;
     if (rect.bottom > vh) el.style.top = `${Math.max(8, vh - rect.height - 8)}px`;
+    // v1.14.6: also clamp top/left so a menu spawned near (0,0) — e.g. from
+    // a PageHeader pill at the very top of the viewport — doesn't render
+    // behind Obsidian's chrome at the top of the window.
+    if (rect.top < 8) el.style.top = "8px";
+    if (rect.left < 8) el.style.left = "8px";
   }, [x, y]);
 
   const openSubmenu = useCallback((parentEl: HTMLElement, child: ContextMenuItem[], ownerKey: string) => {
