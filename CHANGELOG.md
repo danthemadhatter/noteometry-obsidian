@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.14.7 — 2026-05-05
+
+Real fix for the PageHeader popover. Dan: "again, pill does nothing."
+
+v1.14.6's defensive clamps were aimed at the wrong root cause. The console screenshot Dan sent proved `setCtxMenu` fires with valid in-viewport coords (`itemCount:1, hasButton:true, hasRect:true, x:264, y:132`) and the menu still doesn't appear. That ruled out the click path, the zero-rect guard, and the viewport clamp — all working as intended.
+
+### Fixed
+- **ContextMenu now portals to `document.body` via `createPortal`.** Root cause: `position: fixed` resolves to the nearest ancestor that has `transform`, `filter`, `perspective`, `contain: layout/paint/strict`, or `will-change: transform` set — not the viewport. Obsidian sets one or more of these on `.workspace-leaf` and surrounding view containers for GPU compositing, so the menu was painting at (264, 132) **inside the leaf** instead of (264, 132) on screen. Depending on leaf scroll/position that's invisible, behind chrome, or off-screen.
+- Portaling to `document.body` escapes every Obsidian stacking context. The same coords now resolve to the actual viewport.
+
+### Added
+- `tests/unit/v1147ContextMenuPortal.test.ts` pins the portal contract at the source level: imports `createPortal` from `react-dom`, calls it in the render path, targets `document.body`, and guards against SSR / no-document environments. A future "simplify" diff that drops the portal will fail this loudly.
+
 ## 1.14.6 — 2026-05-05
 
 Follow-up to v1.14.5. Dan: "File pills don'tg work at all. Still cant test" + "making saving bullet proof by prompting an 'are you sure' typa thing for all boxes. The text box exploded and the toolbar layout needs 'pills'".

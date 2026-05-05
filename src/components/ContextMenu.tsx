@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 export interface ContextMenuItem {
   label: string;
@@ -50,6 +51,15 @@ interface SubMenuState {
 export default function ContextMenu({ x, y, items, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<SubMenuState | null>(null);
+
+  // v1.14.7: portal target. ContextMenu MUST render at document.body so
+  // that `position: fixed` resolves to the viewport, not to whatever
+  // Obsidian ancestor (workspace-leaf, view-container) has set transform/
+  // contain/will-change — any of which re-anchors fixed-positioned
+  // descendants and made the menu paint at (x,y) inside the leaf rather
+  // than the screen. Symptom: menu "paints" but is invisible / off-screen
+  // even though setCtxMenu fires with valid in-viewport coords.
+  const portalTarget = typeof document !== "undefined" ? document.body : null;
 
   useEffect(() => {
     // Close on outside click. Use capture so we fire before any handler
@@ -136,7 +146,9 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     onClose();
   }, [openSubmenu, onClose]);
 
-  return (
+  if (!portalTarget) return null;
+
+  const tree = (
     <>
       <div
         ref={menuRef}
@@ -192,6 +204,8 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
       )}
     </>
   );
+
+  return createPortal(tree, portalTarget);
 }
 
 interface SubMenuProps {
