@@ -243,7 +243,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
             ref={(el) => { ancestorBtnRefs.current[0] = el; }}
             className="noteometry-page-header-segment"
             onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => {
+            onClick={(e) => {
               e.stopPropagation();
               showFlyoutAt(
                 ancestorBtnRefs.current[0] ?? null,
@@ -267,7 +267,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
                 ref={(el) => { ancestorBtnRefs.current[i] = el; }}
                 className="noteometry-page-header-segment"
                 onPointerDown={(e) => e.stopPropagation()}
-                onPointerUp={(e) => {
+                onClick={(e) => {
                   e.stopPropagation();
                   showFlyoutAt(
                     ancestorBtnRefs.current[i] ?? null,
@@ -286,7 +286,7 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
         ref={pageBtnRef}
         className="noteometry-page-header-picker"
         onPointerDown={(e) => e.stopPropagation()}
-        onPointerUp={(e) => {
+        onClick={(e) => {
           e.stopPropagation();
           showFlyoutAt(
             pageBtnRef.current,

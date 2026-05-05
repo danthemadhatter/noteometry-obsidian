@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.14.5 — 2026-05-05
+
+Residual bug sweep on top of v1.14.4. Dan: "Things don't save, ever" + "The tabs are cool but they don't click or do anything."
+
+### Fixed
+- **Closing a tab or force-reloading mid-save lost everything.** v1.14.4 fixed the unmount race for TextBox edits typed within ~2s of refresh, but the larger save path was still vulnerable. Two compounding causes:
+  1. `handleSaveData` checked `this.file`, which Obsidian's FileView nulls between `onUnloadFile` and `onClose`. The redundant flush in `onClose` always early-returned with no target.
+  2. `vault.modify` is async — when the renderer reloads or the tab closes, the in-flight Promise dies before bytes hit disk. No retry, no queue.
+- **Fix (a):** `NoteometryView` now keeps a `lastFile` field set in `onLoadFile` and cleared AFTER the flush in `onUnloadFile`. `handleSaveData` uses `lastFile ?? this.file` so the close-time flush always has a target.
+- **Fix (b):** Synchronous emergency cache. `handleSaveData` now stashes the packed v3 JSON in `localStorage` (key `nm:cache:<path>`) BEFORE awaiting `vault.modify`, and clears it after the write resolves. localStorage is synchronous and survives Electron renderer reload, so it captures exactly the failure modes async vault writes can't. On the next `onLoadFile` for that path, any stranded cache entry is decoded, persisted to disk, and the user gets a Notice that prior changes were recovered.
+- **PageHeader breadcrumb pills did nothing when clicked.** The Notebooks pill, ancestor segments, and page picker all opened their flyouts via `onPointerUp`, which doesn't reliably fire across React's synthetic event boundary on every input device. Switched all three to `onClick` (keeping `onPointerDown` stopPropagation so the canvas-area deselect doesn't trigger from the same gesture). Tabs now actually open their popovers.
+
+### Added
+- New unit suite `persistenceRecoveryCache.test.ts` pinning the round-trip + isolation + quota-tolerance contract for the recovery cache.
+
 ## 1.14.4 — 2026-05-05
 
 Critical hotfix on top of v1.14.3. Dan: "If I do a refresh, it erases the text from the text box. I was smart enough to save it elsewhere."
