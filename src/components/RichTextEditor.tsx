@@ -295,26 +295,31 @@ export default function RichTextEditor({ textBoxId, scope }: Props) {
           aria-label="Insert link"
         >🔗</button>
 
-        {/* v1.14.2: inline + display math. Tap a rendered atom to edit. */}
-        <button
-          className="noteometry-richtext-btn noteometry-richtext-mathbtn"
-          onPointerDown={(e) => { e.preventDefault(); handleInsertMath(false); }}
-          title="Insert inline math (LaTeX) — tap a math atom to edit"
-          aria-label="Insert inline math"
-        ><span><i>√x</i></span></button>
-        <button
-          className="noteometry-richtext-btn noteometry-richtext-mathbtn"
-          onPointerDown={(e) => { e.preventDefault(); handleInsertMath(true); }}
-          title="Insert display math (LaTeX) — tap a math atom to edit"
-          aria-label="Insert display math"
-        >Σ</button>
+        {/* v1.14.3: Math dropdown. Pick inline or display; opens a LaTeX
+         *  prompt. Tap any rendered atom afterwards to edit. */}
+        <select
+          className="noteometry-richtext-select noteometry-richtext-mathselect"
+          value=""
+          onChange={(e) => {
+            const v = e.target.value;
+            e.target.value = ""; // reset so the option can be re-picked
+            if (v === "inline") handleInsertMath(false);
+            else if (v === "display") handleInsertMath(true);
+          }}
+          title="Insert math (LaTeX) — tap a math atom afterwards to edit"
+          aria-label="Insert math"
+        >
+          <option value="">Math ▾</option>
+          <option value="inline">Inline math…</option>
+          <option value="display">Display math…</option>
+        </select>
 
         {/* Native color picker — system UI on iPad / Z Fold. */}
         <label className="noteometry-richtext-color" title="Text color">
           <span className="noteometry-richtext-color-label">A</span>
           <input
             type="color"
-            defaultValue="#1a1a1a"
+            defaultValue="#000000"
             onChange={(e) => handleColor(e.target.value)}
             aria-label="Text color"
           />

@@ -639,7 +639,14 @@ export default function NoteometryApp({
     const last = snapshot[snapshot.length - 1];
     const anchorX = (last?.bounds?.maxX ?? scrollX + 200) + 16;
     const anchorY = last?.bounds?.minY ?? scrollY + 200;
-    const obj = createChatObject(anchorX, anchorY, { attachedImage: composite });
+    // v1.14.3: Words spawns a chat with a plain-English seed prompt so
+    // the user starts from "Explain in plain English…" — distinct from
+    // Math (which runs the v12 LaTeX protocol). User can edit the seed
+    // before sending.
+    const obj = createChatObject(anchorX, anchorY, {
+      attachedImage: composite,
+      seedText: "Explain this in plain English. Be concise. Use minimal math notation; favor intuition and analogies.\n\n",
+    });
     setCanvasObjects((prev) => [...prev, obj]);
     setSelectedObjectId(obj.id);
     clearStack();
