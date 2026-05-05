@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.14.3 — 2026-05-05
+
+Mass fix release. Dan: "Color palate for ink is akward to use. Text should default to black, everywhere. Lasso no longer works. It opens a text box instead when you click the numbers, which i want to revert to 'math' and ABC to 'Words' with 2 distinct prompts built in, where 'math' does v12 math. Math tab should be a dropdown in the text box. File tree system does not work at all."
+
+### Fixed
+- **MathDropin had no CSS at all.** Inherited the canvas-object scope's `--nm-paper-ink`, which in dark mode is light gray — so the LaTeX rendered white-on-white and the user couldn't read it. ("The 123 button currently opens a tab and has white text so I can't read it.") Added complete styling: paper-white background, **always-black text**, full-width Solve pill, monospace edit textarea.
+- **All canvas dropins now force paper-white background + black text**, regardless of Obsidian theme. The canvas is supposed to feel like a notebook, not the host theme's chrome. TextBox, ChatDropin, MathDropin all locked to `#fff` paper / `#000` ink.
+- **PageHeader breadcrumb no longer renders empty.** When a page has no folder ancestors (vault root or directly inside the configured Noteometry root), the left side of the band would show nothing — making the file tree look "broken." Now always shows a `Notebooks ▾` pill that opens a flyout of every top-level folder containing pages.
+- **Ink palette swatches are bigger and clearly distinct.** Bumped from 22px to 30px, added a visible inactive border ring, increased gap from 6px to 10px. ("It seemed like one and was fucked up" — they were too small / too close.)
+
+### Renamed
+- **Lasso → `123` is now `Math`.** Same v12 LaTeX vision flow, just clearer label. Spawns a MathDropin (now actually readable).
+- **Lasso → `ABC` is now `Words`.** Same chat-with-image flow, but pre-seeds the prompt textarea with "Explain this in plain English. Be concise. Use minimal math notation; favor intuition and analogies." User can edit before sending. Two genuinely distinct prompts: Math = v12 math; Words = plain-language explanation.
+
+### Changed
+- **TextBox math toolbar collapsed.** v1.14.2's `√x` and `Σ` buttons → a single `Math ▾` dropdown with "Inline math…" and "Display math…" options. One control, not two; matches the rest of the toolbar's `<select>` pattern.
+- **TextBox text color picker defaults to pure `#000000`** instead of `#1a1a1a`. ("Text should default to black, everywhere.")
+
 ## 1.14.2 — 2026-05-04
 
 Dan: "Lets put the math block inside the text block, that way it all formats correctly. for sub and super scripts, the math tools will take care of it." Done.

@@ -505,16 +505,16 @@ export default function LassoOverlay({
       <button
         className="noteometry-lasso-action-btn noteometry-lasso-action-123"
         onClick={onProcess123}
-        title="Render as math (LaTeX)"
+        title="Render selection as math (LaTeX) — v12 deterministic protocol"
       >
-        123
+        Math
       </button>
       <button
         className="noteometry-lasso-action-btn noteometry-lasso-action-abc"
         onClick={onProcessABC}
-        title="Ask a question about the selection"
+        title="Ask a plain-English question about the selection"
       >
-        ABC
+        Words
       </button>
       <button className="noteometry-lasso-action-btn" onClick={onClear}>Clear</button>
       {canMove && (

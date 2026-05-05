@@ -227,9 +227,34 @@ export default function PageHeader({ app, plugin, file, onShowFlyout }: Props) {
     );
   }
 
+  // v1.14.3: when the page has no folder ancestors (file lives directly
+  // in the vault root or directly inside the configured Noteometry root),
+  // the breadcrumb would otherwise render empty — so the left half of
+  // the band looked dead. Always show a "Notebooks ▾" pill that opens a
+  // flyout of top-level folders containing pages, so there's never a
+  // dead-band state.
+  const showNotebooksPill = segs.ancestors.length === 0;
+
   return (
     <div className="noteometry-page-header">
       <div className="noteometry-page-header-breadcrumb">
+        {showNotebooksPill && (
+          <button
+            ref={(el) => { ancestorBtnRefs.current[0] = el; }}
+            className="noteometry-page-header-segment"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              showFlyoutAt(
+                ancestorBtnRefs.current[0] ?? null,
+                buildAncestorFlyout(app, root, ""),
+              );
+            }}
+            title="Switch notebook"
+          >
+            Notebooks ▾
+          </button>
+        )}
         {segs.ancestors.map((anc, i) => {
           const isFirst = i === 0;
           // Sibling flyout pivots around this ancestor's PARENT folder.
