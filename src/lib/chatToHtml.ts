@@ -17,8 +17,8 @@
  * span — the user still sees the symbols, just unrendered.
  */
 
-import katex from "katex";
 import type { ChatMessage } from "../types";
+import { renderMathHtml } from "./renderMath";
 
 /** HTML-escape plain (non-math) text segments. */
 function escapeHtml(s: string): string {
@@ -28,20 +28,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-/** Render one math source string with KaTeX. Display vs. inline is the
- *  caller's call. Falls back to escaped raw text on error. */
-function renderTex(src: string, displayMode: boolean): string {
-  try {
-    return katex.renderToString(src, {
-      displayMode,
-      throwOnError: false,
-      output: "html",
-    });
-  } catch {
-    return `<span class="katex-error">${escapeHtml(src)}</span>`;
-  }
 }
 
 /**
@@ -107,7 +93,7 @@ export function renderTextWithMath(text: string): string {
       if (t.kind === "text") {
         return escapeHtml(t.src).replace(/\n/g, "<br>");
       }
-      return renderTex(t.src, t.kind === "display");
+      return renderMathHtml(t.src, t.kind === "display");
     })
     .join("");
 }
