@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.14.8 — 2026-05-05
+
+Scrapped the PageHeader band. Dan: "Notebooks offers no input. The other one is not a tree spur, its linked to the tabs. Rather than continuing, either make it work or scrap it. Your call."
+
+Four releases of attempted fixes (v1.14.5 onClick swap, v1.14.6 viewport clamps + zero-rect guard, v1.14.7 portal-to-body) still left the Notebooks pill non-functional, and the breadcrumb/page-picker pills were redundant with the left-pane Pages sidebar — which already lists every page in the vault and switches the current tab on click. Honest call: the band was dead weight. Removing entirely beats shipping a half-working nav surface.
+
+### Removed
+- **`src/components/PageHeader.tsx`** — deleted.
+- **`<PageHeader />` mount in `NoteometryApp.tsx`** — removed; canvas area now goes straight to the drawing surface.
+- **All `.noteometry-page-header*` CSS rules in `styles.css`** — ~140 lines stripped.
+
+### Kept
+- The v1.14.6 viewport clamp tests (`v1146ContextMenuClamp.test.ts`) — still a valid contract for ContextMenu regardless of who calls it.
+- The v1.14.7 portal contract (`v1147ContextMenuPortal.test.ts`) — same reason; right-click and any future popover host benefits.
+
+### Added
+- `tests/unit/v1148PageHeaderRemoved.test.ts` — pins the removal so a future "let's bring back the breadcrumb" diff that doesn't address the underlying nav model has to delete this test out loud.
+
+### Navigation now
+Left-pane **Pages sidebar** is the single source of nav. Click any page → loads in current tab. Right-click hub stays purely tools.
+
 ## 1.14.7 — 2026-05-05
 
 Real fix for the PageHeader popover. Dan: "again, pill does nothing."

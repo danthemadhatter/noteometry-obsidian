@@ -18,7 +18,6 @@ import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
 import type { ContextMenuItem } from "./ContextMenu";
-import PageHeader from "./PageHeader";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
 import type { CanvasObject } from "../lib/canvasObjects";
@@ -1003,10 +1002,9 @@ export default function NoteometryApp({
     } else {
       /* ── Right-clicked on empty canvas — full tool interface ── */
 
-      // v1.13.0: 📚 Pages submenu removed from the right-click hub.
-      // Navigation lives in the always-visible PageHeader band above
-      // the canvas (notebook · course breadcrumb + page-picker
-      // button). Right-click goes back to being purely tools.
+      // v1.14.8: navigation now lives in the left-pane Pages sidebar
+      // only (PageHeader band scrapped — see render section). Right-click
+      // hub stays purely tools.
 
       // v1.6.9: pin Clear Canvas at the TOP of the hub, right next to
       // Undo/Redo. Previously it was the last item after Export PNG, so
@@ -1445,17 +1443,14 @@ export default function NoteometryApp({
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
-            {/* v1.13.0: page header band — sits above the drawing
-                surface in the canvas-area's flex column. NOT floating
-                on the canvas. Has a notebook · course breadcrumb on
-                the left and a page-picker button on the right. Each
-                surface opens a flyout via the existing ContextMenu. */}
-            <PageHeader
-              app={app}
-              plugin={plugin}
-              file={file}
-              onShowFlyout={(items, x, y) => setCtxMenu({ x, y, items })}
-            />
+            {/* v1.14.8: PageHeader band scrapped. Three releases of
+                attempted fixes (v1.14.5 onClick swap, v1.14.6 viewport
+                clamps + zero-rect guard, v1.14.7 portal-to-body) still
+                left the Notebooks pill non-functional, and the
+                breadcrumb/page-picker pills were redundant with the
+                left-pane Pages sidebar which already lists every page
+                and switches the current tab on click. Removed entirely
+                rather than ship a half-working band. */}
             {/* Hidden image input */}
             <input
               ref={imageInputRef}
