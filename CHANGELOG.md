@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.14.12 — 2026-05-06
+
+Fix the dead "+ Add section" button and the mismatched add-button widths in CanvasNav. Dan: "The Add Section section doesnt work" / "add page need to be the same column width as the section."
+
+### Root cause
+
+1. **Dead Add section.** `onAddSection` called `window.prompt("New section name…")`. Obsidian's Electron renderer suppresses `window.prompt` (it returns `null` immediately on desktop and never appears on iPad), so the early `if (!name) return` swallowed the click. The button looked broken because there was no UI to respond to.
+2. **Width mismatch.** Both "+ Add section" and "+ Add page" use `.noteometry-nav-add` with `flex: 1`. The Sections column is `width: 30%` (capped 140-240 px) and the Pages column is `flex: 1` (much wider). Same class, two very different rendered widths — Add section ended up at ~140-240 px wide while Add page stretched across most of the Pages header.
+
+### Fixed
+- **"+ Add section" actually adds a section now.** Clicking it opens an inline draft row at the top of the sections list (same shape and gesture as the existing rename input). Type a name, press Enter to commit or Escape to cancel; blur also commits. Obsidian's `app.vault.createFolder` is then called with the new path under the configured Vault Folder, the new section is auto-selected, and the listbox refreshes.
+- **Add buttons are the same visual width.** `.noteometry-nav-add` is now `flex: 0 0 auto` (content-sized) with slightly more horizontal padding. Both buttons render at the same width because they're the same content; column widths no longer leak into button width.
+- **Existing-section guard preserved.** Typing a name that matches an existing folder shows the same `Section "X" already exists.` notice as before and selects that section instead of failing silently.
+
+### Tests
+- **`tests/unit/v1412CanvasNavAddSection.test.ts`** (3 tests) — source-level regression assertions:
+  1. CanvasNav.tsx must not call `window.prompt(` (the suppressed API that caused the dead button).
+  2. CanvasNav.tsx contains the inline draft state (`newSectionDraft`) and the commit callback (`commitNewSection`).
+  3. The `.noteometry-nav-add` rule in styles.css uses `flex: 0 0 auto`, not `flex: 1`.
+
+All three would have failed against v1.14.11.
+
 ## 1.14.11 — 2026-05-05
 
 Stop CanvasNav mouse events from bubbling to the canvas area. Dan: "if i right click for a delete pop up, the big tool pane pops up too."

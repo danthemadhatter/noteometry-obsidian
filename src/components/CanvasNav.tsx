@@ -34,6 +34,11 @@ export default function CanvasNav({ app, plugin, file }: Props) {
   const [focusedPagePath, setFocusedPagePath] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [renaming, setRenaming] = useState<{ kind: "section" | "page"; path: string; value: string } | null>(null);
+  // v1.14.12: inline "new section" input. Replaces window.prompt(),
+  // which Obsidian's Electron renderer disables on desktop and which
+  // doesn't exist on iPad — clicking "+ Add section" used to look
+  // dead because the prompt never appeared.
+  const [newSectionDraft, setNewSectionDraft] = useState<string | null>(null);
 
   const sectionsListRef = useRef<HTMLUListElement | null>(null);
   const pagesListRef = useRef<HTMLUListElement | null>(null);
@@ -70,10 +75,16 @@ export default function CanvasNav({ app, plugin, file }: Props) {
     void app.workspace.getLeaf(false).openFile(target);
   }, [app]);
 
-  const onAddSection = useCallback(async () => {
-    const name = window.prompt("New section name (e.g. ELEN201):");
-    if (!name) return;
-    const trimmed = name.trim();
+  // v1.14.12: open the inline draft row instead of calling
+  // window.prompt (which Obsidian's renderer suppresses).
+  const onAddSection = useCallback(() => {
+    setNewSectionDraft("");
+  }, []);
+
+  const commitNewSection = useCallback(async () => {
+    if (newSectionDraft === null) return;
+    const trimmed = newSectionDraft.trim();
+    setNewSectionDraft(null);
     if (!trimmed) return;
     const path = `${root.replace(/\/+$/, "")}/${trimmed}`;
     const existing = app.vault.getAbstractFileByPath(path);
@@ -89,7 +100,7 @@ export default function CanvasNav({ app, plugin, file }: Props) {
     } catch (err) {
       new Notice(`Couldn't create section: ${(err as Error).message ?? err}`);
     }
-  }, [app, root]);
+  }, [app, root, newSectionDraft]);
 
   const onAddPage = useCallback(async () => {
     const target = activeSection?.folderPath ?? root;
@@ -295,7 +306,30 @@ export default function CanvasNav({ app, plugin, file }: Props) {
           aria-activedescendant={activeSection ? `nm-section-${activeSection.folderPath || "root"}` : undefined}
           onKeyDown={onSectionsKeyDown}
         >
-          {sections.length === 0 && (
+          {/* v1.14.12: inline draft row for new section. Replaces
+              window.prompt(), which Obsidian disables. */}
+          {newSectionDraft !== null && (
+            <li>
+              <div className="noteometry-nav-row noteometry-nav-section noteometry-nav-row-draft" role="presentation">
+                <span className="noteometry-nav-glyph" aria-hidden="true">📁</span>
+                <input
+                  autoFocus
+                  className="noteometry-nav-rename-input"
+                  value={newSectionDraft}
+                  placeholder="Section name (e.g. ELEN201)"
+                  onChange={e => setNewSectionDraft(e.target.value)}
+                  onBlur={() => void commitNewSection()}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") { e.preventDefault(); void commitNewSection(); }
+                    if (e.key === "Escape") { e.preventDefault(); setNewSectionDraft(null); }
+                  }}
+                  onClick={e => e.stopPropagation()}
+                  aria-label="New section name"
+                />
+              </div>
+            </li>
+          )}
+          {sections.length === 0 && newSectionDraft === null && (
             <li className="noteometry-nav-empty">No sections yet.</li>
           )}
           {sections.map(section => {

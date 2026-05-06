@@ -4379,11 +4379,15 @@
 }
 
 .noteometry-nav-add {
-  flex: 1;
+  /* v1.14.12: was flex: 1, which made the button stretch to fill its
+     header. Sections column is 30% (capped 140-240px) and Pages
+     column is flex: 1, so the same class rendered at two very
+     different widths. Content-sized fixes the visual mismatch. */
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border: 1px solid transparent;
   border-radius: var(--nm-radius-sm, 4px);
   background: transparent;
@@ -4394,6 +4398,14 @@
   white-space: nowrap;
   text-align: left;
   transition: all 0.1s;
+}
+
+/* v1.14.12: inline new-section draft row. Same shape as a section
+   row, just hosts an input instead of a label. */
+.noteometry-nav-row-draft {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+  border-left: 3px solid var(--nm-accent, var(--text-accent));
+  cursor: text;
 }
 
 .noteometry-nav-add:hover:not(:disabled) {
