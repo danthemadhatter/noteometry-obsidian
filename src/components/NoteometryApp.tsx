@@ -17,6 +17,7 @@ import CanvasObjectLayer from "./CanvasObjectLayer";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
+import CanvasNav from "./CanvasNav";
 import type { ContextMenuItem } from "./ContextMenu";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
@@ -1443,14 +1444,16 @@ export default function NoteometryApp({
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
-            {/* v1.14.8: PageHeader band scrapped. Three releases of
-                attempted fixes (v1.14.5 onClick swap, v1.14.6 viewport
-                clamps + zero-rect guard, v1.14.7 portal-to-body) still
-                left the Notebooks pill non-functional, and the
-                breadcrumb/page-picker pills were redundant with the
-                left-pane Pages sidebar which already lists every page
-                and switches the current tab on click. Removed entirely
-                rather than ship a half-working band. */}
+            {/* v1.14.9: OneNote-style two-column nav, ON the canvas.
+                Replaces the scrapped v1.14.8 PageHeader band and makes
+                the file tree finally visible. Sections (course folders)
+                | Pages (.nmpage files in the section). Click to open,
+                double-click to rename, right-click to delete (with
+                v1.14.6 confirm pattern). + Add section / + Add page
+                inline at the top of each column. Collapse arrow on the
+                Pages-column header reduces the whole nav to a thin
+                rail. */}
+            <CanvasNav app={app} plugin={plugin} file={file} />
             {/* Hidden image input */}
             <input
               ref={imageInputRef}

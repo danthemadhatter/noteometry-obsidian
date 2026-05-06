@@ -4530,3 +4530,232 @@
     transition: none;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   v1.14.9: CanvasNav — OneNote-style on-canvas file tree
+   Two-column always-visible navigation that lives INSIDE
+   .noteometry-canvas-area. Sections | Pages. The whole point is
+   that it's on the canvas, not buried in an Obsidian sidebar that
+   never gets opened.
+   ────────────────────────────────────────────────────────────── */
+
+.noteometry-nav {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  height: 240px;
+  max-height: 35vh;
+  border-bottom: 2px solid var(--nm-paper-border, var(--background-modifier-border));
+  background: var(--nm-faceplate-recessed, var(--background-secondary));
+  font-size: 13px;
+  z-index: 30;
+  position: relative;
+}
+
+.noteometry-nav-collapsed {
+  height: auto;
+  width: auto;
+  align-self: flex-start;
+  border-bottom: none;
+  background: transparent;
+  padding: 4px;
+}
+
+.noteometry-nav-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+}
+
+.noteometry-nav-col:last-child {
+  border-right: none;
+}
+
+.noteometry-nav-sections {
+  width: 30%;
+  min-width: 140px;
+  max-width: 240px;
+  background: var(--nm-faceplate, var(--background-secondary-alt));
+}
+
+.noteometry-nav-pages {
+  flex: 1;
+  background: var(--nm-paper, var(--background-primary));
+}
+
+.noteometry-nav-col-hdr {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+  background: inherit;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.noteometry-nav-add {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm, 4px);
+  background: transparent;
+  color: var(--nm-accent, var(--text-accent));
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+  transition: all 0.1s;
+}
+
+.noteometry-nav-add:hover:not(:disabled) {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+  border-color: var(--nm-accent, var(--text-accent));
+}
+
+.noteometry-nav-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.noteometry-nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-height: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--nm-radius-sm, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.noteometry-nav-toggle:hover {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+  color: var(--nm-accent, var(--text-accent));
+}
+
+.noteometry-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.noteometry-nav-list li {
+  margin: 0;
+  padding: 0;
+}
+
+.noteometry-nav-empty {
+  padding: 12px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.noteometry-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--nm-paper-ink, var(--text-normal));
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.08s;
+  border-left: 3px solid transparent;
+}
+
+.noteometry-nav-row:hover {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+}
+
+.noteometry-nav-row.active {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+  border-left-color: var(--nm-accent, var(--text-accent));
+  font-weight: 600;
+}
+
+.noteometry-nav-glyph {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #d4a017;
+  line-height: 1;
+}
+
+.noteometry-nav-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.noteometry-nav-sub {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.noteometry-nav-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--nm-faceplate-recessed, var(--background-secondary));
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.noteometry-nav-row.active .noteometry-nav-count {
+  background: var(--nm-paper, var(--background-primary));
+}
+
+.noteometry-nav-rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--nm-accent, var(--text-accent));
+  border-radius: 3px;
+  background: var(--nm-paper, var(--background-primary));
+  color: var(--nm-paper-ink, var(--text-normal));
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* Mobile: stack the columns vertically. Sections on top is the
+   familiar OneNote-on-iPad layout. */
+@media (max-width: 720px) {
+  .noteometry-nav {
+    flex-direction: column;
+    height: 220px;
+  }
+  .noteometry-nav-sections,
+  .noteometry-nav-pages {
+    width: 100%;
+    max-width: none;
+    flex: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+  }
+  .noteometry-nav-pages {
+    border-bottom: none;
+  }
+}
