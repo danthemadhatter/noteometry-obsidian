@@ -233,7 +233,12 @@ export default function CanvasNav({ app, plugin, file }: Props) {
 
   if (collapsed) {
     return (
-      <div className="noteometry-nav noteometry-nav-collapsed">
+      <div
+        className="noteometry-nav noteometry-nav-collapsed"
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           className="noteometry-nav-toggle"
@@ -247,8 +252,28 @@ export default function CanvasNav({ app, plugin, file }: Props) {
     );
   }
 
+  // v1.14.11: the nav sits INSIDE the canvas area, which has its own
+  // onClick / onContextMenu handlers (deselect + big tools menu).
+  // Without this, right-clicking a nav row popped the confirm dialog
+  // AND the canvas tools menu on top of it ("the big tool pane pops
+  // up too"), and left-clicking a row also deselected the canvas
+  // selection. Stop all mouse events from bubbling out of the nav
+  // shell. The individual row buttons still receive the events via
+  // React's synthetic bubbling through the shell itself before this
+  // handler fires — React dispatches captured events inside-out, and
+  // a child's onClick runs before a parent's stopPropagation here.
+  const stopMouseBubble = (e: React.MouseEvent) => e.stopPropagation();
+
   return (
-    <div className="noteometry-nav" role="navigation" aria-label="Noteometry pages">
+    <div
+      className="noteometry-nav"
+      role="navigation"
+      aria-label="Noteometry pages"
+      onClick={stopMouseBubble}
+      onDoubleClick={stopMouseBubble}
+      onContextMenu={stopMouseBubble}
+      onMouseDown={stopMouseBubble}
+    >
       {/* Sections column */}
       <div className="noteometry-nav-col noteometry-nav-sections">
         <div className="noteometry-nav-col-hdr">
