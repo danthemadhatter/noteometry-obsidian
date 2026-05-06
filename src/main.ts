@@ -1,6 +1,5 @@
 import { Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from "obsidian";
 import { NoteometryView, VIEW_TYPE } from "./NoteometryView";
-import { NoteometryHomeView, HOME_VIEW_TYPE } from "./HomeView";
 import { NoteometrySettingTab } from "./settings";
 import { NoteometrySettings, DEFAULT_SETTINGS } from "./types";
 import { logVersionBanner } from "./lib/version";
@@ -12,6 +11,16 @@ import {
 } from "./lib/persistence";
 import { getMostRecentNmpage } from "./lib/recentPages";
 import { applyGlobalTheme, removeGlobalTheme } from "./lib/globalTheme";
+
+/** v1.14.10: HomeView scrapped. The house-icon "wonder" was
+ *  out-of-sight/out-of-mind — Dan never opened it, thirty revisions
+ *  proved it, and the v1.14.9 on-canvas CanvasNav replaces every job
+ *  Home was supposed to do (see Resume / Recents / New page). Legacy
+ *  workspace.json entries from old sessions still list a
+ *  noteometry-home leaf though, so Obsidian will restore a
+ *  "Plugin no longer active" ghost tab unless we sweep on onLayoutReady.
+ *  That sweep is sweepLegacyHomeLeaves() below. */
+const LEGACY_HOME_VIEW_TYPE = "noteometry-home";
 
 export default class NoteometryPlugin extends Plugin {
   settings: NoteometrySettings = { ...DEFAULT_SETTINGS };
@@ -26,18 +35,10 @@ export default class NoteometryPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new NoteometryView(leaf, this)
     );
 
-    this.registerView(
-      HOME_VIEW_TYPE,
-      (leaf: WorkspaceLeaf) => new NoteometryHomeView(leaf, this)
-    );
-
     this.registerExtensions(["nmpage"], VIEW_TYPE);
 
     this.addRibbonIcon("pencil", "New Noteometry page", () => {
       void this.createAndOpenNewPage();
-    });
-    this.addRibbonIcon("home", "Noteometry home", () => {
-      void this.openHome();
     });
 
     this.addCommand({
@@ -47,25 +48,10 @@ export default class NoteometryPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "noteometry-open-home",
-      name: "Noteometry: Open home",
-      callback: () => this.openHome(),
-    });
-
-    this.addCommand({
       id: "noteometry-convert-legacy-md",
       name: "Noteometry: Convert legacy .md pages to .nmpage",
       callback: () => this.runConvertLegacyCommand(),
     });
-
-    // v1.12.0: PagesPanel leaf-view replaced by the Pages submenu in
-    // the canvas right-click hub (see buildPagesMenu). Removed here:
-    //   - registerPagesPanelView(this)
-    //   - 'Noteometry pages' ribbon icon
-    //   - 'noteometry-open-pages-panel' command
-    // The leaf-management war (v1.11.1–v1.11.5: stacking duplicates,
-    // displaced file-explorer, dead 'Plugin no longer active' leaves)
-    // is over. No leaf, no fight.
 
     // v1.11.1: apply global theme if enabled.
     if (this.settings.globalThemeEnabled) {
@@ -75,15 +61,12 @@ export default class NoteometryPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
       // v1.11.3+1.11.4: rescue any canvas leaves stuck in the sidebar
-      // from prior buggy sessions, then restore the file explorer if
-      // it was displaced by the pages panel before the v1.11.3 fix.
+      // from prior buggy sessions.
       this.relocateNoteometryLeavesOutOfSidebar();
-      // v1.12.0: the panel-leaf is gone, but historical workspace.json
-      // can still hold leftover noteometry-pages-panel leaves AND dead
-      // 'Plugin no longer active' empty leaves from the v1.11.x cycle.
-      // Sweep them once on first load after upgrade so the workspace
-      // ends clean. After this users will never see them again.
+      // v1.12.0: sweep historical noteometry-pages-panel leaves.
       this.detachLegacyPagesPanelLeaves();
+      // v1.14.10: sweep historical noteometry-home leaves.
+      this.sweepLegacyHomeLeaves();
       this.detachDeadEmptyLeavesInSidebar();
       void this.ensureFileExplorerVisible();
       void this.notifyIfLegacyPagesPresent();
@@ -113,41 +96,21 @@ export default class NoteometryPlugin extends Plugin {
     await leaf.openFile(file);
   }
 
-  async openHome(): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE)[0];
-    if (existing) {
-      void this.app.workspace.revealLeaf(existing);
-      return;
-    }
-    const leaf = this.app.workspace.getLeaf(true);
-    await leaf.setViewState({ type: HOME_VIEW_TYPE, active: true });
-  }
-
-  /** v1.11.1: replaces maybeAutoOpenHome. New default behavior:
-   *    - if a Noteometry tab is already open (workspace.json restore),
-   *      do nothing.
-   *    - if homeViewOnLaunch === true, open the Home view (legacy).
+  /** v1.14.10: launch behavior simplified. Home view is gone, so the
+   *  only two states are:
+   *    - if a Noteometry page tab is already restored by workspace.json,
+   *      do nothing (don't stack a second one).
    *    - else open the most-recently-edited .nmpage directly.
    *    - if there are no .nmpage files at all, do nothing (don't
-   *      ambush a fresh vault).
-   *
-   *  Why the default flip: the user said "the opening file thing is
-   *  stupid". The Home view added an extra tap to the most common
-   *  intention (resume the page I was just on). We satisfy the
-   *  intention directly; users who want the menu can re-enable it. */
+   *      ambush a fresh vault — the CanvasNav will render empty and
+   *      Dan can create a section + page from there). */
   private handleLaunchOpen(): void {
     const hasPageTab = this.app.workspace.getLeavesOfType(VIEW_TYPE).length > 0;
-    const hasHomeTab = this.app.workspace.getLeavesOfType(HOME_VIEW_TYPE).length > 0;
-    if (hasPageTab || hasHomeTab) return;
+    if (hasPageTab) return;
 
     const root = rootDir(this);
     const mostRecent = getMostRecentNmpage(this.app, root);
     if (!mostRecent) return; // empty vault — don't ambush
-
-    if (this.settings.homeViewOnLaunch) {
-      void this.openHome();
-      return;
-    }
 
     // Open the most-recent page directly. getLeaf(false) reuses an
     // existing empty leaf when possible; if Obsidian restored a blank
@@ -172,12 +135,9 @@ export default class NoteometryPlugin extends Plugin {
    *  opening canvas pages inside a narrow sidebar pane.
    *
    *  v1.11.4: previous version used `leftSplit.containsLeaf()` which
-   *  isn't a real Obsidian API in current builds, so the check always
-   *  returned false and sidebar leaves slipped through. The reliable
-   *  signal is `leaf.getRoot()` — every leaf reports its split root,
-   *  and we compare against the three known roots. The DOM-walk
-   *  fallback stays as belt-and-braces for headless Obsidian versions
-   *  where getRoot() may be missing. */
+   *  isn't a real Obsidian API; the reliable signal is `leaf.getRoot()`.
+   *  DOM-class fallback (.mod-left-split / .mod-right-split) stays for
+   *  headless Obsidian builds where getRoot() may be missing. */
   private isLeafInSidebar(leaf: WorkspaceLeaf): boolean {
     const ws = this.app.workspace as unknown as {
       leftSplit?: unknown;
@@ -189,13 +149,8 @@ export default class NoteometryPlugin extends Plugin {
     if (root) {
       if (root === ws.leftSplit) return true;
       if (root === ws.rightSplit) return true;
-      // If we know rootSplit and the leaf's root matches, it's in the
-      // main area — trust that and short-circuit the DOM walk.
       if (ws.rootSplit && root === ws.rootSplit) return false;
     }
-    // DOM fallback: walk up from the leaf's container element looking
-    // for Obsidian's sidebar split class. This survives churn in the
-    // workspace internals since the class names have been stable.
     const containerEl = (leaf as unknown as { containerEl?: HTMLElement })
       .containerEl;
     if (containerEl?.closest?.(".mod-left-split, .mod-right-split")) {
@@ -204,11 +159,8 @@ export default class NoteometryPlugin extends Plugin {
     return false;
   }
 
-  /** v1.12.0: detach EVERY leftover noteometry-pages-panel leaf from
-   *  the v1.11.x cycle. The panel view itself is no longer registered
-   *  in this version, so each historical leaf would render as
-   *  'Plugin no longer active'. Sweep on layout-ready and the
-   *  workspace ends clean. Idempotent — once the leaves are gone,
+  /** v1.12.0: detach every leftover noteometry-pages-panel leaf from
+   *  the v1.11.x cycle. Idempotent — once the leaves are gone,
    *  subsequent calls find nothing and no-op. */
   private detachLegacyPagesPanelLeaves(): void {
     const LEGACY_PANEL_VIEW_TYPE = "noteometry-pages-panel";
@@ -218,22 +170,24 @@ export default class NoteometryPlugin extends Plugin {
     for (const leaf of leaves) leaf.detach();
   }
 
+  /** v1.14.10: sweep any historical noteometry-home leaves. The view
+   *  type is no longer registered, so restored leaves paint as the
+   *  "Plugin no longer active" placeholder — which is exactly the
+   *  always-open tab Dan flagged. Detaching them on layout-ready
+   *  removes the ghost permanently; workspace.json won't serialize a
+   *  detached leaf, so the sweep is a one-time cost per upgrade. */
+  private sweepLegacyHomeLeaves(): void {
+    const leaves = this.app.workspace.getLeavesOfType(LEGACY_HOME_VIEW_TYPE);
+    for (const leaf of leaves) leaf.detach();
+  }
+
   /** v1.11.5: detach "Plugin no longer active" / empty-view leaves
-   *  that v1.11.4's manual file-explorer creation accidentally left
-   *  behind. setViewState({ type: "file-explorer" }) on a fresh leaf
-   *  in the left split, before the file-explorer core plugin had
-   *  registered its view type, produced an orphan leaf that Obsidian
-   *  paints as the "Plugin no longer active" placeholder. We detect
-   *  these leaves by view type — "empty" is what Obsidian uses for
-   *  any leaf whose view type isn't registered. We only touch leaves
-   *  in the SIDEBAR; empty leaves in the main area are normal (e.g.
-   *  the New Tab page) and must be left alone. */
+   *  in the sidebar. Main-area empty leaves (e.g. the New Tab page)
+   *  are left alone. */
   private detachDeadEmptyLeavesInSidebar(): void {
     const dead: WorkspaceLeaf[] = [];
     this.app.workspace.iterateAllLeaves((leaf) => {
       const type = leaf.view.getViewType();
-      // "empty" is Obsidian's fallback for unregistered/missing view
-      // types AND for the New Tab page — hence the sidebar guard.
       if (type !== "empty") return;
       if (!this.isLeafInSidebar(leaf)) return;
       dead.push(leaf);
@@ -242,18 +196,7 @@ export default class NoteometryPlugin extends Plugin {
   }
 
   /** v1.11.4 (rewritten in v1.11.5): restore Obsidian's file-explorer
-   *  leaf if no file-explorer view is currently mounted.
-   *
-   *  v1.11.4 originally tried `setViewState({ type: "file-explorer" })`
-   *  on a fresh leaf as a fallback when the `file-explorer:open` command
-   *  wasn't available. That produced "Plugin no longer active" orphan
-   *  leaves because Obsidian only mounts the file-explorer view through
-   *  its core-plugin lifecycle, not through `setViewState` on an
-   *  arbitrary leaf. v1.11.5 drops the manual fallback entirely — the
-   *  only safe path is the command. If the command isn't registered
-   *  (the user disabled the file-explorer core plugin), we leave it
-   *  alone; users who deliberately disabled it don't want us re-enabling
-   *  it on their behalf. */
+   *  leaf if no file-explorer view is currently mounted. */
   private async ensureFileExplorerVisible(): Promise<void> {
     const ws = this.app.workspace;
     const existing = ws.getLeavesOfType("file-explorer");
@@ -262,7 +205,6 @@ export default class NoteometryPlugin extends Plugin {
       commands?: { executeCommandById?: (id: string) => boolean };
     }).commands;
     cmd?.executeCommandById?.("file-explorer:open");
-    // Intentionally no fallback. See doc comment above.
   }
 
   private async runConvertLegacyCommand(): Promise<void> {
@@ -284,10 +226,8 @@ export default class NoteometryPlugin extends Plugin {
     new Notice(`${base}${suffix}.`, 6000);
   }
 
-  /** Tier 3 workspace restoration: the old plugin used a singleton
-   *  ItemView, so saved workspace.json may have noteometry-view leaves
-   *  that Obsidian restores without a bound file. A FileView without a
-   *  file is a broken empty tab — detach them. */
+  /** Tier 3 workspace restoration: detach any noteometry-view leaves
+   *  that Obsidian restored without a bound file. */
   private detachStaleNoteometryLeaves(): void {
     const stale: WorkspaceLeaf[] = [];
     this.app.workspace.iterateAllLeaves((leaf) => {
@@ -298,37 +238,28 @@ export default class NoteometryPlugin extends Plugin {
     for (const leaf of stale) leaf.detach();
   }
 
-  /** v1.11.3: if any canvas (noteometry-view or noteometry-home) leaf
-   *  ended up in the left or right sidebar in a prior session, detach
-   *  it and reopen the file in a fresh main-area tab. The sidebar pane
-   *  is too narrow for canvas work and this is never what the user
-   *  intended — it's always the result of a plugin bug (fixed in this
-   *  release) or a workspace.json restore chain. */
+  /** v1.11.3: if any canvas leaf ended up in the left or right sidebar
+   *  in a prior session, detach it and reopen the file in a fresh
+   *  main-area tab. */
   private relocateNoteometryLeavesOutOfSidebar(): void {
-    const toRelocate: { leaf: WorkspaceLeaf; file: TFile | null; type: string }[] = [];
+    const toRelocate: { leaf: WorkspaceLeaf; file: TFile | null }[] = [];
     this.app.workspace.iterateAllLeaves((leaf) => {
       const type = leaf.view.getViewType();
-      if (type !== VIEW_TYPE && type !== HOME_VIEW_TYPE) return;
+      if (type !== VIEW_TYPE) return;
       if (!this.isLeafInSidebar(leaf)) return;
       const view = leaf.view as { file?: TFile | null };
-      toRelocate.push({ leaf, file: view.file ?? null, type });
+      toRelocate.push({ leaf, file: view.file ?? null });
     });
-    for (const { leaf, file, type } of toRelocate) {
+    for (const { leaf, file } of toRelocate) {
       leaf.detach();
-      if (type === VIEW_TYPE && file) {
+      if (file) {
         void this.app.workspace.getLeaf("tab").openFile(file);
-      } else if (type === HOME_VIEW_TYPE) {
-        void this.app.workspace.getLeaf("tab").setViewState({
-          type: HOME_VIEW_TYPE,
-          active: true,
-        });
       }
     }
   }
 
   /** On load, if the vault still has legacy .md pages containing
-   *  Noteometry-page JSON, tell the user — otherwise they see an empty
-   *  plugin and assume it's broken. Non-blocking, no auto-rename. */
+   *  Noteometry-page JSON, tell the user. */
   private async notifyIfLegacyPagesPresent(): Promise<void> {
     const root = rootDir(this);
     const adapter = this.app.vault.adapter;
@@ -347,8 +278,6 @@ export default class NoteometryPlugin extends Plugin {
 
   async loadSettings() {
     const data = ((await this.loadData()) ?? {}) as Record<string, unknown>;
-    // Allow-list: only keys that exist in DEFAULT_SETTINGS survive. Unknown
-    // fields (stale migrations, old plugin iterations) are dropped on next save.
     const next: Record<string, unknown> = { ...DEFAULT_SETTINGS };
     for (const key of Object.keys(DEFAULT_SETTINGS)) {
       if (key in data) {

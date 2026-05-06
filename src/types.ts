@@ -23,11 +23,6 @@ export interface NoteometrySettings {
    * day-30 re-learning episode (per design doc §6b: gesture recall +
    * object-permanence crash mitigation). */
   gestureTutorialSeen: boolean;
-  /** v1.11.1: when true, Obsidian launch opens the Noteometry Home
-   * view (Resume / New page / Recents). Default false — the user
-   * complained the home view is a stupid extra tap, so we default to
-   * "open the most-recent page directly". Settings can flip this back. */
-  homeViewOnLaunch: boolean;
   /** v1.11.1: apply the Noteometry visual theme to all of Obsidian
    * (sidebar, tab bar, ribbon, command palette). Default true. */
   globalThemeEnabled: boolean;
@@ -47,7 +42,6 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   autoSaveDelay: 2000,
   fingerDrawing: false,
   gestureTutorialSeen: false,
-  homeViewOnLaunch: false,
   globalThemeEnabled: true,
 };
 

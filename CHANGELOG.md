@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.14.10 — 2026-05-05
+
+Killed the Home view. Fixed the CanvasNav accessibility + intuitiveness gaps Dan flagged. Dan: "It could work. It's not intuitive. It's very unclear — even more from an accessibility standpoint. There's a weird thing where theres always a tab open. The Home icon and all it's wonder need to be gone."
+
+The "always a tab open" weirdness was the HomeView leaf that Obsidian restored from `workspace.json` in sessions where Dan had ever opened it. The Home view itself was the out-of-sight/out-of-mind surface v1.14.9 was supposed to replace, so in v1.14.10 we remove it entirely and sweep the legacy leaves so restored sessions don't paint the "Plugin no longer active" ghost.
+
+### Removed
+- **`src/HomeView.ts`** — deleted. Home view registration, `home` ribbon icon, `noteometry-open-home` command, and `openHome()` helper all gone from `src/main.ts`.
+- **`src/components/Home.tsx`** — deleted.
+- **`homeViewOnLaunch` setting** — dropped from `DEFAULT_SETTINGS` and from the Settings tab. The allow-list in `loadSettings` drops stale values on next save.
+- **`.noteometry-home*` CSS** — ~210 lines stripped from `styles.css`.
+
+### Added
+- **`sweepLegacyHomeLeaves()` in `src/main.ts`** — runs on `onLayoutReady` and detaches any surviving `noteometry-home` leaves from old `workspace.json` files. Idempotent; one-time cost per upgrade.
+- **`tests/unit/v1410HomeRemoved.test.ts`** — pins the full removal (deleted files, no imports, no ribbon icon, no command, no setting, no CSS, sweep present).
+- **`tests/unit/v1410CanvasNavA11y.test.ts`** — pins the CanvasNav accessibility contract: ARIA listbox / option roles, `aria-selected`, keyboard handlers for Arrow / Enter / F2 / Delete, `:focus-visible` outline, filled-accent active row.
+
+### Changed — CanvasNav accessibility + intuitiveness
+- **Root bucket relabeled.** v1.14.9's opaque `(root)` label is gone. The synthetic bucket for loose `.nmpage` files now reads with the actual root folder name (e.g. `Noteometry`, or `APUS` if the configured root is `Noteometry/APUS`) and renders with a notebook glyph (📒) distinct from the regular yellow folder (📁). Helper: `rootSectionLabel(rootFolder)` in `src/lib/canvasNavTree.ts`. `NavSection` gets a new `isRootBucket: boolean` flag so the UI can treat it specially.
+- **Full keyboard nav.** Arrow Up/Down moves selection inside each column. Arrow Right / Tab jumps from Sections to Pages; Arrow Left / Shift+Tab jumps back. Enter opens a page. F2 renames the focused row. Delete / Backspace triggers the v1.14.6 confirm-to-delete pattern. All lists expose `aria-activedescendant` so screen readers track focus.
+- **Active-row contrast.** The v1.14.9 "3px left border + tinted background" selected state was too subtle. v1.14.10 fills the active row with the Noteometry accent color and uses `--text-on-accent` for the label — unmistakable, and it passes WCAG AA against the paper background.
+- **Visible focus ring.** New `.noteometry-nav-row:focus-visible` outline so keyboard users can see where they are without losing track of which row is selected.
+- **Root-bucket guard.** Rename and delete on the synthetic root bucket are refused with a Notice. Deleting that bucket would have trashed the entire Noteometry folder along with every section inside it.
+- **Empty-state copy trimmed.** "No pages in this section. Click + Add page." → "No pages yet." The button is right above; the instruction was dead weight.
+
+### Launch behavior
+- `handleLaunchOpen` no longer branches on `homeViewOnLaunch`. It either (a) leaves a restored page tab alone or (b) opens the most-recent `.nmpage` directly. No home-view fallback.
+
 ## 1.14.9 — 2026-05-05
 
 OneNote-style file tree, on canvas, always visible. Dan: "I have been bitching about the importance of the file tree the file tree the file tree, and it was never opened because its not on the FUCKING canvas. Sorry, not sure who or what is at fault, but as the one with Bipolar disorder and ADHD, i shouldnt have to stress this hard without you even noticing."

@@ -9,7 +9,9 @@ import { findAllNmpages } from "./recentPages";
  *  Sections = first-level child folders of the Noteometry root.
  *  Pages    = every .nmpage that lives anywhere underneath a section.
  *  Loose .nmpage files directly in the root land in a synthetic
- *  "(root)" section so they don't disappear. */
+ *  section labeled with the root folder name (e.g. "Noteometry")
+ *  so the bucket reads as a real place instead of the opaque
+ *  "(root)" jargon Dan flagged in v1.14.10. */
 
 export interface NavSection {
   /** Display name shown in the Sections column. */
@@ -19,6 +21,12 @@ export interface NavSection {
   folderPath: string;
   /** Pages inside this section, sorted by name. */
   pages: NavPage[];
+  /** v1.14.10: true for the synthetic bucket that holds loose
+   *  .nmpage files directly under the Noteometry root. CanvasNav
+   *  uses this to (a) render a different glyph (\ud83d\udcd2 notebook)
+   *  and (b) refuse rename/delete on the bucket itself, which would
+   *  blow away the entire root folder. */
+  isRootBucket?: boolean;
 }
 
 export interface NavPage {
@@ -34,7 +42,16 @@ export interface NavPage {
   mtime: number;
 }
 
-const ROOT_SECTION_LABEL = "(root)";
+/** v1.14.10: derive the synthetic-section label from the root path.
+ *  "Noteometry" reads as a place; the previous "(root)" was opaque
+ *  jargon. Falls back to the literal "Noteometry" for the empty
+ *  string (vault-root configurations). */
+export function rootSectionLabel(rootFolder: string): string {
+  const trimmed = rootFolder.replace(/\/+$/, "");
+  if (!trimmed) return "Noteometry";
+  const tail = trimmed.slice(trimmed.lastIndexOf("/") + 1);
+  return tail || "Noteometry";
+}
 
 export function buildNav(app: App, rootFolder: string): NavSection[] {
   const root = (app.vault.getAbstractFileByPath(rootFolder) ?? null) as TFolder | null;
@@ -88,7 +105,12 @@ export function buildNav(app: App, rootFolder: string): NavSection[] {
 
   if (looseRoot.length > 0) {
     looseRoot.sort(byLabel);
-    sections.unshift({ name: ROOT_SECTION_LABEL, folderPath: rootFolder, pages: looseRoot });
+    sections.unshift({
+      name: rootSectionLabel(rootFolder),
+      folderPath: rootFolder,
+      pages: looseRoot,
+      isRootBucket: true,
+    });
   }
 
   return sections;
