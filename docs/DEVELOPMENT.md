@@ -1,6 +1,6 @@
 # Noteometry Development Guide
 
-> Current as of **v1.7.2**. See [RELEASE.md](../RELEASE.md) for the ship checklist.
+> Current as of **v1.14.11**. See [RELEASE.md](../RELEASE.md) for the ship checklist.
 
 ## Setup
 
@@ -13,12 +13,13 @@ npm install --legacy-peer-deps
 ## Build
 
 ```bash
-npm run build    # TypeScript check + esbuild production bundle + auto-deploy
+npm run build    # TypeScript check + esbuild production bundle + auto-deploy (main branch only)
 npm run dev      # esbuild watch mode (rebuild on file changes)
 npm test         # Run vitest unit tests
+npm test -- --run  # Run vitest once (no watch)
 ```
 
-The build automatically deploys `main.js`, `styles.css`, and `manifest.json` to `~/Documents/Noteometry/.obsidian/plugins/noteometry/` (the Obsidian Sync vault).
+Production builds auto-deploy `main.js`, `styles.css`, and `manifest.json` to `~/Documents/Noteometry/.obsidian/plugins/noteometry/` (the Obsidian Sync vault) **only when the working tree is on `main`**. Branch builds skip the deploy step so a feature branch can't clobber the running plugin.
 
 ## Development Workflow
 
@@ -26,29 +27,30 @@ The build automatically deploys `main.js`, `styles.css`, and `manifest.json` to 
 2. Run `npm run build`
 3. In Obsidian: Settings → Community plugins → toggle Noteometry off/on (or Ctrl+P → "Reload app without saving")
 4. Test the changes
-5. Commit and push
+5. Commit and push — open a PR, squash-merge, then `.github/workflows/auto-tag.yml` auto-tags + auto-releases ~35-45s after merge
 
 ## Project Structure
 
 ### Entry Point: `src/main.ts`
-- Extends Obsidian's `Plugin` class
-- Registers the `NoteometryView` view type
-- Loads/saves settings
-- Adds ribbon icon and command to open Noteometry
-- Auto-opens the view on startup
-- Closes empty "New Tab" leaves that Obsidian creates
+- Extends Obsidian's `Plugin` class (~294 lines)
+- `registerView(VIEW_TYPE, …)` for `NoteometryView`
+- `registerExtensions(["nmpage"], VIEW_TYPE)` so `.nmpage` opens directly in the canvas
+- Loads/saves settings; `addRibbonIcon("pencil", "New Noteometry page")`
+- Two commands: **New page** and **Convert legacy .md pages to .nmpage**
+- On layout-ready, sweeps any stranded `noteometry-home` leaves (the legacy HomeView removed in v1.14.10)
+- Applies the global theme (`globalThemeEnabled`) to Obsidian's chrome
 
 ### View Bridge: `src/NoteometryView.ts`
-- Extends Obsidian's `FileView` (Tier 3, v1.7+) — bound to one `.nmpage` `TFile`
-- Registered for the `nmpage` extension via `registerExtensions(["nmpage"], VIEW_TYPE)` in `main.ts`
-- Mounts React root on `onOpen()`; re-renders on `onLoadFile()` so drop-ins see the bound file
+- Extends Obsidian's `FileView` — bound to one `.nmpage` `TFile`
+- Mounts React root on `onOpen()`; re-renders on `onLoadFile()` so drop-ins and CanvasNav see the bound file
 - Calls `flushSave()` on `onClose()` to prevent data loss
+- `onUnloadFile` / `onClose` use `lastFile` because `this.file` is null between them
 - Blocks touch swipe gestures (bubble-phase `stopPropagation`)
 
 ### Root Component: `src/components/NoteometryApp.tsx`
-- ALL state lives here (no global stores except tableStore)
-- Manages: canvas state, panel state, chat state, persistence, undo/redo
-- ~800 lines — this is the God Component by necessity (Obsidian plugin constraints)
+- ALL state lives here (no global stores except `tableStore`)
+- Manages: canvas state, panel state, chat state, persistence, undo/redo, ctxMenu state
+- This is the God Component by necessity (Obsidian plugin constraints)
 
 ### State Management Pattern
 - React `useState` for all UI state
@@ -71,43 +73,43 @@ InkCanvas conditionally attaches pointer event listeners based on the current to
 
 ### Touch vs. Stylus Discrimination
 All pointer handlers in InkCanvas check `e.pointerType`:
-- `"touch"` → always pans (handled by separate touch effect)
+- `"touch"` → always pans (handled by separate touch effect, unless `fingerDrawing` is enabled)
 - `"pen"` or `"mouse"` → uses current tool (pen, eraser, grab, shapes)
 
-### Auto-Save Debouncing
-A `useEffect` watches all saveable state. On change, it clears any pending timer and sets a new 2-second timeout. The `loadingPageRef` flag prevents saves from firing when loading a new page.
+### Auto-Save Debouncing + Recovery Cache
+A `useEffect` watches all saveable state. On change, it clears any pending timer and sets a new 2-second timeout. The `loadingPageRef` flag prevents saves from firing when loading a new page. The save path mirrors the page synchronously to `localStorage` under `nm:cache:<path>` **before** the async `vault.modify` await, so a tab close mid-save still recovers on reload.
+
+### Event Bubbling Inside CanvasNav (v1.14.11)
+CanvasNav's outer shell stops propagation on `click` / `dblclick` / `contextmenu` / `mousedown` so a right-click on a nav row doesn't bubble up to the canvas's `onContextMenu={handleCanvasContextMenu}` and pop the big tools hub. The same fix applies in both the open-state and the collapsed-rail render branches. Pinned by `tests/unit/v1411CanvasNavEventBubble.test.ts`.
+
+### `noUncheckedIndexedAccess`
+`tsconfig.json` enables this — `array[i]` returns `T | undefined` even when `i` looks "obviously" valid. The repo-wide pattern is to capture into a `const` and null-check before use. Existing tests will catch regressions, but the type errors are loud enough on their own.
 
 ## Testing
 
 Tests are in `tests/unit/` using Vitest:
 ```bash
-npm test              # Run all tests
-npx vitest --watch    # Watch mode
+npm test              # Run all tests (watch mode)
+npm test -- --run     # Run once (CI / pre-merge)
+npx vitest --watch    # Watch mode (alternative)
 ```
 
-Current test coverage (see `tests/unit/` for the authoritative list):
-- `canvasObjects.test.ts` — factory functions, ID uniqueness
-- `circuitSniperSnap.test.ts` — proximity pin lookup, angled snap
-- `clearCanvasAction.test.ts` — Clear Canvas factory label / danger flag / onClick wiring
-- `clipboardPayload.test.ts` — copy-to-Word clipboard payload (protected pipeline regression guardrail)
-- `contextMenuInsert.test.ts` — every hub insert factory + quarantined AI drop-in
-- `contextMenuLayout.test.ts` — Clear Canvas sits in the first rows of the hub, behind its own separator
-- `inkEngine.test.ts` — hit-testing, smoothing, polygon intersection
-- `lassoSelection.test.ts` — selection helpers (screen↔world, polygon + bbox selection, pure delete/move semantics, empty-selection predicate)
-- `mathPaletteStamp.test.ts` — `shouldArmStamp()` routing for 20+ symbols across tabs
-- `mathV12Preset.test.ts` — Math v12 DLP prompt preset (protected)
-- `mathml.test.ts` — MathML rendering (protected pipeline)
-- `objectDragHitTest.test.ts` — direct-drag hit test: drag starts on body, passes through on form controls / contenteditable / canvas / role="button"
-- `persistenceV3.test.ts` — v3 pack/unpack round-trips
-- `tableStore.test.ts` — get/set/load/getAll round-trips
+**Configuration** (`vitest.config.ts`):
+- `environment: "node"` — no jsdom. DOM-touching tests stub `document` / `localStorage` / etc. via `vi.stubGlobal` or build minimal fakes inside the test.
+- `obsidian` runtime is aliased to `tests/stubs/obsidian.ts` so any module that imports from `obsidian` resolves under plain Node.
+
+**Baseline at v1.14.11:** 51 test files, 565 tests. Read `tests/unit/` directly for the authoritative current list — adding it inline here drifts every release. Notable suites:
+
+- `version.test.ts` — fails loudly if `manifest.json` / `package.json` / `versions.json` / `src/lib/version.ts` drift apart
+- `mathV12Preset.test.ts`, `mathml.test.ts`, `clipboardPayload.test.ts` — protected pipelines (Math v12 DLP, MathML, copy-to-Word). Changes require explicit review, not a drive-by refactor.
+- `persistenceFileBound.test.ts`, `persistenceRecoveryCache.test.ts`, `persistenceV3.test.ts` — file-bound API, recovery cache, v3 round-trips
+- `gestureRecognizer.test.ts`, `gestureFuzz.test.ts`, `longPressRecognizer.test.ts`, `gestureBinding.test.ts` — gesture state machines
+- `v11*.test.ts`, `v141*.test.ts` — version-pinned regression tests for shipped fixes (each release that fixes a bug should add one here)
 
 To add tests for a new module:
 1. Create `tests/unit/<module>.test.ts`
 2. Import from the module under test (`../../src/lib/<module>`, `../../src/features/...`, etc.)
-3. Run `npm test`
-
-### Do not break
-- `mathV12Preset.test.ts`, `mathml.test.ts`, and `clipboardPayload.test.ts` cover Math v12 / MathML / copy-to-Word. These are protected pipelines — changes require explicit review, not a drive-by refactor.
+3. Run `npm test -- --run`
 
 ## Build Configuration
 
@@ -117,12 +119,13 @@ To add tests for a new module:
 - External: `obsidian`, `electron`, CodeMirror modules, Node builtins
 - Production: minified, no sourcemap
 - Development: inline sourcemap, watch mode
-- Auto-deploy: copies built files to Obsidian Sync vault after production build
+- Auto-deploy: copies built files to Obsidian Sync vault after production build **on the `main` branch only**
 
 ### TypeScript (`tsconfig.json`)
 - Target: ES6, Module: ESNext
 - JSX: react-jsx
 - Strict mode enabled
+- `noUncheckedIndexedAccess: true` (see Key Code Patterns)
 - `skipLibCheck` used in build command (Obsidian types have issues)
 
 ## AI Integration
@@ -135,7 +138,7 @@ To add tests for a new module:
 5. Add settings UI in `settings.ts`
 
 ### API Call Pattern
-All AI calls go through Obsidian's `requestUrl` (for Claude) or standard `fetch` (for LM Studio). This is because `requestUrl` bypasses CORS, which is required on iPad.
+All AI calls go through Obsidian's `requestUrl` (for Claude / Perplexity) or standard `fetch` (for LM Studio). `requestUrl` bypasses CORS, which is required on iPad.
 
 ```typescript
 const response = await requestUrl({
@@ -150,8 +153,8 @@ const response = await requestUrl({
 
 All styles in a single `styles.css` file:
 1. **KaTeX CSS** (line 1) — bundled inline from katex package
-2. **CSS Variables** (lines 9-24) — design tokens (colors, radii, shadows, fonts)
-3. **Layout** — root container, split, canvas area, right panel (no plugin-owned sidebar; navigation lives in Obsidian's file explorer)
+2. **CSS Variables** — design tokens (colors, radii, shadows, fonts)
+3. **Layout** — root container, split, canvas area, right panel, **CanvasNav strip on the canvas (v1.14.9+)**
 4. **Components** — toolbar, objects, palette, chat, etc.
 5. **Responsive** — `@media` queries for tablet (<1024px) and phone (<768px)
 
@@ -179,3 +182,6 @@ CSS class prefix: `noteometry-` for all plugin classes.
 3. Add factory function
 4. Add rendering in `CanvasObjectLayer.tsx` content area
 5. Add handling in `renderLassoRegionToImage` if it should be captured by lasso
+
+### Cutting a Release
+See `RELEASE.md` — the short version: branch → bump version (manifest, package, versions, `src/lib/version.ts`) → CHANGELOG entry at the top of `CHANGELOG.md` → tests pass → push → PR → squash-merge. The auto-tag workflow handles the GitHub release.
