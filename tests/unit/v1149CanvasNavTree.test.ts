@@ -109,9 +109,12 @@ describe("v1.14.9 \u2014 buildNav (canvas nav tree)", () => {
     const app = makeApp(root, all);
     const sections = buildNav(app as unknown as Parameters<typeof buildNav>[0], "Noteometry/APUS");
 
-    // Sections, in display order: (root) first, then ELEN201, MATH240 alpha.
+    // v1.14.10: synthetic root bucket now uses the real folder name,
+    // not the opaque "(root)" jargon. For Noteometry/APUS root, that's
+    // "APUS". Display order: bucket first, then ELEN201, MATH240 alpha.
     const names = sections.map(s => s.name);
-    expect(names[0]).toBe("(root)");
+    expect(names[0]).toBe("APUS");
+    expect(sections[0].isRootBucket).toBe(true);
     expect(names).toContain("ELEN201");
     expect(names).toContain("MATH240");
   });
@@ -134,8 +137,9 @@ describe("v1.14.9 \u2014 buildNav (canvas nav tree)", () => {
     const { root, all } = makeTree();
     const app = makeApp(root, all);
     const sections = buildNav(app as unknown as Parameters<typeof buildNav>[0], "Noteometry/APUS");
-    const rootSec = sections.find(s => s.name === "(root)");
+    const rootSec = sections.find(s => s.isRootBucket);
     expect(rootSec).toBeDefined();
+    expect(rootSec!.name).toBe("APUS");
     expect(rootSec!.pages.map(p => p.label)).toEqual(["Stray"]);
   });
 

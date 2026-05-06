@@ -166,18 +166,7 @@ export class NoteometrySettingTab extends PluginSettingTab {
           })
       );
 
-    /* ── v1.11.1: Launch behavior ────────────────────── */
-    new Setting(containerEl)
-      .setName("Show home view on launch")
-      .setDesc(
-        "When ON, opening Obsidian shows the Noteometry home (Resume / New page / Recents). When OFF (default), opens the most-recent page directly.",
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.homeViewOnLaunch).onChange(async (v) => {
-          this.plugin.settings.homeViewOnLaunch = v;
-          await this.plugin.saveSettings();
-        }),
-      );
+    /* ── v1.14.10: home-view toggle removed — HomeView scrapped. ─ */
 
     /* ── v1.11.1: Custom pages panel ──────────────────── */
     /* v1.12.0: 'Show pages panel' setting removed. The pages panel is

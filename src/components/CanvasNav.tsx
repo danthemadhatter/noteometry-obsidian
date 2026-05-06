@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App, EventRef, Notice, TFile, TFolder } from "obsidian";
 import type NoteometryPlugin from "../main";
 import { rootDir, createNewPageFile } from "../lib/persistence";
-import { buildNav, sectionPathFor, NavSection } from "../lib/canvasNavTree";
+import { buildNav, sectionPathFor, NavSection, NavPage } from "../lib/canvasNavTree";
 
 interface Props {
   app: App;
@@ -12,31 +12,37 @@ interface Props {
   file: TFile | null;
 }
 
-/** v1.14.9: OneNote-style two-column nav, ON the canvas. Replaces the
- *  scrapped PageHeader band and the out-of-sight Pages sidebar. The
- *  rule from Dan: "I have been bitching about the importance of the
- *  file tree the file tree the file tree, and it was never opened
- *  because its not on the FUCKING canvas." This is the file tree.
- *
- *  Sections column = first-level folders under the Noteometry root
- *  (courses). Pages column = every .nmpage in the selected section
- *  (collapsed across any sub-folders so 16 weeks of pages all show
- *  as one flat list, OneNote-style).
- *
- *  Always visible. Click to load. Right-click for rename/delete with
- *  the v1.14.6 confirm pattern. Add buttons inline at the top of each
- *  column. No drag-reorder yet \u2014 add later if it earns its keep. */
+/** v1.14.9: OneNote-style two-column nav, ON the canvas.
+ *  v1.14.10: a11y + intuitiveness pass per Dan's feedback
+ *    ("not intuitive. It's very unclear- even more from an accessibility
+ *    standpoint"). Changes:
+ *      - the synthetic "(root)" bucket now reads with the real folder
+ *        name (e.g. "Noteometry") and a notebook glyph so it looks
+ *        like a place, not jargon.
+ *      - full keyboard nav: Arrow keys move focus+selection inside a
+ *        column, Enter opens (pages) / switches (sections), F2 renames,
+ *        Delete triggers the v1.14.6 confirm, Tab moves between columns.
+ *      - role=listbox / role=option + aria-selected + aria-activedescendant
+ *        so screen readers announce selection correctly.
+ *      - higher-contrast active row: filled accent background, not the
+ *        near-invisible 3px left border we had in v1.14.9.
+ *      - root-bucket rename/delete guarded (used to trash the whole
+ *        Noteometry folder). */
 export default function CanvasNav({ app, plugin, file }: Props) {
   const [tick, setTick] = useState(0);
   const [selectedSectionPath, setSelectedSectionPath] = useState<string | null>(null);
+  const [focusedPagePath, setFocusedPagePath] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [renaming, setRenaming] = useState<{ kind: "section" | "page"; path: string; value: string } | null>(null);
+
+  const sectionsListRef = useRef<HTMLUListElement | null>(null);
+  const pagesListRef = useRef<HTMLUListElement | null>(null);
 
   const root = rootDir(plugin);
   const sections = useMemo<NavSection[]>(() => buildNav(app, root), [app, root, tick]);
 
   // Rebuild on vault structure changes. Modify (per-stroke autosave)
-  // is intentionally NOT included \u2014 it would thrash render every
+  // is intentionally NOT included — it would thrash render every
   // 50ms while drawing. mtime updates aren't shown in the nav anyway.
   useEffect(() => {
     const refs: EventRef[] = [
@@ -95,6 +101,13 @@ export default function CanvasNav({ app, plugin, file }: Props) {
   }, [app, activeSection, root]);
 
   const onDeleteSection = useCallback(async (section: NavSection) => {
+    // v1.14.10: guard the synthetic root bucket. Deleting it would
+    // trash the entire Noteometry root folder along with every
+    // section inside it — never what the user wants.
+    if (section.isRootBucket) {
+      new Notice("Can't delete the root bucket — it's your Noteometry folder. Delete individual pages instead.");
+      return;
+    }
     if (!confirm(`Delete section "${section.name}" and all ${section.pages.length} page${section.pages.length === 1 ? "" : "s"} inside it? This cannot be undone except via Obsidian's trash.`)) return;
     const folder = app.vault.getAbstractFileByPath(section.folderPath);
     if (folder instanceof TFolder) {
@@ -118,9 +131,14 @@ export default function CanvasNav({ app, plugin, file }: Props) {
     }
   }, [app]);
 
-  const beginRenameSection = (section: NavSection) =>
+  const beginRenameSection = (section: NavSection) => {
+    if (section.isRootBucket) {
+      new Notice("Can't rename the root bucket from here — it reflects your Noteometry folder. Change it in Settings → Vault folder.");
+      return;
+    }
     setRenaming({ kind: "section", path: section.folderPath, value: section.name });
-  const beginRenamePage = (page: { path: string; label: string }) =>
+  };
+  const beginRenamePage = (page: NavPage) =>
     setRenaming({ kind: "page", path: page.path, value: page.label });
 
   const commitRename = useCallback(async () => {
@@ -142,6 +160,76 @@ export default function CanvasNav({ app, plugin, file }: Props) {
       new Notice(`Couldn't rename: ${(err as Error).message ?? err}`);
     }
   }, [app, renaming]);
+
+  // v1.14.10: keyboard nav for the sections column.
+  const onSectionsKeyDown = useCallback((e: React.KeyboardEvent<HTMLUListElement>) => {
+    if (renaming) return;
+    const idx = sections.findIndex(s => s.folderPath === activeSection?.folderPath);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = sections[Math.min(sections.length - 1, idx + 1)];
+      if (next) setSelectedSectionPath(next.folderPath);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = sections[Math.max(0, idx - 1)];
+      if (prev) setSelectedSectionPath(prev.folderPath);
+    } else if (e.key === "ArrowRight" || e.key === "Tab") {
+      if (e.key === "Tab" && e.shiftKey) return;
+      e.preventDefault();
+      // Focus the pages column so the user can arrow down into pages.
+      const first = pagesListRef.current?.querySelector<HTMLElement>('[role="option"]');
+      first?.focus();
+    } else if (e.key === "F2" && activeSection) {
+      e.preventDefault();
+      beginRenameSection(activeSection);
+    } else if ((e.key === "Delete" || e.key === "Backspace") && activeSection) {
+      e.preventDefault();
+      void onDeleteSection(activeSection);
+    }
+  }, [sections, activeSection, renaming, onDeleteSection]);
+
+  // v1.14.10: keyboard nav for the pages column.
+  const onPagesKeyDown = useCallback((e: React.KeyboardEvent<HTMLUListElement>) => {
+    if (renaming) return;
+    const pages = activeSection?.pages ?? [];
+    const first = pages[0];
+    if (!first) return;
+    const currentPath = focusedPagePath ?? activePagePath ?? first.path;
+    const idx = pages.findIndex(p => p.path === currentPath);
+    const focusRow = (path: string) => {
+      setFocusedPagePath(path);
+      queueMicrotask(() => {
+        const el = pagesListRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+        el?.focus();
+      });
+    };
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = pages[Math.min(pages.length - 1, idx + 1)];
+      if (next) focusRow(next.path);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = pages[Math.max(0, idx - 1)];
+      if (prev) focusRow(prev.path);
+    } else if (e.key === "ArrowLeft" || (e.key === "Tab" && e.shiftKey)) {
+      e.preventDefault();
+      const section = sectionsListRef.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')
+        ?? sectionsListRef.current?.querySelector<HTMLElement>('[role="option"]');
+      section?.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const page = pages[idx];
+      if (page) openFile(page.file);
+    } else if (e.key === "F2") {
+      e.preventDefault();
+      const page = pages[idx];
+      if (page) beginRenamePage(page);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      const page = pages[idx];
+      if (page) void onDeletePage(page.file);
+    }
+  }, [activeSection, activePagePath, focusedPagePath, renaming, openFile, onDeletePage]);
 
   if (collapsed) {
     return (
@@ -169,31 +257,44 @@ export default function CanvasNav({ app, plugin, file }: Props) {
             className="noteometry-nav-add"
             onClick={onAddSection}
             title="Add section"
+            aria-label="Add section"
           >
             <span aria-hidden="true">+</span> Add section
           </button>
         </div>
-        <ul className="noteometry-nav-list">
+        <ul
+          ref={sectionsListRef}
+          className="noteometry-nav-list"
+          role="listbox"
+          aria-label="Sections"
+          aria-activedescendant={activeSection ? `nm-section-${activeSection.folderPath || "root"}` : undefined}
+          onKeyDown={onSectionsKeyDown}
+        >
           {sections.length === 0 && (
-            <li className="noteometry-nav-empty">No sections yet. Click + Add section.</li>
+            <li className="noteometry-nav-empty">No sections yet.</li>
           )}
           {sections.map(section => {
             const isActive = section.folderPath === activeSection?.folderPath;
             const isRenaming = renaming?.kind === "section" && renaming.path === section.folderPath;
+            const glyph = section.isRootBucket ? "\uD83D\uDCD2" : "\uD83D\uDCC1";
             return (
-              <li key={section.folderPath || "(root)"}>
+              <li key={section.folderPath || "root"}>
                 <button
                   type="button"
-                  className={`noteometry-nav-row noteometry-nav-section${isActive ? " active" : ""}`}
+                  id={`nm-section-${section.folderPath || "root"}`}
+                  role="option"
+                  aria-selected={isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  className={`noteometry-nav-row noteometry-nav-section${isActive ? " active" : ""}${section.isRootBucket ? " is-root-bucket" : ""}`}
                   onClick={() => setSelectedSectionPath(section.folderPath)}
                   onDoubleClick={() => beginRenameSection(section)}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     void onDeleteSection(section);
                   }}
-                  title={`Click to open · double-click to rename · right-click to delete — ${section.folderPath}`}
+                  title={`Click to open · double-click to rename · right-click to delete — ${section.folderPath || root}`}
                 >
-                  <span className="noteometry-nav-glyph" aria-hidden="true">{"\uD83D\uDCC1"}</span>
+                  <span className="noteometry-nav-glyph" aria-hidden="true">{glyph}</span>
                   {isRenaming ? (
                     <input
                       autoFocus
@@ -206,11 +307,14 @@ export default function CanvasNav({ app, plugin, file }: Props) {
                         if (e.key === "Escape") { e.preventDefault(); setRenaming(null); }
                       }}
                       onClick={e => e.stopPropagation()}
+                      aria-label="Rename section"
                     />
                   ) : (
                     <span className="noteometry-nav-label">{section.name}</span>
                   )}
-                  <span className="noteometry-nav-count">{section.pages.length}</span>
+                  <span className="noteometry-nav-count" aria-label={`${section.pages.length} pages`}>
+                    {section.pages.length}
+                  </span>
                 </button>
               </li>
             );
@@ -226,6 +330,7 @@ export default function CanvasNav({ app, plugin, file }: Props) {
             className="noteometry-nav-add"
             onClick={onAddPage}
             title="Add page"
+            aria-label="Add page"
             disabled={!activeSection && sections.length > 0}
           >
             <span aria-hidden="true">+</span> Add page
@@ -240,22 +345,35 @@ export default function CanvasNav({ app, plugin, file }: Props) {
             <span aria-hidden="true">{"\u2039"}</span>
           </button>
         </div>
-        <ul className="noteometry-nav-list">
+        <ul
+          ref={pagesListRef}
+          className="noteometry-nav-list"
+          role="listbox"
+          aria-label="Pages"
+          aria-activedescendant={focusedPagePath ? `nm-page-${focusedPagePath}` : (activePagePath ? `nm-page-${activePagePath}` : undefined)}
+          onKeyDown={onPagesKeyDown}
+        >
           {!activeSection && (
             <li className="noteometry-nav-empty">Pick a section on the left.</li>
           )}
           {activeSection && activeSection.pages.length === 0 && (
-            <li className="noteometry-nav-empty">No pages in this section. Click + Add page.</li>
+            <li className="noteometry-nav-empty">No pages yet.</li>
           )}
           {activeSection && activeSection.pages.map(page => {
             const isActive = page.path === activePagePath;
+            const isFocused = page.path === focusedPagePath;
             const isRenaming = renaming?.kind === "page" && renaming.path === page.path;
             return (
               <li key={page.path}>
                 <button
                   type="button"
+                  id={`nm-page-${page.path}`}
+                  role="option"
+                  aria-selected={isActive}
+                  tabIndex={isActive || isFocused ? 0 : -1}
+                  data-path={page.path}
                   className={`noteometry-nav-row noteometry-nav-page${isActive ? " active" : ""}`}
-                  onClick={() => openFile(page.file)}
+                  onClick={() => { setFocusedPagePath(page.path); openFile(page.file); }}
                   onDoubleClick={() => beginRenamePage(page)}
                   onContextMenu={(e) => {
                     e.preventDefault();
@@ -275,6 +393,7 @@ export default function CanvasNav({ app, plugin, file }: Props) {
                         if (e.key === "Escape") { e.preventDefault(); setRenaming(null); }
                       }}
                       onClick={e => e.stopPropagation()}
+                      aria-label="Rename page"
                     />
                   ) : (
                     <>
