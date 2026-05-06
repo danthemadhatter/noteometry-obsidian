@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.14.11 — 2026-05-05
+
+Stop CanvasNav mouse events from bubbling to the canvas area. Dan: "if i right click for a delete pop up, the big tool pane pops up too."
+
+### Root cause
+
+CanvasNav is mounted inside `.noteometry-canvas-area`, which has its own `onClick={handleCanvasAreaClick}` (deselects canvas objects / places pending stamps) and `onContextMenu={handleCanvasContextMenu}` (opens the big tools menu). Row-level handlers in CanvasNav called `e.preventDefault()` but not `e.stopPropagation()`, so every nav click and right-click also fired the canvas-area handler — the delete-confirm popped AND the big tools menu popped on top of it, and left-clicking a section/page silently deselected whatever was active on the canvas.
+
+### Fixed
+- **Right-click on a nav row no longer opens the canvas tools menu.** The nav shell now stops propagation on `click`, `dblclick`, `contextmenu`, and `mousedown`, so events are contained inside the nav and never reach the canvas-area listeners. The nav's own row handlers still run (React dispatches child handlers before the shell's).
+- **Left-click on a nav row no longer deselects canvas objects.** Same fix path.
+- **Collapsed-rail handlers also contained.** The thin `noteometry-nav-collapsed` rail gets the same stopPropagation treatment — it was the same leak in a different render branch.
+
+### Tests
+- **`tests/unit/v1411CanvasNavEventBubble.test.ts`** (5 tests) — pins the stopPropagation contract at the source level for both the open-state nav shell and the collapsed-rail shell, and asserts the shared `stopMouseBubble` helper actually calls `e.stopPropagation()`. These would have failed before the fix.
+
 ## 1.14.10 — 2026-05-05
 
 Killed the Home view. Fixed the CanvasNav accessibility + intuitiveness gaps Dan flagged. Dan: "It could work. It's not intuitive. It's very unclear — even more from an accessibility standpoint. There's a weird thing where theres always a tab open. The Home icon and all it's wonder need to be gone."
