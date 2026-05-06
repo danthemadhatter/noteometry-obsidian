@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.14.9 — 2026-05-05
+
+OneNote-style file tree, on canvas, always visible. Dan: "I have been bitching about the importance of the file tree the file tree the file tree, and it was never opened because its not on the FUCKING canvas. Sorry, not sure who or what is at fault, but as the one with Bipolar disorder and ADHD, i shouldnt have to stress this hard without you even noticing."
+
+The HomeView and the left-pane Pages sidebar were both "out of sight, out of mind" — Dan never opened them. Thirty revisions of pill toolbars / breadcrumbs / flyouts didn't fix this because none of them put navigation ON the canvas where his eyes already were. v1.14.9 mounts a two-column Sections | Pages tree directly above the drawing surface, modeled on OneNote's notebook pane (per Dan's reference screenshots).
+
+### Added
+- **`src/lib/canvasNavTree.ts`** — `buildNav(app, rootFolder)` walks the Noteometry root: first-level child folders become **Sections** (course folders like ELEN201, MATH240); every `.nmpage` underneath collapses into a flat **Pages** list per section, OneNote-style. Loose pages in the root bucket into a synthetic `(root)` section. Pages sort with `localeCompare(numeric:true)` so `Week2` < `Week10`. Has a fallback that buckets via `findAllNmpages` when the root folder doesn't exist as a `TFolder` yet.
+- **`src/components/CanvasNav.tsx`** — React component, mounted inside `.noteometry-canvas-area` above the canvas. Click a section to filter pages; click a page to open it in the current leaf. Double-click a row to inline-rename via `app.fileManager.renameFile`. Right-click a row to delete with the v1.14.6 confirm pattern. `+ Add section` and `+ Add page` buttons in each column header. Vault `create` / `delete` / `rename` events trigger re-render — `modify` is intentionally ignored to avoid thrashing during stroke autosave. Mobile breakpoint (<720px) stacks columns vertically. A collapse toggle thins the band to a rail when Dan wants more canvas room.
+- **`tests/unit/v1149CanvasNavTree.test.ts`** — 6 tests pinning section grouping, sub-folder collapse, loose-file `(root)` bucket, natural numeric sort, `sectionPathFor` lookup, and empty-vault graceful return.
+- **`.noteometry-nav*` rules in `styles.css`** — two-column flex layout, 240px / 35vh max height, `z-index:30`, OneNote-yellow folder glyph (`#d4a017`), active-row 3px accent border, mobile vertical stack.
+
+### Changed
+- **`src/components/NoteometryApp.tsx`** — replaced the v1.14.8 scrap-comment block in `.noteometry-canvas-area` with `<CanvasNav app={app} plugin={plugin} file={file} />`. Mount sits above the canvas viewport in the same flex column.
+
+### Design rationale
+- Sections = folders, Pages = flat `.nmpage` list. Same model OneNote uses, same model Dan's reference screenshots showed.
+- Always visible, on canvas. The HomeView (separate ItemView on the home icon) and the left-pane sidebar are still there for users who want them, but the canvas nav is now the primary surface.
+- File icon: 📁 yellow `#d4a017` matching OneNote's folder color in Dan's screenshots.
+- Click=open, double-click=rename, right-click=delete with confirm. Same gesture grammar as the v1.14.6 ContextMenu work, so muscle memory carries.
+
 ## 1.14.8 — 2026-05-05
 
 Scrapped the PageHeader band. Dan: "Notebooks offers no input. The other one is not a tree spur, its linked to the tabs. Rather than continuing, either make it work or scrap it. Your call."
