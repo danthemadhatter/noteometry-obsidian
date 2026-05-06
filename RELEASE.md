@@ -2,7 +2,7 @@
 
 > Single source of truth for shipping a Noteometry release. Every bump goes through these steps — no exceptions.
 
-Current version: **1.7.2** (see [`manifest.json`](./manifest.json), [`package.json`](./package.json), [`versions.json`](./versions.json), [`CHANGELOG.md`](./CHANGELOG.md)).
+Current version: **1.14.11** (see [`manifest.json`](./manifest.json), [`package.json`](./package.json), [`versions.json`](./versions.json), [`CHANGELOG.md`](./CHANGELOG.md)).
 
 ---
 
@@ -84,12 +84,14 @@ Preserve every prior entry. Historical changelog entries are not current documen
 
 ## 4. Tag with the `v` prefix
 
-**This repo uses the `v` prefix** — `v1.7.2`, not `1.7.2`. The release workflow fires on any pushed tag and uses `github.ref_name` as both the release name and tag name, so BRAT matches `manifest.json` `"version": "1.7.2"` against a release whose tag is `v1.7.2`.
+**This repo uses the `v` prefix** — `v1.14.11`, not `1.14.11`. The release workflow fires on any pushed tag and uses `github.ref_name` as both the release name and tag name, so BRAT matches `manifest.json` `"version": "1.14.11"` against a release whose tag is `v1.14.11`.
 
 ```bash
-git tag vX.Y.Z         # e.g. v1.7.2
+git tag vX.Y.Z         # e.g. v1.14.11
 git push origin main --tags
 ```
+
+**Note on the current release pipeline:** since v1.14.x, `main` also has an auto-tag workflow (`.github/workflows/auto-tag.yml`) that reads `manifest.json` on every push to `main` and creates the matching `vX.Y.Z` tag server-side if it doesn't already exist, then builds and publishes the release in the same run. In practice that means a squash-merge to `main` produces a finished release in ~35–45 seconds; manual `git tag` + push is the fallback path.
 
 `scripts/ship.sh` does this automatically.
 
@@ -104,12 +106,12 @@ Obsidian's official sample-plugin guideline recommends a bare-number tag. This p
 1. Installs deps (`npm ci`)
 2. Runs `npm run build`
 3. Verifies `main.js`, `styles.css`, and `manifest.json` exist at repo root (bytes printed to the workflow log)
-4. Creates a GitHub release whose tag and name both equal `github.ref_name` (e.g. `v1.7.2`)
+4. Creates a GitHub release whose tag and name both equal `github.ref_name` (e.g. `v1.14.11`)
 5. Attaches `main.js`, `styles.css`, `manifest.json` as individual top-level release assets; `fail_on_unmatched_files: true` stops the job if any are missing
 
 Open the Actions tab, confirm the green check, then open the Releases page and confirm:
 
-- [ ] Tag is exactly `vX.Y.Z` (matches `manifest.json` version with the `v` prefix)
+- [ ] Tag is exactly `vX.Y.Z` (matches `manifest.json` version with the `v` prefix — e.g. `v1.14.11`)
 - [ ] All three release assets present, each at the top level of the release (not zipped)
 - [ ] `manifest.json` asset `version` field equals `X.Y.Z`
 
@@ -123,6 +125,9 @@ On a test vault:
 - [ ] Obsidian reloads the plugin without errors
 - [ ] Canvas opens with Pen as default tool (v1.6.9+)
 - [ ] Right-click opens the hub; Clear Canvas is reachable near the top
+- [ ] CanvasNav (Sections | Pages) renders at the top of the canvas; click section, click page, double-click rename, right-click delete with confirm (v1.14.9+)
+- [ ] Right-clicking a CanvasNav row does NOT also pop the canvas tools menu (v1.14.11+)
+- [ ] No Home view / no "Plugin no longer active" ghost tab restored from old workspace.json (v1.14.10 swept it)
 - [ ] Core smoke flows still work: pen draw, lasso OCR round-trip, insert Calculator / Graph Plotter / Circuit Sniper, Math v12 solve, copy-to-Word from chat (do not modify these; just confirm they still work)
 
 ---

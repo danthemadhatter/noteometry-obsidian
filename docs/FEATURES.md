@@ -1,6 +1,6 @@
 # Noteometry Features
 
-> Current as of **v1.7.2**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes current behaviour only.
+> Current as of **v1.14.11**. See [CHANGELOG.md](../CHANGELOG.md) for per-release notes; this document describes current behaviour only.
 
 ## Canvas / Drawing
 
@@ -8,8 +8,8 @@
 - Freehand drawing with mouse or Apple Pencil
 - **Pen is the default tool on first open** so the Pencil / mouse can draw immediately — previously the canvas opened in `select` mode, which piped pointer events away from the ink layer and made the canvas look broken
 - Catmull-Rom spline smoothing (removes jitter, preserves natural feel)
-- Uniform stroke width (no pressure sensitivity)
-- Configurable width: Fine (1.5px), Medium (3px), Thick (5px), Marker (8px)
+- **Pressure-aware width** for Apple Pencil — pressure modulates stroke width (clamped to 0.3× min); mouse/trackpad input has no pressure data and renders at the full configured width
+- Configurable base width: Fine (1.5px), Medium (3px), Thick (5px), Marker (8px)
 - 6 ink colors: Black, Red, Green, Blue, Orange, Purple
 
 ### Eraser Tool
@@ -32,7 +32,7 @@
 
 ### Select Tool
 - Tap stamps to select (blue dashed highlight)
-- Tap canvas objects (text boxes, tables, images) to select
+- Tap canvas objects (text boxes, tables, images, drop-ins) to select
 - Keyboard Delete/Backspace to remove selected items
 
 ### Tool Cycling
@@ -44,6 +44,10 @@
 - Tracks strokes and stamps
 - Ctrl/Cmd+Z for undo, Ctrl/Cmd+Shift+Z for redo
 - Eraser operations batched into single undo entries
+
+### Zoom
+- Trackpad pinch (`ctrlKey`-synthesised wheel) zooms the viewport, anchored to the cursor
+- Wheel routing distinguishes canvas zoom from nested drop-in scroll (PDFs, scrollable contents)
 
 ## Canvas Objects (DOM Overlays)
 
@@ -72,8 +76,9 @@
 
 ### Object Management
 - Delete button (x) on each object's drag handle
-- Confirmation dialog before deletion
+- Confirmation dialog before deletion (v1.14.6+)
 - Objects only interactive in Select mode
+- Copy / cut / paste of selected objects via standard shortcuts (`objectClipboard.ts`)
 
 ## Lasso + OCR
 
@@ -161,17 +166,30 @@
 - Supports display and inline math
 - Attachments sent as base64 images
 
-## Navigation (Obsidian-native, v1.7+)
+## Navigation (CanvasNav + Obsidian, v1.14.9+)
 
-### Page navigation
-- Pages are `.nmpage` files in the vault — Obsidian's file explorer is the navigation layer (no plugin-owned sidebar)
-- Click any `.nmpage` to open or focus a NoteometryView leaf for that file
-- Rename / move / delete via the file explorer's standard right-click menu
+### CanvasNav (on-canvas Sections | Pages)
+- Two-column listbox at the top of the canvas — **Sections** on the left, **Pages** on the right
+- The synthetic root bucket reads with the real folder name (default `Noteometry`) instead of `(root)`
+- Click a section to focus it; click a page to open it; double-click to rename; right-click to delete (with v1.14.6 confirm)
+- Inline `+ Add` buttons on each column for new section / new page in the focused section
+- Full keyboard navigation: Arrow keys move focus + selection inside a column, Enter opens (pages) / switches (sections), F2 renames, Delete triggers the confirm dialog, Tab moves between columns
+- Screen-reader friendly: `role=listbox` / `role=option`, `aria-selected`, `aria-activedescendant`
+- Active row uses a filled accent background (was a near-invisible 3px left border in v1.14.9)
+- Root-bucket rename / delete are guarded — used to trash the entire Noteometry folder
+- The collapse chevron on the Pages column shrinks the whole strip to a thin rail to give the canvas back its real estate
+- v1.14.11: nav events (click / dblclick / contextmenu / mousedown) `stopPropagation` so a right-click on a nav row no longer also opens the canvas's right-click hub
+
+### Obsidian-side navigation
+- Pages remain `.nmpage` files in the vault — Obsidian's file explorer still works as a parallel entry point
+- Click any `.nmpage` in the file explorer to open or focus a NoteometryView leaf for that file
+- Rename / move / delete via the file explorer's standard right-click menu still works
 - Multiple pages can be open in tabs simultaneously; each has its own scoped `tableStore` and `flushSave`
 
 ### Page creation
-- **Ribbon icon → "New Noteometry page"** (or the equivalent command palette entry) creates a new `.nmpage` in the configured Vault Folder and opens it
+- **Ribbon icon → "New Noteometry page"** (or the equivalent command palette entry) creates a new `.nmpage` next to the active file (or in the configured Vault Folder if no file is active) and opens it
 - The Vault Folder setting is the default landing spot; you can move pages anywhere in the vault afterward
+- v1.14.10 removed the legacy HomeView. `main.ts` sweeps stranded `noteometry-home` leaves on layout-ready
 
 ### Page Persistence
 - Each page saved as a `.nmpage` file (registered extension; opened by NoteometryView, not the markdown editor)
@@ -179,6 +197,7 @@
 - Auto-save with 2-second debounce
 - Save on file change (`onLoadFile` flushes the prior file before loading the new one)
 - Save on view close (`flushSave` before unmount)
+- Recovery cache mirrors the in-progress page to `localStorage` under `nm:cache:<path>` synchronously, before the async `vault.modify` await — so a tab close mid-save still recovers on reload
 - Legacy `.md`-wrapped JSON pages are auto-detected on load; **Noteometry: Convert legacy .md pages to .nmpage** renames them in bulk, with numeric-suffix collision handling
 
 ## Settings
@@ -197,18 +216,20 @@
 | Auto Save | true | Enable auto-save |
 | Auto Save Delay | 2000 | Debounce delay in ms |
 | Finger Drawing | false | Draw with a single finger (enable for Android) |
-| Show Experimental Tools | false | Re-expose Multimeter, Animation Canvas, and Study Gantt in the right-click hub |
+| Gesture Tutorial Seen (v1.11.0+) | false | Internal flag — flips to `true` when the first-run gesture cheatsheet is dismissed. Settings → "Reset gesture tutorial" flips it back so the modal reappears (per the gesture-recall design note) |
+| Global Theme Enabled (v1.11.1+) | true | Apply Noteometry's visual theme to the rest of Obsidian (sidebar, tab bar, ribbon, command palette) |
 
 ## Responsive Design
 
 ### Desktop (>1024px)
 - Right panel 320px, resizable
 - Toolbar centered at bottom
-- File-explorer navigation lives in Obsidian's left side panel (toggle with the standard Obsidian shortcut)
+- File-explorer navigation lives in Obsidian's left side panel (toggle with the standard Obsidian shortcut); CanvasNav lives on the canvas itself
 
 ### Tablet / iPad (768-1024px)
 - Right panel starts at 240px
 - Toolbar scrollable horizontally
+- CanvasNav remains visible; collapsing it returns the canvas to full height
 
 ### Phone (<768px)
 - Canvas and panel stack vertically
@@ -232,8 +253,9 @@
 - Mouse/trackpad drawing
 - HTML5 drag-and-drop from MathPalette to canvas
 - Keyboard shortcuts (Ctrl/Cmd+Z undo, Shift+Z redo, Delete to remove)
-- Mouse wheel for canvas scrolling; plain two-finger scroll pans; trackpad pinch (`ctrlKey`-synthesised wheel) zooms the viewport
+- Mouse wheel for canvas scrolling; plain two-finger scroll pans; trackpad pinch (`ctrlKey`-synthesised wheel) zooms the viewport, anchored to the cursor
 - Right-click opens the context-menu hub at the pointer
+- Right-click on a CanvasNav row does NOT open the canvas hub (v1.14.11 — nav `stopPropagation` on contextmenu)
 
 ## Input Methods (context-menu hub)
 
@@ -243,12 +265,13 @@ The right-click context-menu hub is the single entry point for every insert and 
 - **Two-finger tap** (iPad, desktop touchpads)
 - **Apple Pencil long-press** (550 ms hold, 8 px movement slop) — the mid-draw stroke is cancelled so the hub-open isn't also a scribble
 
-Inside the hub, Clear Canvas is pinned near the top (directly under Undo/Redo, behind its own separator) instead of the bottom of the ~30-item menu, so it's reachable on short iPad viewports without a two-finger scroll.
+Inside the hub, Clear Canvas is pinned near the top (directly under Undo/Redo, behind its own separator) instead of the bottom of the ~30-item menu, so it's reachable on short iPad viewports without a two-finger scroll. The hub is portal-mounted (v1.14.7+) to escape any clipping ancestors and clamp itself to the viewport.
 
 ## Drop-in interaction model
 
 - **Direct drag from any tool.** Drop-in objects (Calculator, Graph Plotter, Unit Converter, Circuit Sniper, etc.) can be moved by tap-dragging the object body no matter which canvas tool is active. This replaces the previous behaviour where the user had to switch to the `select` tool to move a drop-in, which contradicted "every normal app supports direct object dragging."
-- **Inner controls pass through.** Clicks on form inputs, buttons, sliders, `contenteditable` regions, `role="button"` elements, and inner `<canvas>` elements inside a drop-in are not captured as drags — they reach the drop-in's own event handlers. The selector list lives in `src/lib/objectDragHitTest.ts` and is pinned by a jsdom unit test.
+- **Inner controls pass through.** Clicks on form inputs, buttons, sliders, `contenteditable` regions, `role="button"` elements, and inner `<canvas>` elements inside a drop-in are not captured as drags — they reach the drop-in's own event handlers. The selector list lives in `src/lib/objectDragHitTest.ts` and is pinned by a unit test.
+- **Focus guards.** `dropinFocusGuards.ts` keeps typing inside an input from leaking out to the canvas (no accidental tool toggles, no keyboard-shortcut conflicts).
 
 ## Math Palette Routing
 
