@@ -17,7 +17,9 @@ import CanvasObjectLayer from "./CanvasObjectLayer";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
-import CanvasNav from "./CanvasNav";
+import SectionTabsBar from "./canvasNav/SectionTabsBar";
+import PagesRail from "./canvasNav/PagesRail";
+import { useCanvasNavState } from "./canvasNav/useCanvasNavState";
 import type { ContextMenuItem } from "./ContextMenu";
 import { buildClearCanvasAction, CLEAR_CANVAS_LABEL } from "../lib/canvasMenuActions";
 import MathPalette from "./MathPalette";
@@ -112,6 +114,12 @@ export default function NoteometryApp({
     lassoActive, lassoMode, setLassoActive, setLassoMode, regions: lassoRegions,
     pushRegion, clearStack, toggleLasso,
   } = useLassoStack();
+
+  /* ── v1.15.0: OneNote-shell nav state ──────────────
+   * Drives the horizontal SectionTabsBar (top) and vertical PagesRail
+   * (right rail). One source of truth so both presentational components
+   * stay consistent. Replaces the v1.14.x CanvasNav slab. */
+  const canvasNav = useCanvasNavState(app, plugin, file);
 
   /* ── v1.11 phase-0: AI activity context handle ──────────────
      The app shell wraps NoteometryApp in <AIActivityProvider> in
@@ -1436,7 +1444,14 @@ export default function NoteometryApp({
       <MetaLayer />
       {/* ── Main area ── (Obsidian's file explorer is the page navigator) */}
       <div className={`noteometry-main${paperDimClass}`}>
-        <div className="noteometry-split">
+        {/* v1.15.0: OneNote-shell layout.
+            Top strip: horizontal section tabs (SectionTabsBar).
+            Body: canvas-area (left, dominant) + pages rail (right).
+            Replaces the v1.14.x CanvasNav horizontal slab that
+            ate the top third of the canvas and stacked Sections
+            and Pages side-by-side. */}
+        <SectionTabsBar app={app} plugin={plugin} nav={canvasNav} />
+        <div className="noteometry-split nm-onenote-body">
           {/* ── Canvas area ── */}
           <div ref={canvasAreaRef} className={`noteometry-canvas-area${lassoActive ? " noteometry-lasso-active" : ""}${pendingSymbol ? " noteometry-placing-symbol" : ""}`}
             onClick={handleCanvasAreaClick}
@@ -1444,16 +1459,6 @@ export default function NoteometryApp({
             onDragOver={handleCanvasDragOver}
             onDrop={handleCanvasDrop}
           >
-            {/* v1.14.9: OneNote-style two-column nav, ON the canvas.
-                Replaces the scrapped v1.14.8 PageHeader band and makes
-                the file tree finally visible. Sections (course folders)
-                | Pages (.nmpage files in the section). Click to open,
-                double-click to rename, right-click to delete (with
-                v1.14.6 confirm pattern). + Add section / + Add page
-                inline at the top of each column. Collapse arrow on the
-                Pages-column header reduces the whole nav to a thin
-                rail. */}
-            <CanvasNav app={app} plugin={plugin} file={file} />
             {/* Hidden image input */}
             <input
               ref={imageInputRef}
@@ -1592,6 +1597,9 @@ export default function NoteometryApp({
             </div>
           </div>
 
+          {/* v1.15.0: Vertical right-rail pages list. OneNote-style.
+              Sibling to canvas-area so the canvas stays dominant. */}
+          <PagesRail nav={canvasNav} />
           {/* v1.10.0: Right side panel removed entirely. Both Panel (LaTeX
               input + preview) and ChatPanel (sidebar chat) are gone. The
               new flow is canvas-first: lasso → 123/ABC radial spawns Math

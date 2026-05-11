@@ -4313,60 +4313,202 @@
   }
 }
 
+
 /* ──────────────────────────────────────────────────────────────────
-   v1.14.9: CanvasNav — OneNote-style on-canvas file tree
-   Two-column always-visible navigation that lives INSIDE
-   .noteometry-canvas-area. Sections | Pages. The whole point is
-   that it's on the canvas, not buried in an Obsidian sidebar that
-   never gets opened.
+   v1.15.0: OneNote-shell nav.
+   Replaces the v1.14.x .noteometry-nav horizontal slab (Sections col
+   left, Pages col right, 240px tall, eating 30% of the canvas).
+   New shape:
+     - .nm-onenote-tabs:  horizontal section tabs across the top.
+     - .nm-onenote-rail:  vertical pages rail on the right edge.
+     - the canvas-area between them stays dominant.
+   Dan's screenshots (v1.14.12) showed the old slab made the canvas
+   feel cramped and made "where am I?" hard to read. OneNote's actual
+   spatial layout (tabs top, pages right) puts the canvas where it
+   belongs and matches the muscle memory people already have.
    ────────────────────────────────────────────────────────────── */
 
-.noteometry-nav {
+/* ── Section tabs strip ──────────────────────────────────── */
+
+.nm-onenote-tabs {
   display: flex;
   flex-direction: row;
   flex-shrink: 0;
-  height: 240px;
-  max-height: 35vh;
-  border-bottom: 2px solid var(--nm-paper-border, var(--background-modifier-border));
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 6px 0 6px;
   background: var(--nm-faceplate-recessed, var(--background-secondary));
+  border-bottom: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+  font-size: 13px;
+  z-index: 30;
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  /* OneNote-style: tabs sit ON TOP of the page area, with the active
+     tab visually "connecting" downward into the paper. */
+  min-height: 34px;
+}
+
+.nm-onenote-tab {
+  /* Per-tab hue from useCanvasNavState.sectionHue(). Inactive tabs
+     get a thin colored top stripe so the user can see all section
+     colors at a glance. Active tab fills with the color. */
+  --nm-section-hue: 205;
+  --nm-section-color: hsl(var(--nm-section-hue) 65% 45%);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  padding: 6px 12px 6px 12px;
+  border: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+  border-bottom: none;
+  border-top: 3px solid var(--nm-section-color);
+  border-radius: 6px 6px 0 0;
+  background: var(--nm-faceplate, var(--background-secondary-alt));
+  color: var(--nm-paper-ink, var(--text-normal));
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  top: 1px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.nm-onenote-tab:hover:not(.active) {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+}
+
+.nm-onenote-tab.active {
+  background: var(--nm-paper, var(--background-primary));
+  color: var(--nm-paper-ink, var(--text-normal));
+  font-weight: 600;
+  /* Pull the tab down 1px so its bottom edge merges with the page
+     below — the OneNote "connected tab" effect. */
+  z-index: 2;
+  /* Hide the bar's bottom border underneath the active tab. */
+  box-shadow: 0 1px 0 0 var(--nm-paper, var(--background-primary));
+}
+
+.nm-onenote-tab.is-root-bucket {
+  font-style: italic;
+}
+
+.nm-onenote-tab:focus-visible {
+  outline: 2px solid var(--nm-accent-strong, var(--text-accent));
+  outline-offset: -2px;
+  z-index: 3;
+}
+
+.nm-onenote-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nm-onenote-tab-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--nm-faceplate-recessed, var(--background-secondary));
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.nm-onenote-tab.active .nm-onenote-tab-count {
+  background: color-mix(in srgb, var(--nm-section-color) 18%, transparent);
+  color: var(--nm-paper-ink, var(--text-normal));
+}
+
+.nm-onenote-tab-draft {
+  /* Inline draft input — same shape as a tab but borders the active
+     hue so it reads as "you're typing". */
+  border-top-color: var(--nm-accent, var(--text-accent));
+  background: var(--nm-paper, var(--background-primary));
+  padding: 4px 8px;
+}
+
+.nm-onenote-tab-rename {
+  flex: 1;
+  min-width: 80px;
+  padding: 2px 4px;
+  border: 1px solid var(--nm-accent, var(--text-accent));
+  border-radius: 3px;
+  background: var(--nm-paper, var(--background-primary));
+  color: var(--nm-paper-ink, var(--text-normal));
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.nm-onenote-tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  align-self: center;
+  margin-left: 4px;
+  border: 1px dashed var(--nm-paper-border, var(--background-modifier-border));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--nm-accent, var(--text-accent));
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.nm-onenote-tab-add:hover:not(:disabled) {
+  background: var(--nm-accent-light, var(--background-modifier-hover));
+  border-style: solid;
+  border-color: var(--nm-accent, var(--text-accent));
+}
+
+.nm-onenote-tab-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.nm-onenote-tabs-empty {
+  align-self: center;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ── Pages rail (vertical, right edge) ───────────────────── */
+
+.nm-onenote-rail {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 240px;
+  min-width: 200px;
+  max-width: 320px;
+  background: var(--nm-faceplate, var(--background-secondary-alt));
+  border-left: 1px solid var(--nm-paper-border, var(--background-modifier-border));
   font-size: 13px;
   z-index: 30;
   position: relative;
 }
 
-.noteometry-nav-collapsed {
-  height: auto;
+.nm-onenote-rail-collapsed {
   width: auto;
+  min-width: 0;
+  max-width: none;
   align-self: flex-start;
-  border-bottom: none;
   background: transparent;
+  border-left: none;
   padding: 4px;
 }
 
-.noteometry-nav-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-right: 1px solid var(--nm-paper-border, var(--background-modifier-border));
-}
-
-.noteometry-nav-col:last-child {
-  border-right: none;
-}
-
-.noteometry-nav-sections {
-  width: 30%;
-  min-width: 140px;
-  max-width: 240px;
-  background: var(--nm-faceplate, var(--background-secondary-alt));
-}
-
-.noteometry-nav-pages {
-  flex: 1;
-  background: var(--nm-paper, var(--background-primary));
-}
-
-.noteometry-nav-col-hdr {
+.nm-onenote-rail-hdr {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -4378,11 +4520,7 @@
   z-index: 1;
 }
 
-.noteometry-nav-add {
-  /* v1.14.12: was flex: 1, which made the button stretch to fill its
-     header. Sections column is 30% (capped 140-240px) and Pages
-     column is flex: 1, so the same class rendered at two very
-     different widths. Content-sized fixes the visual mismatch. */
+.nm-onenote-rail-add {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -4400,30 +4538,23 @@
   transition: all 0.1s;
 }
 
-/* v1.14.12: inline new-section draft row. Same shape as a section
-   row, just hosts an input instead of a label. */
-.noteometry-nav-row-draft {
-  background: var(--nm-accent-light, var(--background-modifier-hover));
-  border-left: 3px solid var(--nm-accent, var(--text-accent));
-  cursor: text;
-}
-
-.noteometry-nav-add:hover:not(:disabled) {
+.nm-onenote-rail-add:hover:not(:disabled) {
   background: var(--nm-accent-light, var(--background-modifier-hover));
   border-color: var(--nm-accent, var(--text-accent));
 }
 
-.noteometry-nav-add:disabled {
+.nm-onenote-rail-add:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.noteometry-nav-toggle {
+.nm-onenote-rail-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   min-height: 24px;
+  margin-left: auto;
   border: 1px solid transparent;
   border-radius: var(--nm-radius-sm, 4px);
   background: transparent;
@@ -4433,12 +4564,12 @@
   cursor: pointer;
 }
 
-.noteometry-nav-toggle:hover {
+.nm-onenote-rail-toggle:hover {
   background: var(--nm-accent-light, var(--background-modifier-hover));
   color: var(--nm-accent, var(--text-accent));
 }
 
-.noteometry-nav-list {
+.nm-onenote-rail-list {
   list-style: none;
   margin: 0;
   padding: 4px 0;
@@ -4447,24 +4578,24 @@
   min-height: 0;
 }
 
-.noteometry-nav-list li {
+.nm-onenote-rail-list li {
   margin: 0;
   padding: 0;
 }
 
-.noteometry-nav-empty {
+.nm-onenote-rail-empty {
   padding: 12px 14px;
   color: var(--text-muted);
   font-size: 12px;
   font-style: italic;
 }
 
-.noteometry-nav-row {
+.nm-onenote-rail-row {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 6px 10px 6px 12px;
   border: none;
   background: transparent;
   color: var(--nm-paper-ink, var(--text-normal));
@@ -4475,54 +4606,29 @@
   border-left: 3px solid transparent;
 }
 
-.noteometry-nav-row:hover {
+.nm-onenote-rail-row:hover {
   background: var(--nm-accent-light, var(--background-modifier-hover));
 }
 
-.noteometry-nav-row.active {
-  /* v1.14.10: filled accent background for unmistakable selected
-     state. v1.14.9's 3px-left-border + tinted background was too
-     subtle — Dan flagged it as "unclear, even more from an
-     accessibility standpoint". Now the active row is the same
-     accent as the rest of the Noteometry highlight system. */
+.nm-onenote-rail-row.active {
   background: var(--nm-accent, var(--text-accent));
   color: var(--text-on-accent, #ffffff);
   border-left-color: var(--nm-accent-strong, var(--text-accent));
   font-weight: 600;
 }
 
-.noteometry-nav-row.active .noteometry-nav-sub {
+.nm-onenote-rail-row.active .nm-onenote-rail-sub {
   color: var(--text-on-accent, #ffffff);
   opacity: 0.85;
 }
 
-.noteometry-nav-row.active .noteometry-nav-glyph {
-  /* Stay legible against the filled background. */
-  color: #ffd773;
-}
-
-/* v1.14.10: visible keyboard focus ring. Distinct from the active
-   selection so users can keyboard-traverse without losing track of
-   which row is selected vs. focused. */
-.noteometry-nav-row:focus-visible {
+.nm-onenote-rail-row:focus-visible {
   outline: 2px solid var(--nm-accent-strong, var(--text-accent));
   outline-offset: -2px;
   z-index: 1;
 }
 
-/* The synthetic root bucket reads as a notebook, not a folder. */
-.noteometry-nav-row.is-root-bucket .noteometry-nav-glyph {
-  color: #c97f1f;
-}
-
-.noteometry-nav-glyph {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: #d4a017;
-  line-height: 1;
-}
-
-.noteometry-nav-label {
+.nm-onenote-rail-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4530,7 +4636,7 @@
   min-width: 0;
 }
 
-.noteometry-nav-sub {
+.nm-onenote-rail-sub {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--text-muted);
@@ -4538,22 +4644,7 @@
   margin-left: 6px;
 }
 
-.noteometry-nav-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--nm-faceplate-recessed, var(--background-secondary));
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-weight: 500;
-}
-
-.noteometry-nav-row.active .noteometry-nav-count {
-  background: color-mix(in srgb, var(--text-on-accent, #ffffff) 20%, transparent);
-  color: var(--text-on-accent, #ffffff);
-}
-
-.noteometry-nav-rename-input {
+.nm-onenote-rail-rename {
   flex: 1;
   min-width: 0;
   padding: 2px 4px;
@@ -4565,22 +4656,16 @@
   font-family: inherit;
 }
 
-/* Mobile: stack the columns vertically. Sections on top is the
-   familiar OneNote-on-iPad layout. */
+/* Mobile: rail becomes a slide-out drawer (collapsed by default via
+   smaller width). Tabs stay horizontal at the top. */
 @media (max-width: 720px) {
-  .noteometry-nav {
-    flex-direction: column;
-    height: 220px;
+  .nm-onenote-rail {
+    width: 180px;
+    min-width: 160px;
   }
-  .noteometry-nav-sections,
-  .noteometry-nav-pages {
-    width: 100%;
-    max-width: none;
-    flex: 1;
-    border-right: none;
-    border-bottom: 1px solid var(--nm-paper-border, var(--background-modifier-border));
-  }
-  .noteometry-nav-pages {
-    border-bottom: none;
+  .nm-onenote-tab {
+    max-width: 140px;
+    font-size: 12px;
+    padding: 5px 8px;
   }
 }

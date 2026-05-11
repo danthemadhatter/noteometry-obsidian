@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.15.0 — 2026-05-11
+
+Reshape the canvas chrome into a OneNote-style shell. Dan: "I'd rather you accomplish one goal. stop development of noteometry as we have and make it almost exactly like OneNote" / "I want it to look and operate LIKE OneNote, not ditch Noteometry."
+
+### Why
+
+The v1.14.x `CanvasNav` was a 240 px horizontal slab with Sections and Pages stacked side-by-side. In every screenshot Dan sent it ate the top third of the canvas and read as a spreadsheet header, not a notebook. OneNote's actual spatial layout — thin horizontal section tabs across the top, vertical pages rail on the right edge, canvas dominant in the middle — is what people's muscle memory expects.
+
+This release reshapes the chrome to that layout. **No engine code changed:** the custom canvas, lasso → 123/ABC drop-ins, KaTeX, MathML clipboard, SOLVE pipeline, and `.nmpage` format are untouched.
+
+### Added
+- **Horizontal section tabs strip** across the top of the canvas (`SectionTabsBar`). Each section gets a stable hue (`sectionHue(folderPath)`) so "blue tab = ELEN201" becomes muscle memory. Active tab fills with the color and visually connects into the page below — OneNote-style. `+ Add section` opens an inline draft tab (no `window.prompt`, which Obsidian suppresses). Keyboard: `←`/`→` to walk, `F2` to rename, `Delete` to trash. `role="tablist"` + `role="tab"` + `aria-selected`.
+- **Vertical pages rail** on the right edge (`PagesRail`). 240 px default, 200–320 px clamp, collapsible to a thin handle. `+ Add page` is content-sized (no width-mismatch trap from v1.14.12). Keyboard: `↑`/`↓` to walk, `Enter` to open, `F2` to rename, `Delete` to trash. `role="listbox"` + `role="option"` + `aria-activedescendant`.
+- **`useCanvasNavState` hook** — one source of truth shared by tabs bar and pages rail. Owns selection, rename drafts, add-section draft, delete confirms, vault event re-renders.
+
+### Changed
+- `NoteometryApp.tsx` now mounts the tabs strip above `.noteometry-split` and renders `PagesRail` as a sibling to the canvas area, so the canvas takes the full remaining middle.
+- Mouse-event bubbling guards (the v1.14.11 fix) carry over to both new components — clicking a tab or a page row no longer deselects canvas objects or pops the big tools menu.
+
+### Removed
+- `src/components/CanvasNav.tsx` (the slab) — its job is now done by `SectionTabsBar` + `PagesRail` + `useCanvasNavState`.
+- `.noteometry-nav*` CSS rules — replaced by `.nm-onenote-tab*` and `.nm-onenote-rail*`.
+- Retired tests `v1410CanvasNavA11y`, `v1411CanvasNavEventBubble`, `v1412CanvasNavAddSection` — their contracts are absorbed into the new `v1150OneNoteShell` test, which pins the new layout at the source level (no slab class, tabs are `flex-direction: row`, rail is `flex-direction: column`, both stop mouse-event bubbling, both have full keyboard nav, no `window.prompt`, add buttons are content-sized).
+
+### Tests
+- **`tests/unit/v1150OneNoteShell.test.ts`** (17 source-level assertions across 4 describe blocks) — pins:
+  1. `CanvasNav.tsx` does not exist; `noteometry-nav*` CSS rules are gone.
+  2. `SectionTabsBar` renders horizontal `role="tablist"`, has Arrow/F2/Delete handlers, uses `newSectionDraft` (not `window.prompt`), stops all four mouse events from bubbling.
+  3. `PagesRail` is `flex-direction: column` with bounded width + `border-left` (proves right-edge placement), `role="listbox"` + `role="option"`, has Arrow/Enter/F2/Delete handlers, is collapsible, add button is `flex: 0 0 auto`.
+  4. `useCanvasNavState` exposes the full action set; `sectionHue` is stable per path and stays in `[0, 360)`.
+- 568 prior tests still pass (no engine changes).
+
+### Note for Dan
+This is the *spatial* OneNote rework. The Noteometry engine that makes this app actually useful (lasso → LaTeX, KaTeX rendering, MathML clipboard, SOLVE pipeline, custom canvas) stays exactly where it is. Phase 2 candidates (page TOC pill, real Markdown/PDF export, tag pills, backlinks panel) ride on top of this shell in later releases — they're not in this PR.
+
 ## 1.14.12 — 2026-05-06
 
 Fix the dead "+ Add section" button and the mismatched add-button widths in CanvasNav. Dan: "The Add Section section doesnt work" / "add page need to be the same column width as the section."
