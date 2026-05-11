@@ -1,19 +1,28 @@
 name: Auto-tag and release from manifest version
 
-# Companion to main.yml. main.yml only fires on `push: tags` — but
-# Claude's sandbox proxy blocks tag pushes from the local git client
-# (returns HTTP 403 silently). This workflow runs inside GitHub
-# Actions, where GITHUB_TOKEN has contents: write, so it can create
-# and push the tag server-side AND build + publish the release in
-# the same run.
+# Single source of truth for shipping releases. Fires on every push to
+# `main`, reads the version from manifest.json, idempotently creates
+# the matching tag if it doesn't already exist, then builds + publishes
+# the release in the same run.
 #
-# Tags pushed by GITHUB_TOKEN don't trigger downstream workflows
-# (GitHub's loop-prevention guard), so we have to do the build +
-# release here rather than relying on main.yml to fire on the new
-# tag.
+# Why this and not a tag-push workflow:
+#  - Tag pushes from Claude's sandbox proxy return HTTP 403 silently,
+#    so we can't reliably push tags from a local git client. Running
+#    inside GitHub Actions, GITHUB_TOKEN has contents: write and can
+#    create + push tags server-side.
+#  - We had a second workflow (.github/workflows/main.yml) that fired
+#    on `push: tags` and built whatever was at the tagged ref. Any
+#    stray tag push (an old script, a misfired AI session) would
+#    spawn a release for an ancient ref. The v1.8.7 zombie draft
+#    release on 2026-05-09 was caused by exactly that. main.yml was
+#    deleted in the chore-remove-redundant-main-yml PR; this workflow
+#    is now the only path that publishes a release.
 #
 # Idempotent: skips entirely if a release already exists for the tag
 # the manifest declares.
+#
+# Manual escape hatch: `workflow_dispatch: {}` lets you trigger this
+# from the Actions UI without pushing to main.
 
 on:
   push:
