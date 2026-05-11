@@ -101,13 +101,17 @@ Obsidian's official sample-plugin guideline recommends a bare-number tag. This p
 
 ## 5. Verify the release workflow
 
-`.github/workflows/main.yml` runs on any pushed tag. It:
+`.github/workflows/auto-tag.yml` runs on every push to `main` (and is the only workflow that publishes releases). It:
 
-1. Installs deps (`npm ci`)
-2. Runs `npm run build`
-3. Verifies `main.js`, `styles.css`, and `manifest.json` exist at repo root (bytes printed to the workflow log)
-4. Creates a GitHub release whose tag and name both equal `github.ref_name` (e.g. `v1.14.11`)
-5. Attaches `main.js`, `styles.css`, `manifest.json` as individual top-level release assets; `fail_on_unmatched_files: true` stops the job if any are missing
+1. Reads `manifest.json` and derives `tag=v$VERSION`
+2. Skips entirely if a release for that tag already exists (idempotent)
+3. Creates and pushes the tag server-side if it doesn't exist yet
+4. Checks out at the resolved tag, installs deps (`npm ci`), runs `npm run build`
+5. Verifies `main.js`, `styles.css`, and `manifest.json` exist at repo root (bytes printed to the workflow log)
+6. Creates a GitHub release whose tag and name both equal the resolved `vX.Y.Z`
+7. Attaches `main.js`, `styles.css`, `manifest.json` as individual top-level release assets; `fail_on_unmatched_files: true` stops the job if any are missing
+
+> The previous `main.yml` workflow that fired on `push: tags` was removed in May 2026. It was the source of the v1.8.7 zombie draft release — any stray tag push (BRAT, old scripts, AI sessions) would spawn a release at whatever the tag pointed at. With `auto-tag.yml` as the single path, the only way to ship is squash-merge to `main`. Manual trigger from the Actions UI is available via `workflow_dispatch`.
 
 Open the Actions tab, confirm the green check, then open the Releases page and confirm:
 
