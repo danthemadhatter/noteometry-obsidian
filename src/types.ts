@@ -26,6 +26,15 @@ export interface NoteometrySettings {
   /** v1.11.1: apply the Noteometry visual theme to all of Obsidian
    * (sidebar, tab bar, ribbon, command palette). Default true. */
   globalThemeEnabled: boolean;
+  /** v1.16.0: dark gunmetal/CAD visual treatment, scoped to the
+   * Noteometry canvas chrome. Strictly additive — does not touch
+   * the rest of Obsidian, so it composes with the global theme and
+   * any community theme the user has installed. */
+  terminalCadTheme: boolean;
+  /** v1.16.0: render the canvas right-click menu as a cursor-anchored
+   * radial HUD. Falls back to the standard list menu when off so
+   * existing behavior and tests stay valid. */
+  radialHud: boolean;
 }
 
 export const DEFAULT_SETTINGS: NoteometrySettings = {
@@ -43,6 +52,8 @@ export const DEFAULT_SETTINGS: NoteometrySettings = {
   fingerDrawing: false,
   gestureTutorialSeen: false,
   globalThemeEnabled: true,
+  terminalCadTheme: false,
+  radialHud: false,
 };
 
 export interface ChatMessage {

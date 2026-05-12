@@ -17,6 +17,7 @@ import CanvasObjectLayer from "./CanvasObjectLayer";
 import LassoOverlay from "./LassoOverlay";
 import type { LassoBounds } from "./LassoOverlay";
 import ContextMenu from "./ContextMenu";
+import RadialHud from "./RadialHud";
 import SectionTabsBar from "./canvasNav/SectionTabsBar";
 import PagesRail from "./canvasNav/PagesRail";
 import { useCanvasNavState } from "./canvasNav/useCanvasNavState";
@@ -1608,12 +1609,21 @@ export default function NoteometryApp({
         </div>
       </div>
       {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          items={ctxMenu.items}
-          onClose={() => setCtxMenu(null)}
-        />
+        plugin.settings.radialHud ? (
+          <RadialHud
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            items={ctxMenu.items}
+            onClose={() => setCtxMenu(null)}
+          />
+        ) : (
+          <ContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            items={ctxMenu.items}
+            onClose={() => setCtxMenu(null)}
+          />
+        )
       )}
       {/* ── Floating Math Palette ── */}
       {mathPaletteOpen && (
