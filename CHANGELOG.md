@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.16.0 — 2026-05-12
+
+Three user-facing features land in parallel: a hardened save engine, an opt-in dark CAD treatment for the canvas, and a cursor-anchored radial HUD that can replace the standard right-click menu.
+
+### Why
+
+Each addresses a different failure mode in v1.15.x. The save path has had a quiet hole since v1.14.5: the recovery cache survives a tab kill, but concurrent `vault.modify` calls can still interleave, and an autosave fired against default React state before hydration can wipe a real page on disk. The canvas chrome has been document-light since v1.10; a high-density "terminal CAD" treatment was requested for night work. The right-click hub is a tall vertical list — fast on desktop, awkward on touch.
+
+### Added — Fort Knox save engine (`src/lib/persistence.ts`)
+
+- **Per-file write mutex.** Concurrent `savePageToFile` calls for the same path serialize through a `Promise` chain; saves to different files stay parallel. A failed save no longer jams the queue for that file.
+- **Anti-empty-overwrite guard.** Refuses to overwrite a non-empty on-disk page with a payload that's empty (no strokes/stamps/canvasObjects/table/text) AND carries an empty `lastSaved`. Catches the "hook fired with default state before hydration" class of bug. Legitimate Clear Canvas writes (which stamp `lastSaved` to the current time) fall through unchanged. Bypass with `{ allowEmptyOverwrite: true }` if a future caller needs to.
+- **Emergency backup on `vault.modify` failure.** A sibling `.nm-emergency-<isoStamp>.json` is written via `app.vault.adapter.write` so disk-full / permission errors leave a recoverable copy next to the page. Never auto-deleted.
+- **Shadow Ledger.** Rolling per-file ring of the last 5 successful payloads in `localStorage` under `nm:ledger:<path>`. Independent of the existing in-flight `nm:cache:<path>` lifeline — the ledger persists across normal saves so the user can still recover yesterday's content even after several clean saves landed on top.
+
+### Added — Terminal CAD theme (opt-in)
+
+- **Settings → Terminal CAD theme**. Body-class-scoped overrides (`body.nm-terminal-cad .noteometry-root`) that retune the existing `--nm-*` design tokens to dark gunmetal values. Strictly additive: only the Noteometry canvas chrome restyles; Obsidian's file explorer, command palette, and status bar are untouched. Composes cleanly with the global theme and any community theme.
+- Removed cleanly on plugin unload via `document.body.classList.remove("nm-terminal-cad")` in `onunload`.
+
+### Added — Radial HUD right-click menu (opt-in)
+
+- **Settings → Radial HUD**. `RadialHud.tsx` renders the canvas right-click menu as a cursor-anchored disc with six quick slots (Text / Math / Paste / Gemini / Image / Undo) and a "More" center button that drops to the standard list for actions not bound to a slot. Falls back to the standard list when the items array is ≤ 2 entries (e.g. stamp menus).
+- Slots resolve by display label, so a menu without a given slot's action shows a disabled affordance rather than collapsing the layout.
+
+### Tests
+- New `persistenceFortKnox.test.ts` (19 tests) pins the empty-overwrite guard, the per-file mutex, emergency-backup-on-failure, and the shadow ledger ring. Every assertion describes a failure mode the pre-v1.16 `savePageToFile` would have exhibited.
+
+### Compatibility
+- All existing `persistence.ts` exports keep their signatures. The new `opts` parameter on `savePageToFile` is purely additive and defaults to `{}`.
+- Existing settings (`globalThemeEnabled`, `autoSave`, etc.) are untouched; both new toggles default to `false`.
+- `tests/unit/persistenceFileBound.test.ts`, `persistenceRecoveryCache.test.ts`, and every other existing test still pass unchanged (585 → 604 tests).
+
 ## 1.15.0 — 2026-05-11
 
 Reshape the canvas chrome into a OneNote-style shell. Dan: "I'd rather you accomplish one goal. stop development of noteometry as we have and make it almost exactly like OneNote" / "I want it to look and operate LIKE OneNote, not ditch Noteometry."

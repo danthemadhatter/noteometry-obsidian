@@ -58,6 +58,13 @@ export default class NoteometryPlugin extends Plugin {
       applyGlobalTheme();
     }
 
+    // v1.16.0: scoped CAD treatment lives behind a body class so the
+    // styles.css block stays a single :where() opt-in instead of
+    // duplicating every rule. Removed on unload below.
+    if (this.settings.terminalCadTheme) {
+      document.body.classList.add("nm-terminal-cad");
+    }
+
     this.app.workspace.onLayoutReady(() => {
       this.detachStaleNoteometryLeaves();
       // v1.11.3+1.11.4: rescue any canvas leaves stuck in the sidebar
@@ -78,6 +85,9 @@ export default class NoteometryPlugin extends Plugin {
     // v1.11.1: clean up global theme injection so toggling the plugin
     // off restores Obsidian's normal appearance.
     removeGlobalTheme();
+    // v1.16.0: drop the CAD body class so disabling the plugin leaves
+    // Obsidian visually pristine.
+    document.body.classList.remove("nm-terminal-cad");
   }
 
   private resolveNewPageParentFolder(): string {

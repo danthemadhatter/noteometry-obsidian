@@ -4669,3 +4669,211 @@
     padding: 5px 8px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * v1.16.0 — Terminal CAD theme (opt-in)
+ *
+ * Strictly additive. Activated by adding `nm-terminal-cad` to <body>
+ * (main.ts onload, Settings toggle, or the per-page command). Everything
+ * lives behind that class so existing pages and tests stay untouched.
+ *
+ * Scope: only `.noteometry-root` and its descendants are restyled.
+ * The rest of Obsidian (file explorer, command palette, status bar) is
+ * left to whatever theme the user has installed.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+body.nm-terminal-cad .noteometry-root {
+  /* Override the same tokens the rest of the canvas chrome reads,
+     scoped to this subtree so we don't leak into other plugins. */
+  --nm-canvas-bg: #0E1116;
+  --nm-canvas-bg-edge: #0B0D11;
+  --nm-grid-color: #1B2129;
+  --nm-grid-major-color: #2A3340;
+
+  --nm-faceplate: #161B22;
+  --nm-faceplate-light: #1C232C;
+  --nm-faceplate-alt: #11161D;
+  --nm-faceplate-recessed: #0B0D11;
+
+  --nm-sidebar-bg: #0F141A;
+  --nm-chassis: #161B22;
+  --nm-chassis-light: #1C232C;
+  --nm-chassis-dark: #11161D;
+  --nm-chassis-deep: #0B0D11;
+  --nm-chassis-fg: #D4D4D8;
+
+  --nm-ink: #D4D4D8;
+  --nm-ink-muted: #71717A;
+  --nm-paper-ink: #D4D4D8;
+
+  --nm-accent: #6FB5FF;
+  --nm-accent-light: rgba(111, 181, 255, 0.16);
+  --nm-accent-hover: #88C4FF;
+
+  --nm-phosphor: #A6E22E;
+  --nm-phosphor-light: rgba(166, 226, 46, 0.18);
+
+  --nm-paper-border: #2A3340;
+  --nm-warm-border: rgba(255, 255, 255, 0.06);
+  --nm-warm-border-strong: rgba(255, 255, 255, 0.12);
+
+  --nm-dropin-border: #2A3340;
+  --nm-dropin-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+
+  --nm-gunmetal: #2A3340;
+  --nm-gunmetal-light: #3A4452;
+  --nm-gunmetal-dark: #1B2129;
+
+  --nm-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --nm-shadow-toolbar: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+
+  /* Mono-leaning typography for the "CAD" feel without forcing it
+     onto the canvas paper, which still uses the user's font for handwriting. */
+  --nm-font-display: var(--nm-font-mono);
+
+  background: var(--nm-canvas-bg-edge);
+  color: var(--nm-ink);
+}
+
+/* Tighten the canvas chrome. Each rule is its own selector so it's
+   easy to remove individually if a future redesign moves the chrome. */
+body.nm-terminal-cad .noteometry-root .nm-onenote-rail,
+body.nm-terminal-cad .noteometry-root .nm-onenote-tabs {
+  background: var(--nm-chassis-dark);
+  border-color: var(--nm-warm-border);
+}
+
+body.nm-terminal-cad .noteometry-root .nm-onenote-tab {
+  border-color: var(--nm-warm-border);
+  color: var(--nm-ink-muted);
+  font-family: var(--nm-font-mono);
+  letter-spacing: 0.02em;
+}
+
+body.nm-terminal-cad .noteometry-root .nm-onenote-tab.active {
+  background: var(--nm-faceplate-light);
+  color: var(--nm-accent);
+}
+
+/* The context menu inherits via its own rules but reads from the same
+   chassis tokens — confirm dark surfaces look right against the
+   accent. Submenu chevrons stay legible. */
+body.nm-terminal-cad .noteometry-ctx-menu {
+  background: var(--nm-faceplate);
+  border: 1px solid var(--nm-warm-border-strong);
+  color: var(--nm-ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+}
+
+body.nm-terminal-cad .noteometry-ctx-item:hover:not(.disabled) {
+  background: var(--nm-accent-light);
+  color: var(--nm-accent);
+}
+
+body.nm-terminal-cad .noteometry-ctx-item.danger {
+  color: #FF8088;
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Radial HUD — cursor-anchored context menu (opt-in)
+ *
+ * Lives in styles.css rather than its own file so the plugin still
+ * ships as a single stylesheet. Class hierarchy mirrors ContextMenu so
+ * the radial markup can be swapped in by NoteometryApp without
+ * touching the surrounding hit-test pipeline.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.noteometry-radial-hud {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.noteometry-radial-hud-disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  margin-left: -130px;
+  margin-top: -130px;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, rgba(22, 27, 34, 0.92), rgba(22, 27, 34, 0.78) 70%, rgba(22, 27, 34, 0) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.noteometry-radial-hud-item {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  margin-top: -32px;
+  border-radius: 50%;
+  background: var(--nm-faceplate, #161B22);
+  color: var(--nm-ink, #D4D4D8);
+  border: 1px solid var(--nm-warm-border-strong, rgba(255,255,255,0.12));
+  font: 600 12px/1.1 var(--nm-font-mono, monospace);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 120ms ease-out, background 120ms ease-out, color 120ms ease-out;
+}
+
+.noteometry-radial-hud-item:hover:not(:disabled) {
+  background: var(--nm-accent-light, rgba(111, 181, 255, 0.16));
+  color: var(--nm-accent, #6FB5FF);
+  transform: scale(1.06);
+}
+
+.noteometry-radial-hud-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.noteometry-radial-hud-item .nm-radial-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.noteometry-radial-hud-item .nm-radial-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.noteometry-radial-hud-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+  border-radius: 50%;
+  background: var(--nm-faceplate-recessed, #0B0D11);
+  color: var(--nm-ink-muted, #71717A);
+  border: 1px solid var(--nm-warm-border, rgba(255,255,255,0.06));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px/1.1 var(--nm-font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.noteometry-radial-hud-center:hover {
+  color: var(--nm-accent, #6FB5FF);
+  border-color: var(--nm-accent-light, rgba(111, 181, 255, 0.3));
+}

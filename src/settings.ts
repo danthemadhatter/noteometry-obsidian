@@ -222,6 +222,35 @@ export class NoteometrySettingTab extends PluginSettingTab {
           }),
       );
 
+    /* ── v1.16.0: Terminal CAD theme ─────────────────── */
+    new Setting(containerEl)
+      .setName("Terminal CAD theme (Noteometry canvas only)")
+      .setDesc(
+        "Dark gunmetal/CAD treatment for the Noteometry canvas. Scoped to the canvas chrome — does not touch the rest of Obsidian. Toggle takes effect on next page open.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.terminalCadTheme).onChange(async (v) => {
+          this.plugin.settings.terminalCadTheme = v;
+          await this.plugin.saveSettings();
+          // Re-apply body class immediately so the user can see the
+          // change without reloading. The class is read by styles.css.
+          document.body.classList.toggle("nm-terminal-cad", v);
+        }),
+      );
+
+    /* ── v1.16.0: Radial HUD ──────────────────────────── */
+    new Setting(containerEl)
+      .setName("Radial HUD right-click menu")
+      .setDesc(
+        "Render the canvas right-click menu as a cursor-anchored radial HUD instead of a vertical list. Quick actions sit at the cardinal points; the full menu opens on hold.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.radialHud).onChange(async (v) => {
+          this.plugin.settings.radialHud = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
     /* ── Finger drawing ──────────────────────────────── */
     new Setting(containerEl)
       .setName("Finger drawing")
