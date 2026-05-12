@@ -42,14 +42,23 @@ describe("isLegacyNoteometryMdContent", () => {
     expect(isLegacyNoteometryMdContent("# A note\n\nSome prose.")).toBe(false);
   });
 
-  it("returns false for plain JSON that isn't a v3 page", () => {
+  it("returns false for plain JSON that isn't a Noteometry page", () => {
     expect(isLegacyNoteometryMdContent(JSON.stringify({ foo: "bar" }))).toBe(false);
   });
 
-  it("returns false for a v2-shaped page (we only auto-convert v3)", () => {
-    // v2 pages also render, but the convert command must stay conservative
-    // so an ambiguous .md never gets renamed based on a guess.
-    expect(isLegacyNoteometryMdContent(JSON.stringify({ version: 2, strokes: [] }))).toBe(false);
+  // v1.15.1 fix #3: legacy migration was broken because v1/v2 .md files
+  // — the very files this command was written to migrate — were
+  // rejected. The convert command's job is to bring ALL legacy formats
+  // forward, not just the most recent one.
+  it("returns true for a v2-shaped page (legacy migration target)", () => {
+    expect(isLegacyNoteometryMdContent(JSON.stringify({ version: 2, strokes: [] }))).toBe(true);
+  });
+
+  it("returns true for a v1-shaped page (pre-version stroke array)", () => {
+    // Pre-versioned Noteometry pages only had a `strokes` array. We
+    // recognize them by exactly that signal — narrow enough that plain
+    // JSON like {foo: "bar"} still returns false above.
+    expect(isLegacyNoteometryMdContent(JSON.stringify({ strokes: [] }))).toBe(true);
   });
 
   it("returns false for empty or malformed input", () => {
@@ -125,6 +134,20 @@ describe("savePageToFile / loadPageFromFile", () => {
 
     const data = await loadPageFromFile(app, file);
     expect(data).toBeNull();
+  });
+
+  it("savePageToFile re-throws when app.vault.modify rejects (v1.15.1 fix #2)", async () => {
+    // Pre-fix the function swallowed errors and resolved void, which
+    // led NoteometryView.handleSaveData to clear the recovery cache for
+    // a save that never landed on disk. Caller needs the throw so it
+    // can keep the cache around for the next onLoadFile to recover.
+    const boom = new Error("ENOSPC: no space left");
+    const modify = vi.fn().mockRejectedValue(boom);
+    const app = { vault: { modify } } as any;
+    const file = { path: "Notes/full.nmpage" } as any;
+
+    await expect(savePageToFile(app, file, samplePage)).rejects.toBe(boom);
+    expect(modify).toHaveBeenCalledTimes(1);
   });
 
   it("savePageToFile → loadPageFromFile is lossless across a vault write", async () => {
@@ -240,7 +263,7 @@ describe("convertLegacyMdPagesToNmpage", () => {
     expect(fileMap["Noteometry/Foo 3.nmpage"]).toBeDefined();
   });
 
-  it("ignores .md files whose content isn't a v3 Noteometry page", async () => {
+  it("ignores .md files whose content isn't a recognizable Noteometry page", async () => {
     const v3 = JSON.stringify(packToV3(samplePage));
     const { app, fileMap } = buildVault("Noteometry", {
       "Noteometry/Foo.md": v3,
@@ -251,5 +274,32 @@ describe("convertLegacyMdPagesToNmpage", () => {
     expect(result).toEqual({ converted: 1, collisions: 0 });
     expect(fileMap["Noteometry/Notes.md"]).toBeDefined();
     expect(fileMap["Noteometry/Foo.nmpage"]).toBeDefined();
+  });
+
+  // v1.15.1 fix #3: convert v1 (raw stroke array) and v2 (version:2)
+  // .md pages alongside v3. Pre-fix these were skipped, so the only
+  // legacy pages anyone actually had on disk could never be migrated.
+  it("converts a v2-shaped legacy .md page", async () => {
+    const v2 = JSON.stringify({ version: 2, strokes: [], stamps: [], panelInput: "hi" });
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Old.md": v2,
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 0 });
+    expect(fileMap["Noteometry/Old.md"]).toBeUndefined();
+    expect(fileMap["Noteometry/Old.nmpage"]).toBeDefined();
+  });
+
+  it("converts a v1-shaped (pre-version stroke array) legacy .md page", async () => {
+    const v1 = JSON.stringify({ strokes: [] });
+    const { app, fileMap } = buildVault("Noteometry", {
+      "Noteometry/Ancient.md": v1,
+    });
+
+    const result = await convertLegacyMdPagesToNmpage(app, "Noteometry");
+    expect(result).toEqual({ converted: 1, collisions: 0 });
+    expect(fileMap["Noteometry/Ancient.md"]).toBeUndefined();
+    expect(fileMap["Noteometry/Ancient.nmpage"]).toBeDefined();
   });
 });

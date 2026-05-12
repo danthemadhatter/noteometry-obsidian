@@ -75,6 +75,17 @@ export class NoteometryView extends FileView {
   /** Called by Obsidian when the leaf's file changes — including the
    *  initial bind on open. Reads + decodes + hands off to React. */
   async onLoadFile(file: TFile): Promise<void> {
+    // v1.15.1 fix #1: flush any pending autosave for the PREVIOUS file
+    // BEFORE we reassign `lastFile`. Obsidian's onUnloadFile does run a
+    // flush, but a file can be loaded into a leaf that previously had a
+    // different file without a paired unload (e.g. when the user picks a
+    // page from the file explorer with edits still debounced). If we
+    // flipped `lastFile` first the in-flight save would target the new
+    // file's TFile and overwrite its on-disk contents with the previous
+    // file's in-memory state. Flush first → reassign → load.
+    if (this.flushMyTree && this.lastFile && this.lastFile !== file) {
+      try { await this.flushMyTree(); } catch { /* best effort */ }
+    }
     this.lastFile = file;
     let decoded = await loadPageFromFile(this.app, file);
 
@@ -147,8 +158,19 @@ export class NoteometryView extends FileView {
       cachePageDataSync(f.path, JSON.stringify(v3, null, 0));
     } catch { /* packing shouldn't throw, but don't block save if it does */ }
 
-    await savePageToFile(this.app, f, data);
-    clearPageCache(f.path);
+    // v1.15.1 fix #2: only clear the emergency recovery cache when the
+    // vault write actually succeeded. savePageToFile now re-throws on
+    // failure (it used to swallow), so without this guard a failed save
+    // would still drop the cache entry — defeating the whole point of
+    // the cache, which is to survive write failures and force-reloads.
+    try {
+      await savePageToFile(this.app, f, data);
+      clearPageCache(f.path);
+    } catch {
+      // Save failed: keep the cache entry so the next onLoadFile can
+      // recover the unsaved state. The Notice was already raised inside
+      // savePageToFile; nothing more to surface here.
+    }
   }
 
   async onOpen(): Promise<void> {

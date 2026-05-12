@@ -464,19 +464,19 @@ export default function NoteometryApp({
   }, [initialDataToken]);
 
   // Expose a setter so NoteometryView can push new initial data into this
-  // tree when Obsidian rebinds the leaf to a different file. We flush
-  // any pending save for the OLD file first, then hydrate fresh state.
+  // tree when Obsidian rebinds the leaf to a different file. The flush of
+  // the previous file's pending save is now owned by NoteometryView.onLoadFile
+  // (v1.15.1 fix #1): doing it here was a second async hop that hydrated
+  // BEFORE the flush settled, opening a race where the just-hydrated new
+  // file got clobbered by the still-pending save of the old file.
   useEffect(() => {
     registerInitialDataSetter((data: CanvasData | null, _token: number) => {
-      (async () => {
-        await flushPendingSave();
-        if (data) {
-          hydrateFromData(data);
-          setHydrated(true);
-        }
-      })();
+      if (data) {
+        hydrateFromData(data);
+        setHydrated(true);
+      }
     });
-  }, [registerInitialDataSetter, flushPendingSave, hydrateFromData]);
+  }, [registerInitialDataSetter, hydrateFromData]);
 
   const saveNow = useCallback(async () => {
     const f = fileRef.current;
