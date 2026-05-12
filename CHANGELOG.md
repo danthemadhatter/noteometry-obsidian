@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.15.1 — 2026-05-12
+
+Three persistence-correctness bugs in the file-bound IO layer. All three are narrow surgical fixes — no behavior change for the happy path, just fewer ways to lose data.
+
+### Fixed
+- **Cross-file overwrite race in `NoteometryView.onLoadFile`.** When Obsidian rebound a leaf from file A to file B with edits still debounced for A, `this.lastFile = file` flipped to B before the React tree's pending save fired. The in-flight save then targeted B's TFile and wrote A's CanvasData into it. Fix: flush the React tree's pending save BEFORE reassigning `lastFile`. Also removed the redundant async flush in `NoteometryApp`'s `registerInitialDataSetter`, which was a second async hop that re-opened the race after hydration had already started.
+- **Emergency recovery cache dropped on failed save.** `savePageToFile` swallowed `app.vault.modify` errors and resolved void, so `handleSaveData` always cleared the cache — even when the write didn't reach disk. The cache exists exactly to survive force-reloads and write failures; this regressed it into a no-op. Fix: `savePageToFile` re-throws on vault failure, and `handleSaveData` wraps it so `clearPageCache` only runs when the await actually succeeded.
+- **Legacy `.md` migration was v3-only.** `isLegacyNoteometryMdContent` strictly validated against the v3 schema, so legacy v1 (raw `{strokes:[…]}`) and v2 (`{version:2,…}`) `.md` pages — the actual files this command was written to convert — were skipped. Now recognizes v1 + v2 + v3 while still rejecting real markdown and arbitrary JSON.
+
+### Tests
+- `tests/unit/v1151PersistenceBugs.test.ts` — three describe blocks pin all three fixes:
+  1. Source-level: `onLoadFile` flushes before reassigning `lastFile`, with a `lastFile !== file` guard so the initial bind is a no-op. `NoteometryApp`'s setter no longer calls `flushPendingSave`.
+  2. Behavioral: `savePageToFile` rejects when `vault.modify` rejects. Source-level: `handleSaveData` shares one try/catch for save + clear, and the catch arm does NOT call `clearPageCache`.
+  3. Behavioral: `isLegacyNoteometryMdContent` accepts v1/v2/v3 page shapes and still rejects real markdown, plain JSON, arrays, malformed input.
+- `tests/unit/persistenceFileBound.test.ts` updated: the old "v2 returns false" / "we only auto-convert v3" assertions are flipped to assert the new contract. New `convertLegacyMdPagesToNmpage` cases cover v1 + v2 `.md` files actually getting renamed.
+- All 582 unit tests pass (the new v1151 file adds 12 cases; the persistenceFileBound suite was rewritten to match the new contract, so the net total is unchanged from v1.15.0).
+
 ## 1.15.0 — 2026-05-11
 
 Reshape the canvas chrome into a OneNote-style shell. Dan: "I'd rather you accomplish one goal. stop development of noteometry as we have and make it almost exactly like OneNote" / "I want it to look and operate LIKE OneNote, not ditch Noteometry."

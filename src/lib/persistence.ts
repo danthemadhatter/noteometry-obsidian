@@ -97,7 +97,14 @@ export async function loadPageFromFile(app: App, file: TFile): Promise<CanvasDat
   }
 }
 
-/** Serialize CanvasData (as v3) and write to the given TFile. */
+/** Serialize CanvasData (as v3) and write to the given TFile.
+ *
+ *  v1.15.1 fix #2: re-throws on vault.modify failure. Pre-fix this
+ *  swallowed every write error and resolved void, which left the caller
+ *  (NoteometryView.handleSaveData) clearing the emergency recovery
+ *  cache for a save that never made it to disk — the next reload then
+ *  had no cached copy to recover from. Surface the error so the caller
+ *  can keep the cache around when the write didn't succeed. */
 export async function savePageToFile(app: App, file: TFile, data: CanvasData): Promise<void> {
   try {
     const v3 = packToV3(data);
@@ -105,6 +112,7 @@ export async function savePageToFile(app: App, file: TFile, data: CanvasData): P
   } catch (e) {
     console.error("[Noteometry] save failed:", e);
     new Notice(`Failed to save "${file.path}" — changes may not persist (see console)`, 10000);
+    throw e;
   }
 }
 
@@ -151,14 +159,31 @@ export function clearPageCache(filePath: string): void {
   try { ls.removeItem(RECOVERY_PREFIX + filePath); } catch { /* ignore */ }
 }
 
-/** Heuristic: does a .md file's content decode as a v3 Noteometry page?
- *  Used by the "Convert legacy .md pages" command — we only rename files
- *  whose first JSON.parse yields a v3 page, so real markdown is never
- *  touched. */
+/** Heuristic: does a .md file's content decode as ANY recognizable
+ *  Noteometry page (v1, v2, or v3)?
+ *
+ *  v1.15.1 fix #3: pre-fix this only matched v3, so legacy .md pages
+ *  written by Noteometry < v1.10 — which used the raw v1 shape
+ *  (`{strokes: [...]}` with no `version` field) or v2 (`{version: 2, ...}`)
+ *  — could never be migrated. They are the entire reason the convert
+ *  command exists. Match v1/v2 alongside v3, while keeping the bar high
+ *  enough that real markdown is never touched: we require parseable JSON
+ *  PLUS at least one structural hallmark of a Noteometry page (a v3
+ *  envelope, `version === 2`, or a `strokes` array). Plain JSON like
+ *  `{"foo":"bar"}` still returns false. */
 export function isLegacyNoteometryMdContent(raw: string): boolean {
   try {
     const parsed = JSON.parse(raw);
-    return isV3Page(parsed);
+    if (isV3Page(parsed)) return true;
+    if (parsed && typeof parsed === "object") {
+      // v2: explicit version tag.
+      if ((parsed as { version?: unknown }).version === 2) return true;
+      // v1: pre-versioned shape — recognizable only by the presence of
+      // a strokes array. This is the lowest-confidence match, so we keep
+      // it narrow: the property must exist AND be an array.
+      if (Array.isArray((parsed as { strokes?: unknown }).strokes)) return true;
+    }
+    return false;
   } catch {
     return false;
   }
