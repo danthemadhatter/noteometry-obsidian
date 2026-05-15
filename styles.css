@@ -2668,8 +2668,16 @@
     font-size: 13px;
   }
 
-  /* Stack canvas + panel vertically */
-  .noteometry-split {
+  /* Stack canvas + panel vertically.
+   * v1.16.1: scoped to legacy splits that contain .noteometry-right
+   * (the v1.10-era panel). The v1.15.0 OneNote shell uses the same
+   * .noteometry-split element to hold canvas-area + .nm-onenote-rail,
+   * and stacking those vertically on iPad squashes the canvas into a
+   * sliver between the SectionTabsBar above and a full-width rail
+   * below. .nm-onenote-body must stay flex-row on all viewports — the
+   * rail is bounded (200px max) and auto-collapses on mobile via
+   * PagesRail's Platform.isMobile default. */
+  .noteometry-split:not(.nm-onenote-body) {
     flex-direction: column !important;
   }
   .noteometry-right {
@@ -2678,6 +2686,11 @@
     border-left: none !important;
     border-top: 1px solid var(--nm-warm-border-strong);
   }
+
+  /* v1.16.1: OneNote-shell shrink rules for touch devices live at
+   * the bottom of the file (after the base .nm-onenote-* rules) so
+   * source-level contract tests still match the canonical definitions
+   * first. See the "v1.16.1 touch-shell overrides" block near EOF. */
 
   /* Mobile right-pane tabs — only one pane visible at a time */
   .nm-right-tabs {
@@ -4876,4 +4889,47 @@ body.nm-terminal-cad .noteometry-ctx-item.danger {
 .noteometry-radial-hud-center:hover {
   color: var(--nm-accent, #6FB5FF);
   border-color: var(--nm-accent-light, rgba(111, 181, 255, 0.3));
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   v1.16.1 — touch-shell overrides for the OneNote shell.
+
+   The OneNote shell (v1.15.0) puts SectionTabsBar across the top and
+   PagesRail on the right inside .noteometry-split.nm-onenote-body.
+   The v1.10-era mobile rule that stacked .noteometry-split vertically
+   is now :not(.nm-onenote-body), so on iPad we keep canvas + rail
+   side-by-side. These rules just shrink the chrome so the canvas
+   actually has room on iPad portrait (~810px) and Z Fold cover (~720px).
+
+   Placed at end-of-file (after the canonical .nm-onenote-* rules) so
+   the v1.15.0 source-level contract tests that match the first
+   non-greedy occurrence still find the canonical rules first.
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 768px), (pointer: coarse) {
+  .noteometry-container .nm-onenote-tabs {
+    min-height: 32px;
+    padding: 3px 4px 0 4px;
+  }
+  .noteometry-container .nm-onenote-tab {
+    max-width: 140px;
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+  .noteometry-container .nm-onenote-tab-add {
+    width: 32px;
+    height: 32px;
+    margin-left: 2px;
+  }
+  .noteometry-container .nm-onenote-rail {
+    width: 200px;
+    min-width: 160px;
+    max-width: 240px;
+  }
+  /* Collapsed-rail handle: 44px touch target so a finger can re-open
+   * the rail from the canvas edge. */
+  .noteometry-container .nm-onenote-rail-collapsed .nm-onenote-rail-toggle {
+    width: 32px;
+    min-height: 44px;
+  }
 }
