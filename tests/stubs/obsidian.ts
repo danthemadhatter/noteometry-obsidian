@@ -18,10 +18,19 @@ export class TFile {
   basename = "";
   extension = "";
   parent: TFolder | null = null;
+  /** Mirrors Obsidian's TFile.name = `${basename}.${extension}`.
+   *  Implemented as a getter so tests that only set basename + extension
+   *  still produce a sane name without extra boilerplate. */
+  get name(): string {
+    return this.extension ? `${this.basename}.${this.extension}` : this.basename;
+  }
+  stat = { mtime: 0 };
 }
 
 export class TFolder {
   path = "";
+  name = "";
+  parent: TFolder | null = null;
   children: Array<TFile | TFolder> = [];
 }
 

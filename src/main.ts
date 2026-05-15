@@ -7,6 +7,7 @@ import {
   createNewPageFile,
   convertLegacyMdPagesToNmpage,
   findLegacyMdPages,
+  duplicateFolder,
   rootDir,
 } from "./lib/persistence";
 import { getMostRecentNmpage } from "./lib/recentPages";
@@ -51,6 +52,16 @@ export default class NoteometryPlugin extends Plugin {
       id: "noteometry-convert-legacy-md",
       name: "Noteometry: Convert legacy .md pages to .nmpage",
       callback: () => this.runConvertLegacyCommand(),
+    });
+
+    // v1.16.3: copy/paste an entire folder hierarchy so a user can reuse
+    // a semester scaffold (e.g. a 16-week course skeleton) without
+    // recreating sections by hand. Default source is the section
+    // containing the active page; default destination name is "<name> Copy".
+    this.addCommand({
+      id: "noteometry-duplicate-section",
+      name: "Noteometry: Duplicate section (folder) and its pages",
+      callback: () => this.runDuplicateSectionCommand(),
     });
 
     // v1.11.1: apply global theme if enabled.
@@ -215,6 +226,70 @@ export default class NoteometryPlugin extends Plugin {
       commands?: { executeCommandById?: (id: string) => boolean };
     }).commands;
     cmd?.executeCommandById?.("file-explorer:open");
+  }
+
+  /** v1.16.3: duplicate a section (a folder under the Noteometry root).
+   *  All .nmpage files are copied with fresh attachment IDs so editing
+   *  the copy never mutates the original's PDFs or images. Default
+   *  source = the section containing the active page; default name =
+   *  "<source> Copy". Uses `window.prompt` for the destination name —
+   *  same affordance the rest of the plugin uses for one-shot text
+   *  input. */
+  private async runDuplicateSectionCommand(): Promise<void> {
+    const active = this.app.workspace.getActiveFile();
+    let sourceFolder: TFolder | null = null;
+
+    // Walk up from the active file until we hit a folder directly under
+    // the Noteometry root — that's the "section" the user thinks of as
+    // a course folder. If no Noteometry page is open, fall back to the
+    // root folder so users can duplicate the entire Noteometry tree.
+    const root = rootDir(this).replace(/\/+$/, "");
+    if (active) {
+      let cursor: TFolder | null = active.parent;
+      while (cursor) {
+        const parentPath = cursor.parent?.path ?? "";
+        if (parentPath.replace(/\/+$/, "") === root) {
+          sourceFolder = cursor;
+          break;
+        }
+        cursor = cursor.parent;
+      }
+    }
+    if (!sourceFolder) {
+      const rootAbstract = this.app.vault.getAbstractFileByPath(root);
+      if (rootAbstract instanceof TFolder) {
+        // Use the first immediate sub-folder as a hint; if there is none,
+        // bail with a clear message rather than copying the whole root.
+        const firstChild = rootAbstract.children.find(c => c instanceof TFolder) as TFolder | undefined;
+        if (firstChild) {
+          sourceFolder = firstChild;
+        }
+      }
+    }
+    if (!sourceFolder) {
+      new Notice("Noteometry: open a page inside a section first, or create a section to duplicate.", 8000);
+      return;
+    }
+
+    const suggested = `${sourceFolder.name} Copy`;
+    const destName = window.prompt(
+      `Duplicate "${sourceFolder.name}" — what should the new section be named?`,
+      suggested,
+    );
+    if (!destName || !destName.trim()) return;
+
+    const parentPath = sourceFolder.parent?.path ?? "";
+    try {
+      const res = await duplicateFolder(this.app, sourceFolder, parentPath, destName.trim());
+      new Notice(
+        `Noteometry: duplicated "${sourceFolder.name}" → "${res.destinationPath}" ` +
+        `(${res.pages} page${res.pages === 1 ? "" : "s"}, ${res.attachments} attachment${res.attachments === 1 ? "" : "s"}).`,
+        8000,
+      );
+    } catch (e) {
+      console.error("[Noteometry] duplicate section failed:", e);
+      new Notice(`Couldn't duplicate section: ${(e as Error).message ?? e}`, 10000);
+    }
   }
 
   private async runConvertLegacyCommand(): Promise<void> {

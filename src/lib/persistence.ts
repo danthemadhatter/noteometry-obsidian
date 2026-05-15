@@ -555,10 +555,48 @@ export async function convertLegacyMdPagesToNmpage(
  * ══════════════════════════════════════════════════════════════════ */
 
 async function ensureDir(app: App, dir: string): Promise<void> {
+  if (!dir) return;
   const adapter = app.vault.adapter;
   if (!(await adapter.exists(dir))) {
     await adapter.mkdir(dir);
   }
+}
+
+/* ── v1.16.3 portable attachment paths ──────────────────────
+ * Pre-1.16.3, callers passed `f.parent?.path ?? rootDir(plugin)` which
+ * yields the empty string for pages at the vault root (parent is the
+ * vault, whose `.path` is `""`). That short-circuited the `??` fallback
+ * because `""` isn't nullish, so the attachment dir was computed as
+ * `"" + "/attachments" = "/attachments"` — a leading-slash path that
+ * desktop's FileSystemAdapter normalizes to the vault root but iOS's
+ * Capacitor adapter refuses to read. Result: PDFs and dropped images
+ * added on a MacBook never appeared on iPad. The desktop write quietly
+ * landed at `/attachments/<id>.<ext>` (sometimes outside the vault root
+ * entirely) and the iPad read came back empty.
+ *
+ * `attachmentDirFor` now folds both nuisances into one helper:
+ *   - strips a single leading slash so paths stay vault-relative
+ *   - strips trailing slashes so we never produce `foo//attachments`
+ *   - when the parent is the vault root, uses a top-level `attachments`
+ *     folder (no leading slash). Obsidian Sync, iCloud, and Syncthing
+ *     all replicate that path verbatim.
+ *
+ * Public API of saveImageBytesTo / savePdfBytesTo is unchanged. */
+export function attachmentDirFor(parentFolder: string): string {
+  const trimmed = (parentFolder ?? "")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  return trimmed ? `${trimmed}/attachments` : "attachments";
+}
+
+/** Normalize a previously-saved vault path so paths that were written
+ *  with a leading slash before v1.16.3 still resolve. Best-effort: leaves
+ *  data: URLs and absolute filesystem paths alone (the loader for those
+ *  has its own legacy branch). */
+export function normalizeVaultPath(path: string): string {
+  if (!path) return path;
+  if (path.startsWith("data:")) return path;
+  return path.replace(/^\/+/, "");
 }
 
 export async function saveImageBytesTo(
@@ -567,7 +605,7 @@ export async function saveImageBytesTo(
   imageId: string,
   base64Data: string,
 ): Promise<string> {
-  const attachDir = `${parentFolder}/attachments`;
+  const attachDir = attachmentDirFor(parentFolder);
   await ensureDir(app, attachDir);
   const raw = base64Data.replace(/^data:image\/\w+;base64,/, "");
   const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
@@ -582,19 +620,39 @@ export async function savePdfBytesTo(
   pdfId: string,
   bytes: ArrayBuffer,
 ): Promise<string> {
-  const attachDir = `${parentFolder}/attachments`;
+  const attachDir = attachmentDirFor(parentFolder);
   await ensureDir(app, attachDir);
   const vaultPath = `${attachDir}/${pdfId}.pdf`;
   await app.vault.adapter.writeBinary(vaultPath, bytes);
   return vaultPath;
 }
 
+/** Try `readBinary` at `vaultPath`, then with a leading slash stripped
+ *  (pre-v1.16.3 paths). Throws the original error if neither resolves so
+ *  callers still see "missing file" instead of a generic adapter error. */
+async function readBinaryWithLegacyFallback(
+  plugin: NoteometryPlugin,
+  vaultPath: string,
+): Promise<ArrayBuffer> {
+  const adapter = plugin.app.vault.adapter;
+  try {
+    return await adapter.readBinary(vaultPath);
+  } catch (primaryErr) {
+    const normalized = normalizeVaultPath(vaultPath);
+    if (normalized && normalized !== vaultPath) {
+      try {
+        return await adapter.readBinary(normalized);
+      } catch { /* fall through */ }
+    }
+    throw primaryErr;
+  }
+}
+
 export async function loadImageFromVault(
   plugin: NoteometryPlugin,
   vaultPath: string,
 ): Promise<string> {
-  const adapter = plugin.app.vault.adapter;
-  const buf = await adapter.readBinary(vaultPath);
+  const buf = await readBinaryWithLegacyFallback(plugin, vaultPath);
   const bytes = new Uint8Array(buf);
   let binaryStr = "";
   for (let i = 0; i < bytes.length; i++) {
@@ -608,6 +666,223 @@ export async function loadPdfFromVault(
   plugin: NoteometryPlugin,
   vaultPath: string,
 ): Promise<ArrayBuffer> {
-  const adapter = plugin.app.vault.adapter;
-  return await adapter.readBinary(vaultPath);
+  return await readBinaryWithLegacyFallback(plugin, vaultPath);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ * v1.16.3 asset migration + folder duplication
+ *
+ * `migratePageAssetsForPortability` walks a freshly loaded CanvasData
+ * and rewrites two classes of bad reference produced before v1.16.3:
+ *
+ *   1. Leading-slash vault paths ("/attachments/<id>.png"). Stripping
+ *      the slash makes the path resolvable on iOS adapters.
+ *   2. Inline data: URLs for images. We try to write the bytes to the
+ *      page's attachments folder and replace the data URL with the
+ *      portable vault path. Best-effort — if the write fails the data
+ *      URL is left in place so rendering still works on this device.
+ *
+ * The caller (NoteometryView.onLoadFile) detects whether any change
+ * occurred and triggers a save through the existing autosave so the
+ * fixed references are flushed to disk on the device that opens the
+ * file next. Once flushed, every device sees the same vault paths.
+ *
+ * `duplicateFolder` copies a folder hierarchy (sections, sub-folders,
+ * .nmpage files, and attachments) to a new destination. New attachment
+ * IDs are minted on the fly so duplicating "Course A" → "Course B"
+ * keeps each course's attachments isolated. Used by the "Duplicate
+ * section" command and the section context menu.
+ * ══════════════════════════════════════════════════════════════════ */
+
+export interface AssetMigrationResult {
+  /** True when any reference was rewritten. The caller should re-save. */
+  changed: boolean;
+  /** Count of leading-slash paths normalized. */
+  normalized: number;
+  /** Count of inline data: URLs replaced with vault paths. */
+  inlined: number;
+}
+
+export async function migratePageAssetsForPortability(
+  app: App,
+  file: TFile,
+  data: CanvasData,
+): Promise<AssetMigrationResult> {
+  const result: AssetMigrationResult = { changed: false, normalized: 0, inlined: 0 };
+  if (!data || !Array.isArray(data.canvasObjects)) return result;
+  const parentFolder = file.parent?.path ?? "";
+
+  for (const obj of data.canvasObjects) {
+    if (obj.type === "image") {
+      const src = obj.dataURL;
+      if (typeof src !== "string" || !src) continue;
+      if (src.startsWith("data:image/")) {
+        try {
+          const newId = obj.id || crypto.randomUUID();
+          const newPath = await saveImageBytesTo(app, parentFolder, newId, src);
+          obj.dataURL = newPath;
+          result.inlined += 1;
+          result.changed = true;
+        } catch (e) {
+          console.warn("[Noteometry] migrate: image inline → vault failed:", e);
+        }
+      } else if (src.startsWith("/")) {
+        obj.dataURL = normalizeVaultPath(src);
+        result.normalized += 1;
+        result.changed = true;
+      }
+    } else if (obj.type === "pdf") {
+      const ref = obj.fileRef;
+      if (typeof ref !== "string" || !ref) continue;
+      if (ref.startsWith("/")) {
+        obj.fileRef = normalizeVaultPath(ref);
+        result.normalized += 1;
+        result.changed = true;
+      }
+      // We deliberately don't migrate data: PDF URLs here. Pre-1.16
+      // never wrote PDFs as data URLs (savePdfBytesTo has always taken
+      // an ArrayBuffer), so a data:application/pdf would only appear in
+      // a hand-edited file — out of scope.
+    }
+  }
+  return result;
+}
+
+/* ── Folder duplication ────────────────────────────────────────────
+ * A section in Noteometry is just a folder under `rootDir(plugin)`. To
+ * duplicate "Fall 2025 ELEN201" into "Spring 2026 ELEN201" we copy the
+ * folder tree verbatim and rename attachments to fresh IDs so the
+ * duplicate doesn't share attachment files with the original. (Editing
+ * a PDF in the copy would otherwise mutate the original's bytes too —
+ * Obsidian's vault.copy reuses the same TFile reference.)
+ *
+ * The implementation is intentionally narrow: it copies one folder
+ * subtree to a sibling path. Cross-folder moves and partial copies are
+ * out of scope.
+ *
+ * Returns the number of pages and attachments copied so the caller can
+ * surface a Notice. Throws on a name collision or unreadable source so
+ * the caller can present a clear error.
+ * ────────────────────────────────────────────────────────────────── */
+
+export interface FolderCopyResult {
+  destinationPath: string;
+  pages: number;
+  attachments: number;
+}
+
+async function readSourceBytes(app: App, path: string): Promise<ArrayBuffer> {
+  return await app.vault.adapter.readBinary(path);
+}
+
+async function writeDestBytes(app: App, path: string, bytes: ArrayBuffer): Promise<void> {
+  await app.vault.adapter.writeBinary(path, bytes);
+}
+
+export async function duplicateFolder(
+  app: App,
+  source: TFolder,
+  destinationParentPath: string,
+  destinationName: string,
+): Promise<FolderCopyResult> {
+  const parent = destinationParentPath.replace(/\/+$/, "");
+  const destPath = parent ? `${parent}/${destinationName}` : destinationName;
+  if (app.vault.getAbstractFileByPath(destPath)) {
+    throw new Error(`A folder named "${destinationName}" already exists at "${parent || "(root)"}".`);
+  }
+  await app.vault.createFolder(destPath);
+
+  // Plan: walk the source tree. For every sub-folder, mkdir at the
+  // mirrored destination path. For every .nmpage, parse it, rewrite
+  // attachment refs to fresh IDs, copy the bytes of each referenced
+  // attachment to the mirror under `<destFolder>/attachments/<newId>.<ext>`,
+  // then write the rewritten .nmpage. For every non-.nmpage file
+  // (including attachments), copy bytes verbatim — we only rewrite IDs
+  // for attachments that are referenced from a .nmpage.
+
+  const result: FolderCopyResult = { destinationPath: destPath, pages: 0, attachments: 0 };
+
+  const walk = async (srcFolder: TFolder, dstFolderPath: string): Promise<void> => {
+    for (const child of srcFolder.children) {
+      if (child instanceof TFolder) {
+        // Attachments folders are copied alongside their .nmpage parent
+        // via the page's rewritten refs. Skip the literal copy here to
+        // avoid duplicating bytes; the inner walk handles non-page files.
+        const subDst = `${dstFolderPath}/${child.name}`;
+        if (!app.vault.getAbstractFileByPath(subDst)) {
+          await app.vault.createFolder(subDst);
+        }
+        await walk(child, subDst);
+      } else if (child instanceof TFile) {
+        if (child.extension === "nmpage") {
+          await copyPageWithFreshAttachments(app, child, dstFolderPath, result);
+        } else if (child.parent?.name === "attachments") {
+          // Skipped here — referenced attachments were copied via the
+          // page rewrite. Unreferenced attachments are orphans and
+          // intentionally NOT copied (they're the cost of cleanup).
+        } else {
+          // Plain non-page file in the folder (rare for Noteometry but
+          // possible — a README, a stray image). Copy bytes verbatim.
+          const bytes = await readSourceBytes(app, child.path);
+          await writeDestBytes(app, `${dstFolderPath}/${child.name}`, bytes);
+        }
+      }
+    }
+  };
+
+  await walk(source, destPath);
+  return result;
+}
+
+async function copyPageWithFreshAttachments(
+  app: App,
+  page: TFile,
+  dstFolderPath: string,
+  result: FolderCopyResult,
+): Promise<void> {
+  const raw = await app.vault.read(page);
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { parsed = null; }
+
+  if (!isV3Page(parsed)) {
+    // Unknown / unparseable page — copy bytes verbatim so we don't lose
+    // user data.
+    await writeDestBytes(app, `${dstFolderPath}/${page.name}`, await readSourceBytes(app, page.path));
+    result.pages += 1;
+    return;
+  }
+
+  const v3 = parsed;
+  // For each image/pdf element, copy the bytes to a fresh attachment
+  // path in the destination and rewrite the fileRef.
+  for (const el of v3.elements) {
+    if (el.type === "image" || el.type === "pdf") {
+      const oldRef = el.fileRef;
+      if (!oldRef || typeof oldRef !== "string" || oldRef.startsWith("data:")) continue;
+      const sourcePath = normalizeVaultPath(oldRef);
+      try {
+        const bytes = await app.vault.adapter.readBinary(sourcePath);
+        const newId = crypto.randomUUID();
+        const ext = el.type === "pdf" ? "pdf" : "png";
+        const attachDir = attachmentDirFor(dstFolderPath);
+        await ensureDir(app, attachDir);
+        const newRef = `${attachDir}/${newId}.${ext}`;
+        await app.vault.adapter.writeBinary(newRef, bytes);
+        el.fileRef = newRef;
+        result.attachments += 1;
+      } catch (e) {
+        // If the source attachment is missing on this device (e.g. not
+        // yet synced), keep the original ref so the duplicate at least
+        // matches the original. The user will see "MISSING" until the
+        // file syncs in, same as the original.
+        console.warn(`[Noteometry] duplicate: attachment copy failed for ${oldRef}:`, e);
+      }
+    }
+  }
+
+  await app.vault.adapter.write(
+    `${dstFolderPath}/${page.name}`,
+    JSON.stringify(v3, null, 0),
+  );
+  result.pages += 1;
 }
