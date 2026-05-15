@@ -4921,15 +4921,54 @@ body.nm-terminal-cad .noteometry-ctx-item.danger {
     height: 32px;
     margin-left: 2px;
   }
-  .noteometry-container .nm-onenote-rail {
-    width: 200px;
-    min-width: 160px;
-    max-width: 240px;
+
+  /* v1.16.2: rail overlays the canvas on touch instead of consuming a
+   * flex column. v1.16.1 collapsed the rail by default but the rail
+   * (collapsed or not) was still a flex sibling of canvas-area, so it
+   * reserved its own width and left a blank strip / cut-off canvas to
+   * its left. On touch we anchor the rail to the right edge of the
+   * .nm-onenote-body and let canvas-area take the full row width.
+   * Desktop stays unchanged (this whole block is gated on
+   * pointer:coarse / max-width:768px). */
+  .noteometry-container .noteometry-split.nm-onenote-body {
+    position: relative;
   }
-  /* Collapsed-rail handle: 44px touch target so a finger can re-open
-   * the rail from the canvas edge. */
+  .noteometry-container .nm-onenote-rail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 240px;
+    min-width: 160px;
+    max-width: 280px;
+    z-index: 35;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.18);
+  }
+  /* Collapsed: float a compact handle on the right edge, no background
+   * stripe, no flex column. The handle is the only pointer target —
+   * everything to its left is canvas. */
+  .noteometry-container .nm-onenote-rail-collapsed {
+    position: absolute;
+    top: 8px;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    box-shadow: none;
+    background: transparent;
+    border-left: none;
+    pointer-events: none;
+  }
   .noteometry-container .nm-onenote-rail-collapsed .nm-onenote-rail-toggle {
-    width: 32px;
+    width: 28px;
     min-height: 44px;
+    pointer-events: auto;
+    background: var(--nm-faceplate, var(--background-secondary-alt));
+    border: 1px solid var(--nm-paper-border, var(--background-modifier-border));
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    box-shadow: -2px 0 6px rgba(0, 0, 0, 0.15);
   }
 }
