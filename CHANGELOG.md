@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.16.2 — 2026-05-15
+
+Mobile / iPad layout follow-up to v1.16.1. Dan reported v1.16.1 was much better but a "persistent blank column on the right side" still cut the canvas off — the PagesRail was no longer stacked beneath the canvas, but it was still a flex sibling of `.noteometry-canvas-area`, so it reserved its own width on the right whether expanded or collapsed.
+
+### Why
+
+v1.16.1 fixed the *direction* of the split (row, not column) and auto-collapsed the rail on `Platform.isMobile`, but the rail was still in-flow:
+
+- **Expanded:** rail consumed 200–240px of flex width → canvas appeared "cut off."
+- **Collapsed:** rail consumed the natural width of the chevron handle plus its padding → blank strip on the right edge of the canvas.
+
+The architectural fix is to take the rail out of flex flow on touch and overlay it on the canvas instead.
+
+### Fixed
+
+- **Touch rail is now `position: absolute` against `.nm-onenote-body`.** On `pointer: coarse` / `max-width: 768px`, `.nm-onenote-body` becomes a positioning context and the rail anchors to its right edge (`top:0; right:0; bottom:0`). Canvas-area gets the full row width.
+- **Expanded rail overlays the canvas** with a subtle left-edge shadow so it reads as a slide-out drawer rather than a column.
+- **Collapsed rail is now a compact 28×44px floating handle**, `pointer-events: none` on the wrapper with `pointer-events: auto` restored on the toggle, so the entire canvas except the handle stays drawable.
+- **Desktop unchanged** — the whole block is inside the existing `@media (max-width: 768px), (pointer: coarse)` touch-shell scope. Desktop renders the rail as the flex column it has been since v1.15.0.
+
+### Tests
+- New `tests/unit/v1162MobileRailOverlay.test.ts` pins four CSS invariants: positioning context on `.nm-onenote-body`, absolute rail, absolute collapsed-rail with `pointer-events` flip, and the touch-only media-query scope.
+- All existing v1.16.1 mobile-layout tests still pass — the new rules are additive, not replacements.
+
+### Compatibility
+- No API or settings change. Same `Platform.isMobile` runtime gate for the auto-collapsed default. Terminal CAD theme and Radial HUD continue to default off.
+
 ## 1.16.1 — 2026-05-15
 
 iPad / mobile layout regression fix. Dan reported v1.16.0 was unusable on iPad — the canvas was squashed to a sliver and the chrome was "super messed up." Two pieces of the v1.15.0 OneNote shell didn't survive contact with touch devices.
