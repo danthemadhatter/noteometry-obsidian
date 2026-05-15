@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.16.1 — 2026-05-15
+
+iPad / mobile layout regression fix. Dan reported v1.16.0 was unusable on iPad — the canvas was squashed to a sliver and the chrome was "super messed up." Two pieces of the v1.15.0 OneNote shell didn't survive contact with touch devices.
+
+### Why
+
+Two interacting bugs:
+
+1. **Legacy split-stack rule.** The v1.10-era mobile rule `.noteometry-split { flex-direction: column !important }` was written when `.noteometry-split` held the canvas-area plus the (long-deleted) `.noteometry-right` panel. v1.15.0 reused the same element for canvas-area + PagesRail. On iPad — which matches `@media (pointer: coarse)` regardless of viewport width — that `!important` overrode the row layout, the 240px-wide PagesRail collapsed into a full-width row beneath the canvas, and the canvas viewport ended up as a thin band between the SectionTabsBar above and the rail below.
+2. **PagesRail not auto-collapsing on touch.** Even with the row layout restored, a 200px+ rail next to a SectionTabsBar leaves an iPad portrait canvas (~600px usable after Obsidian's own chrome) cramped. Users had no idea the rail was collapsible.
+
+### Fixed
+
+- **Scoped the legacy split-stack rule to `:not(.nm-onenote-body)`** so the OneNote shell stays flex-row on every viewport while the (still-defined-but-unused) `.noteometry-right` path keeps its v1.10-era stacking. Same media query, same `!important`, just no longer firing on the new shell.
+- **PagesRail defaults to collapsed on `Platform.isMobile`.** Matches the existing pattern used for the Tools FAB — runtime check reliable inside Obsidian's webview where pointer-media queries misfire when a paired Apple Pencil reports as fine pointer. Users can re-open the rail explicitly via the handle on the canvas edge.
+- **Tighter touch-shell sizing.** Section tabs cap at 140px / 12px font, rail width caps at 200/240px, collapsed-rail toggle gets a 44px touch target. Rules scoped under `.noteometry-container` and placed after the canonical `.nm-onenote-*` definitions so source-level contract tests still match the canonical rules first.
+
+### Tests
+- New `tests/unit/v1161MobileLayout.test.ts` pins both halves of the fix: the `:not(.nm-onenote-body)` scoping and PagesRail's `Platform.isMobile` default.
+- All 587 (+3 new = 590) existing tests pass.
+
+### Compatibility
+- No API or settings change. Desktop behaviour is identical (the `:not(.nm-onenote-body)` guard only narrows when the rule applies; it never widens). Terminal CAD theme and Radial HUD continue to default off.
+
 ## 1.16.0 — 2026-05-12
 
 Three user-facing features land in parallel: a hardened save engine, an opt-in dark CAD treatment for the canvas, and a cursor-anchored radial HUD that can replace the standard right-click menu.

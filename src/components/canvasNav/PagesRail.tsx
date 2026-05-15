@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
+import { Platform } from "obsidian";
 import { CanvasNavState } from "./useCanvasNavState";
 
 interface Props {
@@ -20,7 +21,14 @@ export default function PagesRail({ nav }: Props) {
     setRenameValue, commitRename, cancelRename,
   } = nav;
 
-  const [collapsed, setCollapsed] = useState(false);
+  // v1.16.1: default to collapsed on mobile/iPad. The expanded rail is
+  // 200px+ wide which on iPad portrait leaves the canvas as a sliver
+  // between the SectionTabsBar and the rail. Users can still expand it
+  // explicitly via the handle. Same Platform.isMobile gate the Tools FAB
+  // uses in NoteometryApp — reliable inside Obsidian's webview where
+  // CSS media queries misfire when a paired Apple Pencil reports as a
+  // fine pointer.
+  const [collapsed, setCollapsed] = useState<boolean>(() => Platform.isMobile);
   const listRef = useRef<HTMLUListElement | null>(null);
 
   const onPagesKeyDown = useCallback((e: React.KeyboardEvent<HTMLUListElement>) => {
