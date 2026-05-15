@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.16.3 — 2026-05-15
+
+Cross-device asset persistence + folder duplication. Dan reported two follow-ups after v1.16.2: PDFs / drawings / drop-ins added on MacBook Pro never appeared on iPad, and there was no way to clone a 16-week course scaffold for a new semester without recreating it by hand.
+
+### Fixed — Cross-device assets sync
+
+**Root cause.** Pre-1.16.3, attachment files were written to a leading-slash path (`/attachments/<id>.png`) whenever the .nmpage lived at the vault root. The React-side caller passed `f.parent?.path ?? rootDir(plugin)`; `parent.path` is the empty string for vault-root files, which is not nullish, so the `??` fallback never fired and the attachment dir became `"" + "/attachments"`. Desktop's Node FileSystemAdapter silently normalized the leading slash, so the bytes landed *somewhere*; iOS's Capacitor adapter rejected the read, so the iPad rendered a "MISSING" placeholder for every PDF and image. Secondary bug: when a vault write failed transiently, the in-memory image kept its `data:` URL and the next save serialized that URL as the page's image fileRef — bloating the page and locking the asset to the desktop session that produced it.
+
+**Fix.**
+- `attachmentDirFor(parentFolder)` is now the single source of truth for the per-page attachments path. Strips leading and trailing slashes, returns a vault-relative `"attachments"` when the parent is the vault root, and produces `"<parent>/attachments"` otherwise. `saveImageBytesTo` and `savePdfBytesTo` route through it.
+- `normalizeVaultPath` + a legacy-fallback read path mean pre-1.16.3 leading-slash refs still resolve on the iPad, even before they're migrated.
+- `migratePageAssetsForPortability` runs once on `onLoadFile`. Leading-slash references are rewritten to vault-relative form; inline `data:image/...` URLs are saved into the page's attachments folder and the reference is rewritten to point at the new vault path. Both rewrites trigger an autosave so the fixed references replicate through Obsidian Sync / iCloud / Syncthing on the next sync tick. The migration is non-destructive: per-object errors are swallowed so a broken vault write can't block opening the page.
+
+### Added — Duplicate section (folder) command
+
+- New command **Noteometry: Duplicate section (folder) and its pages** (id: `noteometry-duplicate-section`).
+- Copies the section containing the active page to a sibling folder under the same parent. Attachments are duplicated with fresh IDs so editing the copy never mutates the original's PDF or image bytes. Pages that point at missing attachments are still copied (their refs survive); the destination renders the same "MISSING" placeholders as the source would on a not-yet-synced device.
+- Default destination name is `<source> Copy`; a `window.prompt` lets users override it. Name collisions surface as a clear error rather than silently merging.
+
+### Tests
+- New `tests/unit/portableAssetPaths.test.ts` pins `attachmentDirFor`, `normalizeVaultPath`, `saveImageBytesTo` / `savePdfBytesTo` portable-path output, and every `migratePageAssetsForPortability` migration branch (normalize-only, inline-only, no-op when clean, best-effort on write failure).
+- New `tests/unit/duplicateFolder.test.ts` pins folder duplication: empty folder, page-with-attachments with fresh-ID rewrite, and the collision error.
+- All 610 existing unit tests still pass.
+
+### Compatibility
+- No API or settings change. Existing pages with leading-slash refs continue to load via the fallback read path; they're rewritten transparently on the next open.
+- The duplicate-section command is purely additive; users who don't run it see no behavior change.
+
 ## 1.16.2 — 2026-05-15
 
 Mobile / iPad layout follow-up to v1.16.1. Dan reported v1.16.1 was much better but a "persistent blank column on the right side" still cut the canvas off — the PagesRail was no longer stacked beneath the canvas, but it was still a flex sibling of `.noteometry-canvas-area`, so it reserved its own width on the right whether expanded or collapsed.

@@ -13,6 +13,7 @@ import {
   cachePageDataSync,
   getCachedPageData,
   clearPageCache,
+  migratePageAssetsForPortability,
 } from "./lib/persistence";
 import type NoteometryPlugin from "./main";
 
@@ -106,6 +107,42 @@ export class NoteometryView extends FileView {
     }
 
     this.currentData = decoded ?? { ...EMPTY_PAGE };
+
+    // v1.16.3: migrate any pre-1.16.3 non-portable asset references
+    // (leading-slash vault paths, inline data: URLs for images) into the
+    // canonical vault-relative form so the same page renders on every
+    // device. If anything actually changed, kick off a save so the fix
+    // lands on disk; otherwise the file we read earlier is byte-identical
+    // to what we'd write back and we skip the I/O. Failures here MUST
+    // not block opening the page — `migratePageAssetsForPortability`
+    // already absorbs per-object errors, but wrap the whole thing in a
+    // try/catch as belt-and-braces.
+    try {
+      const migration = await migratePageAssetsForPortability(
+        this.app, file, this.currentData,
+      );
+      if (migration.changed) {
+        const parts: string[] = [];
+        if (migration.inlined > 0) parts.push(`${migration.inlined} inline image${migration.inlined === 1 ? "" : "s"}`);
+        if (migration.normalized > 0) parts.push(`${migration.normalized} attachment path${migration.normalized === 1 ? "" : "s"}`);
+        if (parts.length > 0) {
+          new Notice(
+            `Noteometry: migrated ${parts.join(" + ")} in "${file.basename}" so they sync across devices. Saving…`,
+            8000,
+          );
+        }
+        // Persist the rewritten references. We deliberately use
+        // savePageToFile directly here — the React tree may not have
+        // mounted yet, so the autosave path through onSaveData isn't
+        // wired up.
+        const fresh = { ...this.currentData, lastSaved: new Date().toISOString() };
+        await savePageToFile(this.app, file, fresh);
+        this.currentData = fresh;
+      }
+    } catch (e) {
+      console.warn("[Noteometry] asset migration skipped:", e);
+    }
+
     this.dataToken += 1;
     if (this.reactSetInitialData) {
       this.reactSetInitialData(this.currentData, this.dataToken);
